@@ -401,7 +401,8 @@ TEST_F(MultiSessionTest, MultiSessionRunnerDirRecreatedSucceeds) {
         "Create the watched directory -> an empty manifest should be "
         "streamed.");
     EXPECT_OK(path::CreateDirRec(test_dir_path_));
-    EXPECT_TRUE(WaitForManifestUpdated(4));
+    // The first update is always the empty manifest, wait for the second one.
+    EXPECT_TRUE(WaitForManifestUpdated(5));
     ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
     CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
         GetManifestUpdateData(metrics::UpdateTrigger::kRunningUpdateAll,
@@ -412,7 +413,7 @@ TEST_F(MultiSessionTest, MultiSessionRunnerDirRecreatedSucceeds) {
     SCOPED_TRACE("Create 'new_file.txt' -> new manifest should be created.");
     EXPECT_OK(path::WriteFile(path::Join(test_dir_path_, "new_file.txt"), kData,
                               kDataSize));
-    ASSERT_TRUE(WaitForManifestUpdated(5));
+    ASSERT_TRUE(WaitForManifestUpdated(6));
     ASSERT_NO_FATAL_FAILURE(
         ExpectManifestEquals({"new_file.txt"}, runner.ManifestId()));
     CheckManifestUpdateRecorded(

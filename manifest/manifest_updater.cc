@@ -104,49 +104,49 @@ void AssetInfo::AppendMoveChunks(RepeatedChunkRefProto* list,
 // Common fields for tasks that fill in manifest data.
 class ManifestTask : public Task {
  public:
-  ManifestTask(std::string src_dir, std::string relative_unix_path,
-               std::string filename)
-      : src_dir_(std::move(src_dir)),
-        rel_unix_path_(std::move(relative_unix_path)),
-        filename_(std::move(filename)) {}
+  ManifestTask(std::string src_dir, PendingAsset asset)
+      : src_dir_(std::move(src_dir)), asset_(std::move(asset)) {}
 
   // Relative unix path of the directory containing the file or directory for
   // this task.
-  const std::string& RelativeUnixPath() const { return rel_unix_path_; }
+  const std::string& RelativeUnixPath() const { return asset_.relative_path; }
 
   // Relative unix path of the file or directory for this task.
   std::string RelativeUnixFilePath() const {
-    return path::JoinUnix(rel_unix_path_, filename_);
+    return path::JoinUnix(RelativeUnixPath(), Filename());
   }
 
   // Name of the file or directory to process with this task.
-  const std::string& Filename() const { return filename_; }
+  const std::string& Filename() const { return asset_.filename; }
 
   // Full path of the file or directory to process with this task.
   std::string FilePath() const {
-    return path::Join(src_dir_, path::ToNative(rel_unix_path_), filename_);
+    return path::Join(src_dir_, path::ToNative(RelativeUnixPath()),
+                      asset_.filename);
   }
 
   // Returns the final status of the task.
   // Should not be accessed before the task is finished.
   const absl::Status& Status() const { return status_; }
 
+  // Returns whether or not this asset is explicitly prioritized.
+  bool Prioritized() const { return asset_.prioritized; }
+
+  // Returns the pending asset's deadline.
+  absl::Time Deadline() const { return asset_.deadline; }
+
  protected:
   const std::string src_dir_;
-  const std::string rel_unix_path_;
-  const std::string filename_;
-
+  const PendingAsset asset_;
   absl::Status status_;
 };
 
 // ThreadPool task that runs the CDC chunker on a given file.
 class FileChunkerTask : public ManifestTask {
  public:
-  FileChunkerTask(std::string src_dir, std::string relative_path,
-                  std::string filename, const fastcdc::Config* cfg,
-                  Buffer buffer)
-      : ManifestTask(std::move(src_dir), std::move(relative_path),
-                     std::move(filename)),
+  FileChunkerTask(std::string src_dir, PendingAsset asset,
+                  const fastcdc::Config* cfg, Buffer buffer)
+      : ManifestTask(std::move(src_dir), std::move(asset)),
         cfg_(cfg),
         buffer_(std::move(buffer)) {
     assert(cfg_->max_size > 0);
@@ -223,11 +223,9 @@ class FileChunkerTask : public ManifestTask {
 // ThreadPool task that creates assets for the contents of a directory.
 class DirScannerTask : public ManifestTask {
  public:
-  DirScannerTask(std::string src_dir, std::string relative_path,
-                 std::string filename, AssetBuilder dir,
+  DirScannerTask(std::string src_dir, PendingAsset asset, AssetBuilder dir,
                  DataStoreReader* data_store)
-      : ManifestTask(std::move(src_dir), std::move(relative_path),
-                     std::move(filename)),
+      : ManifestTask(std::move(src_dir), std::move(asset)),
         dir_(dir),
         data_store_(data_store) {}
 
@@ -419,15 +417,16 @@ absl::Status ManifestUpdater::IsValidDir(std::string dir) {
 }
 
 ManifestUpdater::ManifestUpdater(DataStoreWriter* data_store, UpdaterConfig cfg)
-    : data_store_(data_store), cfg_(std::move(cfg)) {
+    : data_store_(data_store),
+      cfg_(std::move(cfg)),
+      queue_(kMinAssetProcessingTime) {
   path::EnsureEndsWithPathSeparator(&cfg_.src_dir);
 }
 
 ManifestUpdater::~ManifestUpdater() = default;
 
 absl::Status ManifestUpdater::UpdateAll(
-    FileChunkMap* file_chunks,
-    PushIntermediateManifest push_intermediate_manifest) {
+    FileChunkMap* file_chunks, PushManifestHandler push_manifest_handler) {
   RETURN_IF_ERROR(ManifestUpdater::IsValidDir(cfg_.src_dir));
 
   // Don't use the Windows localized time from path::GetStats.
@@ -441,9 +440,8 @@ absl::Status ManifestUpdater::UpdateAll(
 
   std::vector<Operation> operations{{Operator::kAdd, std::move(ri)}};
 
-  absl::Status status =
-      Update(&operations, file_chunks, push_intermediate_manifest,
-             /*recursive=*/true);
+  absl::Status status = Update(&operations, file_chunks, push_manifest_handler,
+                               /*recursive=*/true);
 
   if (status.ok() || !absl::IsUnavailable(status)) return status;
 
@@ -456,7 +454,7 @@ absl::Status ManifestUpdater::UpdateAll(
   RETURN_IF_ERROR(data_store_->Wipe());
   file_chunks->Clear();
 
-  RETURN_IF_ERROR(Update(&operations, file_chunks, push_intermediate_manifest,
+  RETURN_IF_ERROR(Update(&operations, file_chunks, push_manifest_handler,
                          /*recursive=*/true),
                   "Failed to build manifest from scratch");
 
@@ -495,29 +493,98 @@ ContentIdProto ManifestUpdater::DefaultManifestId() {
   return manifest_id_;
 }
 
-size_t ManifestUpdater::QueueTasks(Threadpool* pool,
-                                   const fastcdc::Config* cdc_cfg,
-                                   ManifestBuilder* manifest_builder) {
-  const size_t max_tasks_queued = MaxQueuedTasks(*pool);
-  size_t num_tasks_queued = 0;
-  while (pool->NumQueuedTasks() < max_tasks_queued && !queue_.empty() &&
-         !buffers_.empty()) {
-    PendingAsset asset = std::move(queue_.front());
-    absl::StatusOr<AssetBuilder> dir;
-    queue_.pop_front();
+absl::Status ManifestUpdater::FlushAndPushManifest(
+    FileChunkMap* file_chunks,
+    std::unordered_set<ContentIdProto>* manifest_content_ids,
+    PushManifestHandler push_manifest_handler) {
+  file_chunks->FlushUpdates();
+  ASSIGN_OR_RETURN(manifest_id_, manifest_builder_->Flush(),
+                   "Failed to flush intermediate manifest");
+  // Add all content IDs that were just written back.
+  manifest_content_ids->insert(manifest_builder_->FlushedContentIds().begin(),
+                               manifest_builder_->FlushedContentIds().end());
+  if (push_manifest_handler) push_manifest_handler(manifest_id_);
+  last_manifest_flush_ = absl::Now();
+  return absl::OkStatus();
+}
 
+bool ManifestUpdater::WantManifestFlushed(
+    PushManifestHandler push_manifest_handler) const {
+  return push_manifest_handler && flush_deadline_ < absl::Now() &&
+         last_manifest_flush_ + kMinDelayBetweenFlush < absl::Now();
+}
+
+absl::Status ManifestUpdater::MaybeFlushAndPushManifest(
+    size_t dir_scanner_tasks_queued, FileChunkMap* file_chunks,
+    std::unordered_set<ContentIdProto>* manifest_content_ids,
+    PushManifestHandler push_manifest_handler) {
+  // Flush only if there are no DirScannerTask active.
+  if (dir_scanner_tasks_queued == 0 &&
+      WantManifestFlushed(push_manifest_handler)) {
+    flush_deadline_ = absl::InfiniteFuture();
+    return FlushAndPushManifest(file_chunks, manifest_content_ids,
+                                push_manifest_handler);
+  }
+  return absl::OkStatus();
+}
+
+void ManifestUpdater::AddPriorityAssets(std::vector<std::string> rel_paths) {
+  absl::MutexLock lock(&priority_mutex_);
+  absl::Time now = absl::Now();
+  for (std::string& rel_path : rel_paths) {
+    priority_assets_.push_back(PriorityAsset{std::move(rel_path), now});
+  }
+}
+
+void ManifestUpdater::PrioritizeQueuedAssets() {
+  std::vector<PriorityAsset> prio_assets;
+  {
+    absl::MutexLock lock(&priority_mutex_);
+    if (priority_assets_.empty()) return;
+    std::swap(prio_assets, priority_assets_);
+  }
+
+  absl::Time deadline = queue_.Prioritize(prio_assets, manifest_builder_.get());
+  if (deadline < flush_deadline_) flush_deadline_ = deadline;
+}
+
+ManifestUpdater::QueueTasksResult ManifestUpdater::QueueTasks(
+    bool drain_dir_scanner_tasks, Threadpool* pool,
+    const fastcdc::Config* cdc_cfg) {
+  // Prioritize requested assets before queuing new tasks.
+  PrioritizeQueuedAssets();
+  const size_t max_tasks_queued = MaxQueuedTasks(*pool);
+  size_t file_chunker_tasks = 0, dir_scanner_tasks = 0;
+
+  // Skip DIRECTORY assets if we should drain DirScannerTasks.
+  PendingAssetsQueue::AcceptFunc accept = nullptr;
+  if (drain_dir_scanner_tasks) {
+    accept = [](const PendingAsset& p) {
+      return p.type != AssetProto::DIRECTORY;
+    };
+  }
+
+  absl::StatusOr<AssetBuilder> dir;
+  PendingAsset asset;
+
+  while (pool->NumQueuedTasks() < max_tasks_queued && !buffers_.empty() &&
+         queue_.Dequeue(&asset, accept)) {
     switch (asset.type) {
       case AssetProto::FILE:
         pool->QueueTask(std::make_unique<FileChunkerTask>(
-            cfg_.src_dir, std::move(asset.relative_path),
-            std::move(asset.filename), cdc_cfg, std::move(buffers_.back())));
+            cfg_.src_dir, std::move(asset), cdc_cfg,
+            std::move(buffers_.back())));
         buffers_.pop_back();
+        ++file_chunker_tasks;
         break;
 
       case AssetProto::DIRECTORY:
-        dir = manifest_builder->GetOrCreateAsset(
+        // Flushing the manifest may invalidate the pointers to the directory
+        // proto returned from GetOrCreateAsset(), so the manifest cannot be
+        // flushed as long as DirScannerTask are in the queue.
+        dir = manifest_builder_->GetOrCreateAsset(
             path::JoinUnix(asset.relative_path, asset.filename),
-            AssetProto::DIRECTORY, true);
+            AssetProto::DIRECTORY, /*force_create=*/true);
         if (!dir.ok()) {
           LOG_ERROR(
               "Failed to locate directory '%s' in the manifest, skipping it: "
@@ -526,8 +593,9 @@ size_t ManifestUpdater::QueueTasks(Threadpool* pool,
           continue;
         }
         pool->QueueTask(std::make_unique<DirScannerTask>(
-            cfg_.src_dir, std::move(asset.relative_path),
-            std::move(asset.filename), std::move(dir.value()), data_store_));
+            cfg_.src_dir, std::move(asset), std::move(dir.value()),
+            data_store_));
+        ++dir_scanner_tasks;
         break;
 
       default:
@@ -535,15 +603,13 @@ size_t ManifestUpdater::QueueTasks(Threadpool* pool,
                   AssetProto::Type_Name(asset.type), asset.relative_path);
         continue;
     }
-    ++num_tasks_queued;
   }
-  return num_tasks_queued;
+  return QueueTasksResult{dir_scanner_tasks, file_chunker_tasks};
 }
 
 absl::Status ManifestUpdater::ApplyOperations(
     std::vector<Operation>* operations, FileChunkMap* file_chunks,
-    ManifestBuilder* manifest_builder, AssetBuilder* parent, bool recursive) {
-  assert(manifest_builder != nullptr);
+    AssetBuilder* parent, absl::Time deadline, bool recursive) {
   if (operations->empty()) return absl::OkStatus();
 
   // First, handle all deletions to make the outcome independent of the order of
@@ -561,7 +627,7 @@ absl::Status ManifestUpdater::ApplyOperations(
       // skipped.
       continue;
     }
-    RETURN_IF_ERROR(manifest_builder->DeleteAsset(ai.path),
+    RETURN_IF_ERROR(manifest_builder_->DeleteAsset(ai.path),
                     "Failed to delete asset '%s' from manifest", ai.path);
     last_deleted = &ai.path;
   }
@@ -591,8 +657,8 @@ absl::Status ManifestUpdater::ApplyOperations(
 
       case Operator::kUpdate:
         ASSIGN_OR_RETURN(asset_builder,
-                         manifest_builder->GetOrCreateAsset(ai.path, ai.type,
-                                                            true, &created),
+                         manifest_builder_->GetOrCreateAsset(ai.path, ai.type,
+                                                             true, &created),
                          "Failed to add '%s' to the manifest", ai.path);
         break;
     }
@@ -618,21 +684,21 @@ absl::Status ManifestUpdater::ApplyOperations(
 
     // If the asset is marked as in-progress, we need to queue it up.
     if (asset_builder.InProgress()) {
-      queue_.emplace_back(ai.type, asset_builder.RelativePath(),
-                          asset_builder.Name());
+      PendingAsset pending(ai.type, asset_builder.RelativePath(),
+                           asset_builder.Name(), deadline);
+      queue_.Add(std::move(pending));
     }
   }
   return absl::OkStatus();
 }
 
 absl::Status ManifestUpdater::HandleFileChunkerResult(
-    FileChunkerTask* task, FileChunkMap* file_chunks,
-    ManifestBuilder* manifest_builder) {
+    FileChunkerTask* task, FileChunkMap* file_chunks) {
   const std::string rel_file_path = task->RelativeUnixFilePath();
   buffers_.emplace_back(task->ReleaseBuffer());
 
   AssetBuilder asset_builder;
-  ASSIGN_OR_RETURN(asset_builder, manifest_builder->GetOrCreateAsset(
+  ASSIGN_OR_RETURN(asset_builder, manifest_builder_->GetOrCreateAsset(
                                       rel_file_path, AssetProto::FILE));
   asset_builder.SetInProgress(false);
   if (!task->Status().ok()) {
@@ -664,7 +730,6 @@ absl::Status ManifestUpdater::HandleFileChunkerResult(
 
 absl::Status ManifestUpdater::HandleDirScannerResult(
     DirScannerTask* task, FileChunkMap* file_chunks,
-    ManifestBuilder* manifest_builder,
     std::unordered_set<ContentIdProto>* manifest_content_ids) {
   // Include the error in the stats, but we can still try to process the
   // (partial) results.
@@ -672,21 +737,26 @@ absl::Status ManifestUpdater::HandleDirScannerResult(
     ++stats_.total_dirs_failed;
   }
 
+  // If there's a chance we can do more work within the parent's deadline, we
+  // propagate the deadline to the children.
+  // TODO(chrschn) Use SteadyClock instead of the system clock.
+  absl::Time deadline = task->Deadline() > absl::Now() ? task->Deadline()
+                                                       : absl::InfiniteFuture();
+
   // DirScannerTasks are inherently recursive.
-  RETURN_IF_ERROR(ApplyOperations(task->Operations(), file_chunks,
-                                  manifest_builder, task->Dir(),
-                                  /*recursive=*/true));
+  RETURN_IF_ERROR(ApplyOperations(task->Operations(), file_chunks, task->Dir(),
+                                  deadline, /*recursive=*/true));
   task->Dir()->SetInProgress(false);
   // Union all manifest chunk content IDs.
-  assert(manifest_content_ids != nullptr);
   manifest_content_ids->insert(task->ManifestContentIds()->begin(),
                                task->ManifestContentIds()->end());
   return task->Status();
 }
 
-absl::Status ManifestUpdater::Update(
-    OperationList* operations, FileChunkMap* file_chunks,
-    PushIntermediateManifest push_intermediate_manifest, bool recursive) {
+absl::Status ManifestUpdater::Update(OperationList* operations,
+                                     FileChunkMap* file_chunks,
+                                     PushManifestHandler push_manifest_handler,
+                                     bool recursive) {
   Stopwatch sw;
   LOG_INFO(
       "Updating manifest for '%s': applying %u changes, "
@@ -695,11 +765,17 @@ absl::Status ManifestUpdater::Update(
 
   stats_ = UpdaterStats();
 
+  // Collects the content IDs that make up the manifest when recursing. They are
+  // used to prune the manifest cache directory at the end of the Update()
+  // process.
+  std::unordered_set<ContentIdProto> manifest_content_ids;
+
   CdcParamsProto cdc_params;
   cdc_params.set_min_chunk_size(cfg_.min_chunk_size);
   cdc_params.set_avg_chunk_size(cfg_.avg_chunk_size);
   cdc_params.set_max_chunk_size(cfg_.max_chunk_size);
-  ManifestBuilder manifest_builder(cdc_params, data_store_);
+  manifest_builder_ =
+      std::make_unique<ManifestBuilder>(cdc_params, data_store_);
 
   // Load the manifest id from the store.
   ContentIdProto manifest_id;
@@ -712,17 +788,17 @@ absl::Status ManifestUpdater::Update(
     // A non-existing manifest is not an issue, just build it from scratch.
     LOG_INFO("No cached manifest found. Building from scratch.");
   } else {
-    RETURN_IF_ERROR(manifest_builder.LoadManifest(manifest_id),
+    RETURN_IF_ERROR(manifest_builder_->LoadManifest(manifest_id),
                     "Failed to load manifest with id '%s'",
                     ContentId::ToHexString(manifest_id));
     // The CDC params might have changed when loading the manifest.
-    if (ValidateCdcParams(manifest_builder.Manifest()->cdc_params())) {
-      cdc_params = manifest_builder.Manifest()->cdc_params();
+    if (ValidateCdcParams(manifest_builder_->Manifest()->cdc_params())) {
+      cdc_params = manifest_builder_->Manifest()->cdc_params();
     }
   }
 
-  RETURN_IF_ERROR(ApplyOperations(operations, file_chunks, &manifest_builder,
-                                  nullptr, recursive));
+  RETURN_IF_ERROR(ApplyOperations(operations, file_chunks, nullptr,
+                                  absl::InfiniteFuture(), recursive));
 
   Threadpool pool(cfg_.num_threads > 0 ? cfg_.num_threads
                                        : std::thread::hardware_concurrency());
@@ -731,36 +807,36 @@ absl::Status ManifestUpdater::Update(
   buffers_.reserve(max_queued_tasks);
   while (buffers_.size() < max_queued_tasks)
     buffers_.emplace_back(cfg_.max_chunk_size << 1);
-  size_t num_tasks_queued = 0;
+  size_t total_tasks_queued = 0, scanner_tasks_queued = 0;
 
-  // Collect the content IDs that make up the manifest when recursing. They are
-  // used to prune the manifest cache directory in the end.
-  std::unordered_set<ContentIdProto> manifest_content_ids;
-
-  // Push intermediate manifest if there are queued chunker tasks.
-  if (push_intermediate_manifest && !queue_.empty()) {
-    file_chunks->FlushUpdates();
-    ASSIGN_OR_RETURN(manifest_id_, manifest_builder.Flush(),
-                     "Failed to flush intermediate manifest");
-    // Add all content IDs that were just written back.
-    manifest_content_ids.insert(manifest_builder.FlushedContentIds().begin(),
-                                manifest_builder.FlushedContentIds().end());
-    push_intermediate_manifest(manifest_id_);
+  // Push intermediate manifest if there are queued tasks.
+  if (push_manifest_handler && !queue_.Empty()) {
+    RETURN_IF_ERROR(FlushAndPushManifest(file_chunks, &manifest_content_ids,
+                                         push_manifest_handler));
   }
 
   fastcdc::Config cdc_cfg = CdcConfigFromProto(cdc_params);
 
-  // Wait for the chunker tasks and update file assets.
-  while (!queue_.empty() || num_tasks_queued > 0) {
-    num_tasks_queued += QueueTasks(&pool, &cdc_cfg, &manifest_builder);
+  // Wait for the chunker and scanner tasks.
+  while (!queue_.Empty() || total_tasks_queued > 0) {
+    RETURN_IF_ERROR(MaybeFlushAndPushManifest(scanner_tasks_queued, file_chunks,
+                                              &manifest_content_ids,
+                                              push_manifest_handler));
+    // Flushing the manifest may invalidate the AssetProto pointers held by the
+    // queued DirScannerTask. If the manifest should be flushed, we drain the
+    // queue from those tasks so that the push is safe.
+    bool drain_dir_scanners = WantManifestFlushed(push_manifest_handler);
+    QueueTasksResult queued = QueueTasks(drain_dir_scanners, &pool, &cdc_cfg);
+    total_tasks_queued += queued.dir_scanners + queued.file_chunkers;
+    scanner_tasks_queued += queued.dir_scanners;
+
     std::unique_ptr<Task> task = pool.GetCompletedTask();
-    assert(num_tasks_queued > 0);
-    --num_tasks_queued;
+    assert(total_tasks_queued > 0);
+    --total_tasks_queued;
 
     FileChunkerTask* chunker_task = dynamic_cast<FileChunkerTask*>(task.get());
     if (chunker_task) {
-      status =
-          HandleFileChunkerResult(chunker_task, file_chunks, &manifest_builder);
+      status = HandleFileChunkerResult(chunker_task, file_chunks);
 
       if (!status.ok()) {
         LOG_ERROR("Failed to process file '%s': %s", chunker_task->FilePath(),
@@ -771,8 +847,10 @@ absl::Status ManifestUpdater::Update(
 
     DirScannerTask* scanner_task = dynamic_cast<DirScannerTask*>(task.get());
     if (scanner_task) {
+      assert(scanner_tasks_queued > 0);
+      --scanner_tasks_queued;
       status = HandleDirScannerResult(scanner_task, file_chunks,
-                                      &manifest_builder, &manifest_content_ids);
+                                      &manifest_content_ids);
       if (!status.ok()) {
         LOG_ERROR("Failed to process directory '%s': %s",
                   scanner_task->FilePath(), status.ToString());
@@ -781,10 +859,8 @@ absl::Status ManifestUpdater::Update(
     }
   }
 
-  file_chunks->FlushUpdates();
-  ASSIGN_OR_RETURN(manifest_id_, manifest_builder.Flush(),
-                   "Failed to flush manifest");
-
+  RETURN_IF_ERROR(
+      FlushAndPushManifest(file_chunks, &manifest_content_ids, nullptr));
   // Save the manifest id to the store.
   std::string id_str = manifest_id_.SerializeAsString();
   RETURN_IF_ERROR(
@@ -796,10 +872,7 @@ absl::Status ManifestUpdater::Update(
   // chunks are present.
   if (status.ok() && recursive) {
     // Retain the chunk that stores the manifest ID.
-    manifest_content_ids.insert(ManifestUpdater::GetManifestStoreId());
-    // Add all content IDs that were just written back.
-    manifest_content_ids.insert(manifest_builder.FlushedContentIds().begin(),
-                                manifest_builder.FlushedContentIds().end());
+    manifest_content_ids.insert(GetManifestStoreId());
     status = data_store_->Prune(std::move(manifest_content_ids));
     if (!status.ok()) {
       // Signal to the caller that the manifest needs to be rebuilt from

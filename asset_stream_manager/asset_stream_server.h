@@ -33,6 +33,11 @@ namespace cdc_ft {
 using ContentSentHandler = std::function<void(
     size_t byte_count, size_t chunk_count, std::string instance_id)>;
 
+// Handles requests to prioritize the given list of assets while updating the
+// manifest. |rel_paths| relative Unix paths of assets to prioritize.
+using PrioritizeAssetsHandler =
+    std::function<void(std::vector<std::string> rel_paths)>;
+
 class DataStoreReader;
 class FileChunkMap;
 
@@ -49,7 +54,7 @@ class AssetStreamServer {
   static std::unique_ptr<AssetStreamServer> Create(
       AssetStreamServerType type, std::string src_dir,
       DataStoreReader* data_store_reader, FileChunkMap* file_chunks,
-      ContentSentHandler content_sent);
+      ContentSentHandler content_sent, PrioritizeAssetsHandler prio_assets);
 
   AssetStreamServer(const AssetStreamServer& other) = delete;
   AssetStreamServer& operator=(const AssetStreamServer& other) = delete;

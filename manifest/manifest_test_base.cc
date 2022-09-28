@@ -84,7 +84,9 @@ std::vector<ManifestTestBase::AssetInfoForTest>
 ManifestTestBase::GetAllManifestAssets(ContentIdProto actual_manifest_id) {
   ContentIdProto manifest_id;
   EXPECT_OK(data_store_.GetProto(manifest_store_id_, &manifest_id));
-  EXPECT_EQ(manifest_id, actual_manifest_id);
+  EXPECT_EQ(ContentId::ToHexString(manifest_id),
+            ContentId::ToHexString(actual_manifest_id))
+      << DumpDataStoreProtos();
 
   ManifestIterator manifest_iter(&data_store_);
   EXPECT_OK(manifest_iter.Open(manifest_id));

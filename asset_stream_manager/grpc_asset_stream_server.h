@@ -40,7 +40,8 @@ class GrpcAssetStreamServer : public AssetStreamServer {
   // Creates a new asset streaming gRpc server.
   GrpcAssetStreamServer(std::string src_dir, DataStoreReader* data_store_reader,
                         FileChunkMap* file_chunks,
-                        ContentSentHandler content_sent);
+                        ContentSentHandler content_sent,
+                        PrioritizeAssetsHandler prio_assets);
 
   ~GrpcAssetStreamServer();
 

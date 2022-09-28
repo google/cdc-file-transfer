@@ -225,7 +225,7 @@ TEST_F(ManifestUpdaterTest, UpdateAll_RecoversFromMissingChunks) {
 
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
   // 1 for manifest id, 1 for manifest, 5 indirect assets.
-  // There would be 7 chunks without the removal above, see UpdateAll_Prune.
+  // There would be 8 chunks without the removal above, see UpdateAll_Prune.
   EXPECT_EQ(data_store_.Chunks().size(), 7)
       << "Manifest: " << ContentId::ToHexString(updater.ManifestId())
       << std::endl
