@@ -125,12 +125,28 @@ struct Inode {
 // Asset proto -> inode map.
 using InodeMap = std::unordered_map<const AssetProto*, std::shared_ptr<Inode>>;
 
-// Queued request to open a file that has not been processed yet and should be
-// processed once the manifest is updated.
-struct OpenRequest {
-  fuse_req_t req;
-  fuse_ino_t ino;
-  struct fuse_file_info* fi;
+// Queued request that cannot be processed yet and should be processed once the
+// manifest is updated.
+struct QueuedRequest {
+  // The request type that was blocked.
+  enum class Type { kOpen, kOpenDir, kLookup };
+  Type type;
+  std::string rel_path;
+
+  union {
+    // Only valid for type == kOpen or type == kOpenDir.
+    struct Open {
+      fuse_req_t req;
+      fuse_ino_t ino;
+      struct fuse_file_info fi;
+    } open;
+    // Only valid for type == kLookup.
+    struct Lookup {
+      fuse_req_t req;
+      fuse_ino_t parent_ino;
+      const char* name;
+    } lookup;
+  } u;
 };
 
 // Global context. Fuse is based on loose callbacks, so this holds the fs state.
@@ -170,12 +186,13 @@ struct CdcFuseFsContext {
   static thread_local Buffer buffer;
 
   // Configuration client to get configuration updates from the workstation.
-  std::unique_ptr<ConfigStreamClient> config_stream_client_;
+  std::unique_ptr<ConfigStreamClient> config_stream_client;
 
-  // Queue for requests to open files that have not been processed yet.
-  absl::Mutex queued_open_requests_mutex_;
-  std::vector<OpenRequest> queued_open_requests_
-      ABSL_GUARDED_BY(queued_open_requests_mutex_);
+  // Queue for requests to open files or directories that have not been
+  // processed yet.
+  absl::Mutex queued_requests_mutex;
+  std::vector<QueuedRequest> queued_requests
+      ABSL_GUARDED_BY(queued_requests_mutex);
 
   // Identifies whether FUSE consistency should be inspected after manifest
   // update.
@@ -372,6 +389,75 @@ bool ValidateInode(fuse_req_t req, Inode& inode, fuse_ino_t ino) {
   }
   return true;
 }
+
+// Returns the full relative file path for the given |inode|.
+std::string GetRelativePath(const Inode& inode) {
+  if (inode.asset.parent_ino() == FUSE_ROOT_ID)
+    return inode.asset.proto()->name();
+  std::string rel_path = GetRelativePath(GetInode(inode.asset.parent_ino()));
+  absl::StrAppend(&rel_path, "/", inode.asset.proto()->name());
+  return rel_path;
+}
+
+// Asks the server to prioritize the asset at |rel_file_path|.
+void PrioritizeAssetOnServer(const std::string& rel_file_path) {
+  std::vector<std::string> assets{rel_file_path};
+  LOG_INFO("Requesing server to prioritize asset '%s'", rel_file_path);
+  absl::Status status =
+      ctx->config_stream_client->ProcessAssets(std::move(assets));
+  // An error is not critical, but we should log it.
+  if (!status.ok()) {
+    LOG_ERROR(
+        "Failed to request prioritization for asset '%s' from the server: %s",
+        rel_file_path, status.ToString());
+  }
+}
+
+// Queues a CdcFuseOpen request in the list of pending requests. Thread-safe.
+void QueueOpenRequest(const std::string& rel_path, fuse_req_t req,
+                      fuse_ino_t ino, struct fuse_file_info* fi)
+    ABSL_LOCKS_EXCLUDED(ctx->queued_requests_mutex) {
+  QueuedRequest qr{QueuedRequest::Type::kOpen, rel_path};
+  qr.u.open.req = req;
+  qr.u.open.ino = ino;
+  qr.u.open.fi = *fi;
+  {
+    absl::MutexLock lock(&ctx->queued_requests_mutex);
+    ctx->queued_requests.emplace_back(std::move(qr));
+  }
+  PrioritizeAssetOnServer(rel_path);
+}
+
+// Queues a CdcFuseOpenDir request in the list of pending requests. Thread-safe.
+void QueueOpenDirRequest(const std::string& rel_path, fuse_req_t req,
+                         fuse_ino_t ino, struct fuse_file_info* fi)
+    ABSL_LOCKS_EXCLUDED(ctx->queued_requests_mutex) {
+  QueuedRequest qr{QueuedRequest::Type::kOpenDir, rel_path};
+  qr.u.open.req = req;
+  qr.u.open.ino = ino;
+  qr.u.open.fi = *fi;
+  {
+    absl::MutexLock lock(&ctx->queued_requests_mutex);
+    ctx->queued_requests.emplace_back(std::move(qr));
+  }
+  PrioritizeAssetOnServer(rel_path);
+}
+
+// Queues a CdcFuseLookup reuquest in the list of pending requests. Thread-safe.
+void QueueLookupRequest(const std::string& rel_path, fuse_req_t req,
+                        fuse_ino_t parent_ino, const char* name)
+    ABSL_LOCKS_EXCLUDED(ctx->queued_requests_mutex) {
+  QueuedRequest qr{QueuedRequest::Type::kLookup, rel_path};
+  qr.u.lookup.req = req;
+  qr.u.lookup.parent_ino = parent_ino;
+  qr.u.lookup.name = name;
+  {
+    absl::MutexLock lock(&ctx->queued_requests_mutex);
+    ctx->queued_requests.emplace_back(std::move(qr));
+  }
+  PrioritizeAssetOnServer(rel_path);
+}
+
 }  // namespace
 
 // Implementation of the Fuse lookup() method.
@@ -384,6 +470,17 @@ void CdcFuseLookup(fuse_req_t req, fuse_ino_t parent_ino, const char* name)
   if (!ValidateInode(req, parent, parent_ino)) {
     return;
   }
+
+  if (parent.asset.proto()->in_progress()) {
+    // This directory has not been processed yet. Queue up the request and block
+    // until an updated manifest is available.
+    std::string rel_path = GetRelativePath(parent);
+    LOG_INFO("Request to open ino %u queued (file '%s' not ready)", parent_ino,
+             rel_path);
+    QueueLookupRequest(rel_path, req, parent_ino, name);
+    return;
+  }
+
   absl::StatusOr<const AssetProto*> proto = parent.asset.Lookup(name);
   if (!proto.ok()) {
     LOG_ERROR("Lookup of '%s' in ino %u failed: '%s'", name, parent_ino,
@@ -468,13 +565,11 @@ void CdcFuseOpen(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info* fi)
     return;
   }
 
-  if (proto->file_size() > 0 && proto->file_chunks_size() == 0 &&
-      proto->file_indirect_chunks_size() == 0) {
+  if (proto->file_size() > 0 && proto->in_progress()) {
     // This file has not been processed yet. Queue up the request Block until an
     // updated manifest is available.
     LOG_DEBUG("Request to open ino %u queued (file not ready)", ino);
-    absl::MutexLock lock(&ctx->queued_open_requests_mutex_);
-    ctx->queued_open_requests_.push_back({req, ino, fi});
+    QueueOpenRequest(GetRelativePath(inode), req, ino, fi);
     return;
   }
 
@@ -566,6 +661,15 @@ void CdcFuseOpenDir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info* fi)
     fuse_reply_err(req, ENOTDIR);
     return;
   }
+  if (proto->in_progress()) {
+    // This directory has not been processed yet. Queue up the request until an
+    // updated manifest is available.
+    LOG_DEBUG("Request to open directory '%s' ino %u queued (dir not ready)",
+              proto->name(), ino);
+    QueueOpenDirRequest(GetRelativePath(inode), req, ino, fi);
+    return;
+  }
+
   fuse_reply_open(req, fi);
 }
 
@@ -1462,8 +1566,8 @@ absl::Status SetManifest(const ContentIdProto& manifest_id)
     absl::MutexLock inodes_lock(&ctx->inodes_mutex);
     for (const auto& [proto, inode] : ctx->inodes) {
       // Reset kUpdatedProto to kInitialized. The state was only used for
-      // validation. kUpdated is still needed for clearing kernel caches when a
-      // file is opened.
+      // validation. kUpdated is still needed for clearing kernel caches when
+      // a file is opened.
       assert(inode->IsValid());
       if (inode->IsUpdatedProto() ||
           inode->asset.proto()->type() == AssetProto::DIRECTORY) {
@@ -1474,21 +1578,36 @@ absl::Status SetManifest(const ContentIdProto& manifest_id)
   }
 
   // Process outstanding open requests. Be sure to move the vector because
-  // CdcFuseOpen() might requeue requests.
-  std::vector<OpenRequest> requests;
+  // processing might requeue requests.
+  std::vector<QueuedRequest> requests;
   {
-    absl::MutexLock lock(&ctx->queued_open_requests_mutex_);
-    requests.swap(ctx->queued_open_requests_);
+    absl::MutexLock lock(&ctx->queued_requests_mutex);
+    requests.swap(ctx->queued_requests);
   }
-  for (const OpenRequest request : requests) {
-    LOG_DEBUG("Resuming request to open ino %u", request.ino);
-    CdcFuseOpen(request.req, request.ino, request.fi);
+  for (QueuedRequest& qr : requests) {
+    switch (qr.type) {
+      case QueuedRequest::Type::kLookup:
+        LOG_DEBUG("Resuming request to look up '%s' in '%s' (ino %u)",
+                  qr.u.lookup.name, qr.rel_path, qr.u.lookup.parent_ino);
+        CdcFuseLookup(qr.u.lookup.req, qr.u.lookup.parent_ino,
+                      qr.u.lookup.name);
+        break;
+      case QueuedRequest::Type::kOpen:
+        LOG_DEBUG("Resuming request to open file '%s' (ino %u)", qr.rel_path,
+                  qr.u.open.ino);
+        CdcFuseOpen(qr.u.open.req, qr.u.open.ino, &qr.u.open.fi);
+        break;
+      case QueuedRequest::Type::kOpenDir:
+        LOG_DEBUG("Resuming request to open dir '%s' (ino %u)", qr.rel_path,
+                  qr.u.open.ino);
+        CdcFuseOpenDir(qr.u.open.req, qr.u.open.ino, &qr.u.open.fi);
+        break;
+    }
   }
 
 #ifndef USE_MOCK_LIBFUSE
   // Acknowledge that the manifest id was received and FUSE was updated.
-  absl::Status status =
-      ctx->config_stream_client_->SendManifestAck(manifest_id);
+  absl::Status status = ctx->config_stream_client->SendManifestAck(manifest_id);
   if (!status.ok()) {
     LOG_ERROR("Failed to send ack for manifest '%s'",
               ContentId::ToHexString(manifest_id));
@@ -1504,11 +1623,15 @@ absl::Status StartConfigClient(std::string instance,
                                std::shared_ptr<grpc::Channel> channel) {
   LOG_DEBUG("Starting configuration client");
   assert(ctx && ctx->initialized);
-  if (ctx->config_stream_client_) {
-    ctx->config_stream_client_.reset();
+  if (ctx->config_stream_client) {
+    ctx->config_stream_client.reset();
   }
-  ctx->config_stream_client_ = std::make_unique<ConfigStreamClient>(
+#ifndef USE_MOCK_LIBFUSE
+  ctx->config_stream_client = std::make_unique<ConfigStreamGrpcClient>(
       std::move(instance), std::move(channel));
+#else
+  ctx->config_stream_client = std::make_unique<MockConfigStreamClient>();
+#endif
   return absl::OkStatus();
 }
 
@@ -1542,12 +1665,18 @@ absl::Status Run(DataStoreReader* data_store_reader, bool consistency_check) {
   if (res == -1) return MakeStatus("Session loop failed");
   LOG_INFO("Session loop finished.");
 
-  ctx->config_stream_client_->Shutdown();
+  ctx->config_stream_client->Shutdown();
 #else
   // This code is not unit tested.
 #endif
   return absl::OkStatus();
 }
+
+#ifdef USE_MOCK_LIBFUSE
+ConfigStreamClient* GetConfigClient() {
+  return ctx ? ctx->config_stream_client.get() : nullptr;
+}
+#endif
 
 }  // namespace cdc_fuse_fs
 }  // namespace cdc_ft

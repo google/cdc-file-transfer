@@ -130,6 +130,13 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "mock_config_stream_client",
+    srcs = ["mock_config_stream_client.cc"],
+    hdrs = ["mock_config_stream_client.h"],
+    deps = [":config_stream_client"],
+)
+
 filegroup(
     name = "all_test_sources",
     srcs = glob(["*_test.cc"]),

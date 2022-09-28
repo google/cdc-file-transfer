@@ -91,6 +91,7 @@ class CdcFuseFsTest : public ::testing::Test {
   CdcFuseFsTest() : builder_(&cache_) {
     cdc_fuse_fs::Initialize(0, nullptr).IgnoreError();
     Log::Initialize(std::make_unique<FuseLog>(LogLevel::kInfo));
+    cdc_fuse_fs::StartConfigClient("fake", nullptr).IgnoreError();
   }
   ~CdcFuseFsTest() {
     Log::Shutdown();
@@ -168,6 +169,7 @@ class CdcFuseFsTest : public ::testing::Test {
     AssetProto* file1 = manifest.mutable_root_dir()->mutable_dir_assets(0);
     EXPECT_EQ(file1->name(), kFile1Name);
     file1->clear_file_chunks();
+    file1->set_in_progress(true);
     return cache_.AddProto(manifest);
   }
 

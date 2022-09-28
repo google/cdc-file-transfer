@@ -33,7 +33,7 @@ using ConfigStreamService = proto::ConfigStreamService;
 // from the workstation.
 class ManifestIdReader {
  public:
-  ManifestIdReader(ConfigStreamService::Stub* stub) : stub_(stub) {}
+  explicit ManifestIdReader(ConfigStreamService::Stub* stub) : stub_(stub) {}
 
   // Starts a GetManifestId() request and listens to the stream of manifest ids
   // sent from the workstation. Calls |callback| on every manifest id received.
@@ -88,21 +88,22 @@ class ManifestIdReader {
   std::unique_ptr<std::thread> reader_thread_;
 };
 
-ConfigStreamClient::ConfigStreamClient(std::string instance,
-                                       std::shared_ptr<grpc::Channel> channel)
+ConfigStreamGrpcClient::ConfigStreamGrpcClient(
+    std::string instance, std::shared_ptr<grpc::Channel> channel)
     : instance_(std::move(instance)),
       stub_(ConfigStreamService::NewStub(std::move(channel))),
       read_client_(std::make_unique<ManifestIdReader>(stub_.get())) {}
 
-ConfigStreamClient::~ConfigStreamClient() = default;
+ConfigStreamGrpcClient::~ConfigStreamGrpcClient() = default;
 
-absl::Status ConfigStreamClient::StartListeningToManifestUpdates(
+absl::Status ConfigStreamGrpcClient::StartListeningToManifestUpdates(
     std::function<absl::Status(const ContentIdProto&)> callback) {
   LOG_INFO("Starting to listen to manifest updates");
   return read_client_->StartListeningToManifestUpdates(callback);
 }
 
-absl::Status ConfigStreamClient::SendManifestAck(ContentIdProto manifest_id) {
+absl::Status ConfigStreamGrpcClient::SendManifestAck(
+    ContentIdProto manifest_id) {
   AckManifestIdReceivedRequest request;
   request.set_gamelet_id(instance_);
   *request.mutable_manifest_id() = std::move(manifest_id);
@@ -114,7 +115,21 @@ absl::Status ConfigStreamClient::SendManifestAck(ContentIdProto manifest_id) {
   return absl::OkStatus();
 }
 
-void ConfigStreamClient::Shutdown() {
+absl::Status ConfigStreamGrpcClient::ProcessAssets(
+    std::vector<std::string> assets) {
+  ProcessAssetsRequest request;
+  for (std::string& asset : assets)
+    request.add_relative_paths(std::move(asset));
+
+  grpc::ClientContext context_;
+  ProcessAssetsResponse response;
+  // The caller is waiting for the updated manifest anyway, so we can just wait
+  // for the response.
+  RETURN_ABSL_IF_ERROR(stub_->ProcessAssets(&context_, request, &response));
+  return absl::OkStatus();
+}
+
+void ConfigStreamGrpcClient::Shutdown() {
   LOG_INFO("Stopping to listen to manifest updates");
   read_client_->Shutdown();
 }
