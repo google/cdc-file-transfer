@@ -1,0 +1,29 @@
+---
+Language: Proto
+BasedOnStyle: Google
+
+---
+Language: Cpp
+BasedOnStyle: Google
+
+DerivePointerAlignment: false
+PointerAlignment: Left
+SortIncludes: true
+---
+Language: JavaScript
+BasedOnStyle: Google
+
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+---
+Language: TextProto
+BasedOnStyle: Google
+
+---
+Language: CSharp
+BasedOnStyle: Microsoft
+ColumnLimit: 100
+NamespaceIndentation: All
+BreakBeforeTernaryOperators: true

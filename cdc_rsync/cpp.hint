@@ -1,0 +1,2 @@
+#define CDC_RSYNC_API __declspec(dllexport)
+#define CDC_RSYNC_API __declspec(dllimport)

@@ -1,0 +1,44 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package cdc_ft.backgroundservice;
+
+import "google/protobuf/empty.proto";
+
+// A common interface implemented by the process manager and all background
+// services in the SDK; see go/stadia-process-manager#heading=h.8da0zckti0ek.
+service BackgroundService {
+  // Exit is used to ask the service to exit. In the case of the process
+  // manager, this cascades to all background processes.
+  rpc Exit(ExitRequest) returns (ExitResponse) {}
+
+  // GetPid is used to get the PID of the service process.
+  rpc GetPid(GetPidRequest) returns (GetPidResponse) {}
+
+  // HealthCheck is used to verify that the service is running. It returns an
+  // empty protobuf if the service is ready to serve requests.
+  rpc HealthCheck(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+}
+
+message ExitRequest {}
+
+message ExitResponse {}
+
+message GetPidRequest {}
+
+message GetPidResponse {
+  int32 pid = 1;
+}

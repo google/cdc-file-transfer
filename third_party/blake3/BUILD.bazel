@@ -1,0 +1,49 @@
+# Description:
+# BLAKE3 is a very fast cryptographic hash function, see README.md for details.
+#
+
+licenses(["unencumbered"])  # Creative Commons CC0
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["LICENSE"])
+
+config_setting(
+    name = "windows",
+    values = {
+        "cpu": "x64_windows",
+    },
+)
+
+cc_library(
+    name = "blake3",
+    srcs = [
+        "c/blake3.c",
+        "c/blake3_dispatch.c",
+        "c/blake3_portable.c",
+    ] + select({
+        ":windows": [
+            "c/blake3_avx2_x86-64_windows_msvc.asm",
+            "c/blake3_avx512_x86-64_windows_msvc.asm",
+            "c/blake3_sse2_x86-64_windows_msvc.asm",
+            "c/blake3_sse41_x86-64_windows_msvc.asm",
+        ],
+        "//conditions:default": [
+            "c/blake3_avx2_x86-64_unix.S",
+            "c/blake3_avx512_x86-64_unix.S",
+            "c/blake3_sse2_x86-64_unix.S",
+            "c/blake3_sse41_x86-64_unix.S",
+        ],
+    }),
+    hdrs = [
+        "c/blake3.h",
+        "c/blake3_impl.h",
+    ],
+    includes = ["c"],
+)
+
+cc_binary(
+    name = "example",
+    srcs = ["c/example.c"],
+    deps = [":blake3"],
+)

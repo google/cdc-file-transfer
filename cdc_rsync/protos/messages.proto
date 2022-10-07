@@ -1,0 +1,193 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+option optimize_for = LITE_RUNTIME;
+
+package cdc_ft;
+
+// Used for testing.
+message TestRequest {
+  string message = 1;
+}
+
+// Notify server that subsequent messages are going to be compressed, e.g. when
+// the client is about to send missing files. Once all compressed data is sent,
+// the client waits for the ToggleCompressionResponse.
+message ToggleCompressionRequest {}
+
+// Notify client that all compressed messages have been received (e.g. all
+// missing files have been copied to the server) and that the client may switch
+// to uncompressed transfer again. This "write fence" or "sync point" is
+// necessary to prevent that the server reads past the compressed data because
+// it doesn't know where compressed data ends.
+message ToggleCompressionResponse {}
+
+// Send command line options to server.
+// The options largely match the command line args.
+message SetOptionsRequest {
+  message FilterRule {
+    enum Type {
+      TYPE_INCLUDE = 0;
+      TYPE_EXCLUDE = 1;
+    }
+
+    Type type = 1;
+    string pattern = 2;
+  }
+
+  string destination = 1;
+  bool delete = 2;
+  bool recursive = 3;
+  int32 verbosity = 4;
+  bool whole_file = 5;
+  bool compress = 6;
+  repeated FilterRule filter_rules = 7;
+  bool checksum = 8;
+  bool relative = 9;
+  bool dry_run = 10;
+  bool existing = 11;
+  string copy_dest = 12;
+}
+
+// Send file list to server.
+message AddFilesRequest {
+  message File {
+    string filename = 1;
+
+    // Linux epoch time. time_t, basically.
+    int64 modified_time = 2;
+
+    uint64 size = 3;
+  }
+
+  // Files are relative to this directory.
+  string directory = 1;
+
+  // Files in |directory|.
+  repeated File files = 2;
+
+  // Directories in |directory|.
+  repeated string dirs = 3;
+}
+
+// Send stats to client for logging purposes.
+message SendFileStatsResponse {
+  // Number of files present on the client, but not on the server.
+  uint32 num_missing_files = 1;
+
+  // Number of files present on the server, but not on the client.
+  uint32 num_extraneous_files = 2;
+
+  // Number of files present on both and matching.
+  uint32 num_matching_files = 3;
+
+  // Number of files present on both, but not matching.
+  uint32 num_changed_files = 4;
+
+  // Sum of the size of all missing files.
+  uint64 total_missing_bytes = 5;
+
+  // Sum of the client size of all changed files.
+  uint64 total_changed_client_bytes = 6;
+
+  // Sum of the server size of all changed files.
+  uint64 total_changed_server_bytes = 7;
+
+  // Number of directories present on the client, but not on the server.
+  uint32 num_missing_dirs = 8;
+
+  // Number of directories present on the server, but not on the client.
+  uint32 num_extraneous_dirs = 9;
+
+  // Number of directories present on both and matching.
+  uint32 num_matching_dirs = 10;
+}
+
+// Send indices of missing and changed files to client.
+message AddFileIndicesResponse {
+  // Client-side index of the file.
+  repeated uint32 client_indices = 1;
+}
+
+// Tell server that client will send data of a missing file.
+message SendMissingFileDataRequest {
+  // Server-side of the missing file.
+  uint32 server_index = 1;
+
+  // The actual file data is sent as raw data.
+}
+
+// Tell client that server is about to send signature data for diffing files.
+message SendSignatureResponse {
+  // Client-side index of the file.
+  uint32 client_index = 1;
+
+  // The total size of the server-side file.
+  uint64 server_file_size = 2;
+}
+
+// Send signatures for diffing file data to client. Uses SOA layout to save
+// bandwidth. The arrays are expected to be of the same length.
+message AddSignaturesResponse {
+  // Chunk sizes.
+  repeated uint32 sizes = 1;
+
+  // Chunk hashes, size should match (size of sizes) * (hash length).
+  bytes hashes = 2;
+}
+
+// Send patching information to server. Uses SOA layout to save bandwidth.
+// The arrays are expected to be of the same length.
+message AddPatchCommandsRequest {
+  enum Source {
+    // Use bytes [offset, offset + size) from |data| contained in this message.
+    // This means that no existing chunk can be reused.
+    SOURCE_DATA = 0;
+
+    // Use bytes [offset, offset + size) from the basis file.
+    // This means that an existing chunk can be reused.
+    SOURCE_BASIS_FILE = 1;
+  }
+
+  // Whether this is a reused chunk or a new chunk.
+  repeated Source sources = 1;
+
+  // Offsets into |data| or the basis file, depending on the source.
+  repeated uint64 offsets = 2;
+
+  // Sizes in |data| or the basis file, depending on the source.
+  repeated uint32 sizes = 3;
+
+  // Data bytes, for SOURCE_DATA.
+  bytes data = 4;
+}
+
+// Send list of to-be-deleted files to the client.
+message AddDeletedFilesResponse {
+  // Files are relative to this directory.
+  string directory = 1;
+
+  // Files in |directory|.
+  repeated string files = 2;
+
+  // Directories in |directory|.
+  repeated string dirs = 3;
+}
+
+// Tell server to shut the frick down.
+message ShutdownRequest {}
+
+// Ack for ShutdownRequest.
+message ShutdownResponse {}

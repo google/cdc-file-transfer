@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="cdc_ft::ChunkTransferTask">
+    <DisplayString>{{ id={id}, done={done} }}</DisplayString>
+  </Type>
+  <Type Name="cdc_ft::ContentIdProto">
+    <!-- Used on Linux -->
+    <DisplayString>{{ {cdc_ft::ContentId::ToHexString(*this)} }}</DisplayString>
+  </Type>
+  <Type Name="cdc_ft::proto::ContentId">
+    <!-- Used on Windows -->
+    <!-- Note to self: Don't use this in my promo artifacts -->
+    <DisplayString Condition="blake3_sum_160_.ptr_->_Mypair._Myval2._Mysize == 20">{{ {(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[0],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[1],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[2],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[3],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[4],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[5],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[6],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[7],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[8],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[9],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[10],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[11],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[12],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[13],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[14],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[15],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[16],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[17],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[18],nvoXb}{(uint8_t)blake3_sum_160_.ptr_->_Mypair._Myval2._Bx._Ptr[19],nvoXb} }}</DisplayString>
+    <DisplayString>{{ invalid }}</DisplayString>
+  </Type>
+</AutoVisualizer>

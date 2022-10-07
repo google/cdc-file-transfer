@@ -1,0 +1,115 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "common/sdk_util.h"
+
+#include <stdlib.h>
+
+#include "common/log.h"
+#include "common/path.h"
+#include "common/status_test_macros.h"
+#include "gtest/gtest.h"
+
+namespace cdc_ft {
+namespace {
+
+constexpr bool kCreateFile = true;
+constexpr bool kDontCreateFile = false;
+
+class SdkUtilTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    Log::Initialize(std::make_unique<ConsoleLog>(LogLevel::kInfo));
+  }
+
+  void TearDown() override {
+    Log::Shutdown();
+    for (std::string dir_path : test_created_directories_) {
+      EXPECT_OK(path::RemoveDirRec(dir_path));
+    }
+  }
+
+ protected:
+  void CheckSdkPaths(const SdkUtil& sdk_util, const std::string& sdk_dir) {
+    EXPECT_EQ(sdk_util.GetSDKPath(), sdk_dir);
+    EXPECT_EQ(sdk_util.GetSshPath(),
+              path::Join(sdk_dir, "tools\\OpenSSH-Win64"));
+    EXPECT_EQ(sdk_util.GetSshExePath(),
+              path::Join(sdk_dir, "tools\\OpenSSH-Win64\\ssh.exe"));
+    EXPECT_EQ(sdk_util.GetScpExePath(),
+              path::Join(sdk_dir, "tools\\OpenSSH-Win64\\scp.exe"));
+    EXPECT_EQ(sdk_util.GetDevBinPath(), path::Join(sdk_dir, "dev", "bin"));
+  }
+
+  void SetupGetSdkVersion(const std::string& file_content,
+                          bool create_version_file) {
+    std::string ggp_sdk_path = std::tmpnam(nullptr);
+    EXPECT_OK(path::SetEnv("GGP_SDK_PATH", ggp_sdk_path));
+    test_created_directories_.push_back(ggp_sdk_path);
+    EXPECT_OK(path::CreateDirRec(ggp_sdk_path));
+    if (create_version_file) {
+      std::string version_path = path::Join(ggp_sdk_path, "VERSION");
+      EXPECT_OK(path::WriteFile(version_path, file_content.c_str(),
+                                file_content.size()));
+    }
+  }
+
+  // Contains assets which where created during test.
+  // The assets are to be deleted in the end of the test.
+  std::vector<std::string> test_created_directories_;
+};
+
+TEST_F(SdkUtilTest, CheckRoamingAppDataPaths) {
+  SdkUtil sdk_util;
+  EXPECT_OK(sdk_util.GetInitStatus());
+
+  std::string appdata_dir;
+  EXPECT_OK(
+      path::GetKnownFolderPath(path::FolderId::kRoamingAppData, &appdata_dir));
+
+  const std::string ggp_path = path::Join(appdata_dir, "GGP");
+  EXPECT_EQ(sdk_util.GetUserConfigPath(), ggp_path);
+  EXPECT_EQ(sdk_util.GetServicesConfigPath(), path::Join(ggp_path, "services"));
+  EXPECT_EQ(sdk_util.GetSshConfigPath(), path::Join(ggp_path, "ssh", "config"));
+  EXPECT_EQ(sdk_util.GetSshKeyFilePath(),
+            path::Join(ggp_path, "ssh", "id_rsa"));
+  EXPECT_EQ(sdk_util.GetSshKnownHostsFilePath(),
+            path::Join(ggp_path, "ssh", "known_hosts"));
+}
+
+TEST_F(SdkUtilTest, CheckSdkPathsWithoutGgpSdkPathEnv) {
+  // Clear environment variable and figure out default SDK dir.
+  EXPECT_OK(path::SetEnv("GGP_SDK_PATH", ""));
+  std::string program_files_dir;
+  EXPECT_OK(path::GetKnownFolderPath(path::FolderId::kProgramFiles,
+                                     &program_files_dir));
+  const std::string sdk_dir = path::Join(program_files_dir, "GGP SDK");
+
+  SdkUtil sdk_util;
+  EXPECT_OK(sdk_util.GetInitStatus());
+  CheckSdkPaths(sdk_util, sdk_dir);
+}
+
+TEST_F(SdkUtilTest, CheckSdkPathsWithGgpSdkPathEnv) {
+  // Set a path with unicode character.
+  std::string sdk_dir = u8"C:\\I\\♥\\GGP SDK\\";
+  EXPECT_OK(path::SetEnv("GGP_SDK_PATH", sdk_dir));
+
+  SdkUtil sdk_util;
+  EXPECT_OK(sdk_util.GetInitStatus());
+  CheckSdkPaths(sdk_util, sdk_dir);
+}
+
+}  // namespace
+}  // namespace cdc_ft

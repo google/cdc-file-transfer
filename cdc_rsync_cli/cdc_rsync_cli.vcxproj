@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{3FAC852A-00A8-4CFB-9160-07EFF2B73562}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>cdc_rsync</RootNamespace>
+    <WindowsTargetPlatformVersion Condition="$(VisualStudioVersion) == 15">$([Microsoft.Build.Utilities.ToolLocationHelper]::GetLatestSDKTargetPlatformVersion('Windows', '10.0'))</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion Condition="$(VisualStudioVersion) == 16">10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset Condition="$(VisualStudioVersion) == 15">v141</PlatformToolset>
+    <PlatformToolset Condition="$(VisualStudioVersion) == 16">v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Makefile</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset Condition="$(VisualStudioVersion) == 15">v141</PlatformToolset>
+    <PlatformToolset Condition="$(VisualStudioVersion) == 16">v142</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="Shared">
+    <Import Project="..\all_files.vcxitems" Label="Shared" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>$(SolutionDir)bazel-out\x64_windows-dbg\bin\cdc_rsync_cli\</OutDir>
+    <AdditionalOptions>/std:c++17</AdditionalOptions>
+    <NMakePreprocessorDefinitions>UNICODE</NMakePreprocessorDefinitions>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>$(SolutionDir)bazel-out\x64_windows-opt\bin\cdc_rsync_cli\</OutDir>
+    <NMakePreprocessorDefinitions>UNICODE</NMakePreprocessorDefinitions>
+    <AdditionalOptions>/std:c++17</AdditionalOptions>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\cdc_rsync_server\cdc_rsync_server.vcxproj">
+      <Project>{4ece65e0-d950-4b96-8ad5-0313261b8c8d}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <!-- Prevent console from being closed -->
+  <ItemDefinitionGroup>
+    <Link>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+  <!-- Bazel setup -->
+  <PropertyGroup>
+    <BazelTargets>//cdc_rsync_cli:cdc_rsync</BazelTargets>
+    <BazelOutputFile>cdc_rsync.exe</BazelOutputFile>
+    <BazelIncludePaths>..\;..\third_party\absl;..\third_party\blake3\c;..\bazel-stadia-file-transfer\external\com_github_zstd\lib;..\third_party\googletest\googletest\include;..\third_party\protobuf\src;$(VC_IncludePath);$(WindowsSDK_IncludePath)</BazelIncludePaths>
+    <BazelSourcePathPrefix>..\/</BazelSourcePathPrefix>
+  </PropertyGroup>
+  <Import Project="..\NMakeBazelProject.targets" />
+  <!-- For some reason, msbuild doesn't include this file, so copy it explicitly. -->
+  <!-- TODO: Reenable once we can cross-compile these.
+  <PropertyGroup>
+    <GgpRsyncServerFile>$(SolutionDir)bazel-out\k8-$(BazelCompilationMode)\bin\cdc_rsync_server\cdc_rsync_server</GgpRsyncServerFile>
+  </PropertyGroup>
+  <Target Name="CopyServer" Inputs="$(GgpRsyncServerFile)" Outputs="$(OutDir)cdc_rsync_server" AfterTargets="Build">
+    <Copy SourceFiles="$(GgpRsyncServerFile)" DestinationFiles="$(OutDir)cdc_rsync_server" />
+  </Target>
+  -->
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

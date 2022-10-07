@@ -1,0 +1,59 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package cdc_ft.localassetsstreammanager;
+
+service LocalAssetsStreamManager {
+  // Start streaming Workstation assets by mounting their directory on a
+  // gamelet.
+  rpc StartSession(StartSessionRequest) returns (StartSessionResponse) {}
+
+  // Stop streaming assets from the Workstation to the gamelet.
+  rpc StopSession(StopSessionRequest) returns (StopSessionResponse) {}
+}
+
+// NextID: 7
+message StartSessionRequest {
+  // ID of assets streaming target gamelet. gamelet_id will continue to be set
+  // alongside gamelet_name for backwards compatibility, but new code should
+  // not read from the gamelet_id field.
+  string gamelet_id = 1;
+  // The resource name of the assets streaming target gamelet, in the form
+  // "organizations/{org-id}/projects/{proj-id}/pools/{pool-id}/gamelets/{gamelet-id}".
+  // If gamelet_name is specified, it will take precedence over gamelet_id.
+  string gamelet_name = 5;
+  // Path in the local workstation to stream assets from.
+  string workstation_directory = 2;
+  // The user's email.
+  string account = 3;
+  // The OnePlatForm Url of the publishing API.
+  string url = 4;
+  // Caller of the SartSession request.
+  enum Origin {
+    ORIGIN_UNKNOWN = 0;
+    ORIGIN_CLI = 1;
+    ORIGIN_PARTNER_PORTAL = 2;
+  }
+  Origin origin = 6;
+}
+
+message StartSessionResponse {}
+
+message StopSessionRequest {
+  string gamelet_id = 1;
+}
+
+message StopSessionResponse {}

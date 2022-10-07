@@ -1,0 +1,75 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// This proto defines the service to stream chunks from workstations to
+// gamelet instances.
+//
+// References:
+// * (internal).0
+// * (internal)
+
+syntax = "proto3";
+
+import "proto/manifest.proto";
+
+package cdc_ft.proto;
+
+service AssetStreamService {
+  // Requests the contents of a chunk by its id.
+  rpc GetContent(GetContentRequest) returns (GetContentResponse) {}
+
+  // Send the contents of the chunk cache to the server.
+  // Used for statistics only.
+  rpc SendCachedContentIds(SendCachedContentIdsRequest)
+      returns (SendCachedContentIdsResponse) {}
+}
+
+message GetContentRequest {
+  // IDs of the requested chunks.
+  repeated ContentId id = 1;
+
+  // ID of the requesting thread. Used for statistics only.
+  uint64 thread_id = 2;
+}
+
+message GetContentResponse {
+  repeated bytes data = 1;
+}
+
+message SendCachedContentIdsRequest {
+  repeated ContentId id = 1;
+}
+
+message SendCachedContentIdsResponse {}
+
+service ConfigStreamService {
+  rpc GetManifestId(GetManifestIdRequest)
+      returns (stream GetManifestIdResponse) {}
+
+  rpc AckManifestIdReceived(AckManifestIdReceivedRequest)
+      returns (AckManifestIdReceivedResponse) {}
+}
+
+message GetManifestIdRequest {}
+
+message GetManifestIdResponse {
+  ContentId id = 1;
+}
+
+message AckManifestIdReceivedRequest {
+  string gamelet_id = 1;
+  ContentId manifest_id = 2;
+}
+
+message AckManifestIdReceivedResponse {}

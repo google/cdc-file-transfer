@@ -1,0 +1,84 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31702.278
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CDC RSync", "CDC RSync", "{74FA49B8-56C3-4F9E-B9D5-35FA1C9A13C8}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_rsync_cli", "cdc_rsync_cli\cdc_rsync_cli.vcxproj", "{3FAC852A-00A8-4CFB-9160-07EFF2B73562}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_rsync_server", "cdc_rsync_server\cdc_rsync_server.vcxproj", "{4ECE65E0-D950-4B96-8AD5-0313261B8C8D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Asset Streaming 3.0", "Asset Streaming 3.0", "{E4C4704F-C5C8-4A1D-B7E7-4D201DD29585}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_fuse_fs", "cdc_fuse_fs\cdc_fuse_fs.vcxproj", "{A537310C-0571-43D5-B7FE-C867F702294F}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "asset_stream_manager", "asset_stream_manager\asset_stream_manager.vcxproj", "{84D81562-D66C-4A60-9F48-2696D7D81D26}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "all_files", "all_files.vcxitems", "{F542AF2D-5A17-4F55-BE40-B1A2A6182811}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tests_asset_streaming_30", "tests_asset_streaming_30\tests_asset_streaming_30.vcxproj", "{2B36A6AA-FD11-4F77-A79B-29A3B185E701}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tests_cdc_rsync", "tests_cdc_rsync\tests_cdc_rsync.vcxproj", "{DBFE017C-31F0-47CA-9649-06F3C3CF0E41}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tests_common", "tests_common\tests_common.vcxproj", "{3798EC21-115D-4D94-9896-88B14924C45C}"
+EndProject
+Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		all_files.vcxitems*{2b36a6aa-fd11-4f77-a79b-29a3b185e701}*SharedItemsImports = 4
+		all_files.vcxitems*{3798ec21-115d-4d94-9896-88b14924c45c}*SharedItemsImports = 4
+		all_files.vcxitems*{3fac852a-00a8-4cfb-9160-07eff2b73562}*SharedItemsImports = 4
+		all_files.vcxitems*{4ece65e0-d950-4b96-8ad5-0313261b8c8d}*SharedItemsImports = 4
+		all_files.vcxitems*{84d81562-d66c-4a60-9f48-2696d7d81d26}*SharedItemsImports = 4
+		all_files.vcxitems*{a537310c-0571-43d5-b7fe-c867f702294f}*SharedItemsImports = 4
+		all_files.vcxitems*{dbfe017c-31f0-47ca-9649-06f3c3cf0e41}*SharedItemsImports = 4
+		all_files.vcxitems*{f542af2d-5a17-4f55-be40-b1a2a6182811}*SharedItemsImports = 9
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3FAC852A-00A8-4CFB-9160-07EFF2B73562}.Debug|x64.ActiveCfg = Debug|x64
+		{3FAC852A-00A8-4CFB-9160-07EFF2B73562}.Debug|x64.Build.0 = Debug|x64
+		{3FAC852A-00A8-4CFB-9160-07EFF2B73562}.Release|x64.ActiveCfg = Release|x64
+		{3FAC852A-00A8-4CFB-9160-07EFF2B73562}.Release|x64.Build.0 = Release|x64
+		{4ECE65E0-D950-4B96-8AD5-0313261B8C8D}.Debug|x64.ActiveCfg = Debug|GGP
+		{4ECE65E0-D950-4B96-8AD5-0313261B8C8D}.Debug|x64.Build.0 = Debug|GGP
+		{4ECE65E0-D950-4B96-8AD5-0313261B8C8D}.Release|x64.ActiveCfg = Release|GGP
+		{4ECE65E0-D950-4B96-8AD5-0313261B8C8D}.Release|x64.Build.0 = Release|GGP
+		{A537310C-0571-43D5-B7FE-C867F702294F}.Debug|x64.ActiveCfg = Debug|GGP
+		{A537310C-0571-43D5-B7FE-C867F702294F}.Debug|x64.Build.0 = Debug|GGP
+		{A537310C-0571-43D5-B7FE-C867F702294F}.Release|x64.ActiveCfg = Release|GGP
+		{A537310C-0571-43D5-B7FE-C867F702294F}.Release|x64.Build.0 = Release|GGP
+		{84D81562-D66C-4A60-9F48-2696D7D81D26}.Debug|x64.ActiveCfg = Debug|x64
+		{84D81562-D66C-4A60-9F48-2696D7D81D26}.Debug|x64.Build.0 = Debug|x64
+		{84D81562-D66C-4A60-9F48-2696D7D81D26}.Release|x64.ActiveCfg = Release|x64
+		{84D81562-D66C-4A60-9F48-2696D7D81D26}.Release|x64.Build.0 = Release|x64
+		{2B36A6AA-FD11-4F77-A79B-29A3B185E701}.Debug|x64.ActiveCfg = Debug|x64
+		{2B36A6AA-FD11-4F77-A79B-29A3B185E701}.Debug|x64.Build.0 = Debug|x64
+		{2B36A6AA-FD11-4F77-A79B-29A3B185E701}.Release|x64.ActiveCfg = Release|x64
+		{2B36A6AA-FD11-4F77-A79B-29A3B185E701}.Release|x64.Build.0 = Release|x64
+		{DBFE017C-31F0-47CA-9649-06F3C3CF0E41}.Debug|x64.ActiveCfg = Debug|x64
+		{DBFE017C-31F0-47CA-9649-06F3C3CF0E41}.Debug|x64.Build.0 = Debug|x64
+		{DBFE017C-31F0-47CA-9649-06F3C3CF0E41}.Release|x64.ActiveCfg = Release|x64
+		{DBFE017C-31F0-47CA-9649-06F3C3CF0E41}.Release|x64.Build.0 = Release|x64
+		{3798EC21-115D-4D94-9896-88B14924C45C}.Debug|x64.ActiveCfg = Debug|x64
+		{3798EC21-115D-4D94-9896-88B14924C45C}.Debug|x64.Build.0 = Debug|x64
+		{3798EC21-115D-4D94-9896-88B14924C45C}.Release|x64.ActiveCfg = Release|x64
+		{3798EC21-115D-4D94-9896-88B14924C45C}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3FAC852A-00A8-4CFB-9160-07EFF2B73562} = {74FA49B8-56C3-4F9E-B9D5-35FA1C9A13C8}
+		{4ECE65E0-D950-4B96-8AD5-0313261B8C8D} = {74FA49B8-56C3-4F9E-B9D5-35FA1C9A13C8}
+		{A537310C-0571-43D5-B7FE-C867F702294F} = {E4C4704F-C5C8-4A1D-B7E7-4D201DD29585}
+		{84D81562-D66C-4A60-9F48-2696D7D81D26} = {E4C4704F-C5C8-4A1D-B7E7-4D201DD29585}
+		{2B36A6AA-FD11-4F77-A79B-29A3B185E701} = {E4C4704F-C5C8-4A1D-B7E7-4D201DD29585}
+		{DBFE017C-31F0-47CA-9649-06F3C3CF0E41} = {74FA49B8-56C3-4F9E-B9D5-35FA1C9A13C8}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9BA5F690-431F-405B-9068-06CB69DAB7B2}
+	EndGlobalSection
+EndGlobal

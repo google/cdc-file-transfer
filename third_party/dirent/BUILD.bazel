@@ -1,0 +1,15 @@
+# Description:
+# This project provides Linux compatible Dirent interface for Microsoft Windows.
+#
+
+licenses(["notice"])  # MIT license
+
+exports_files(["LICENSE"])
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "dirent",
+    hdrs = ["include/dirent.h"],
+    includes = ["include"],
+)

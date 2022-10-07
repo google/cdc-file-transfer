@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="google::protobuf::RepeatedField&lt;*&gt;">
+    <DisplayString>{{ size={current_size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">current_size_</Item>
+      <Item Name="[capacity]" ExcludeView="simple">total_size_</Item>
+      <ArrayItems Condition="ptr_.rep != 0">
+        <Size>current_size_</Size>
+        <ValuePointer>($T1*)ptr_.rep->elements</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="google::protobuf::RepeatedPtrField&lt;*&gt;">
+    <DisplayString>{{ size={current_size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">current_size_</Item>
+      <Item Name="[capacity]" ExcludeView="simple">total_size_</Item>
+      <ArrayItems Condition="rep_ != 0">
+        <Size>current_size_</Size>
+        <ValuePointer>($T1**)rep_->elements</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+  <Type Name="google::protobuf::Map&lt;*&gt;">
+    <DisplayString>{{size={elements_->num_elements_}}}</DisplayString>
+    <Expand>
+      <CustomListItems MaxItemsPerView="5000" ExcludeView="Test">
+
+        <Variable Name="iBucket" InitialValue="elements_->index_of_first_non_null_" />
+        <Variable Name="pBucket" InitialValue="elements_->table_ == nullptr ? nullptr : ((InnerMap::Node**)elements_->table_)[elements_->index_of_first_non_null_]" />
+        <Variable Name="iBucketIncrement" InitialValue="-1" />
+
+        <Size>elements_->num_elements_</Size>
+        <Loop>
+          <If Condition="pBucket == nullptr">
+            <Exec>iBucket++</Exec>
+            <Exec>iBucketIncrement = __findnonnull(((InnerMap::Node**)elements_->table_) + iBucket, elements_->num_buckets_ - iBucket)</Exec>
+            <Break Condition="iBucketIncrement == -1" />
+            <Exec>iBucket += iBucketIncrement</Exec>
+            <Exec>pBucket = ((InnerMap::Node**)elements_->table_)[iBucket]</Exec>
+          </If>
+          <Item>(((InnerMap::Node*)pBucket)->kv.v_)</Item>
+          <Exec>pBucket = pBucket->next</Exec>
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

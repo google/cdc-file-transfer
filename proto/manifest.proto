@@ -1,0 +1,151 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// This proto defines the manifest format used for Asset Streaming 3.0 and
+// package diffing.
+//
+// References:
+// * (internal).0
+// * (internal)
+
+syntax = "proto3";
+
+package cdc_ft.proto;
+
+// This message wraps a hash of chunk contents. It is used as a key to uniquely
+// identify, look up, and deduplicate chunks.
+message ContentId {
+  // The first 20 byte (= 160 bit) of the BLAKE3 sum of the content.
+  //
+  // If we assume a total storage size of 1 EiB (2^60) and a chunk size of at
+  // least 64 KiB, the probability of a collision for a 160-bit hash is
+  // approximately 1e-22 (calculated using
+  // https://gist.github.com/zadam/6474221007e27705b3bde0a3a9323a84).
+  bytes blake3_sum_160 = 1;
+}
+
+// References a chunk by ContentId at a given offset within the asset.
+// ChunkRefs never overlap or leave gaps, the offset of one chunk plus its
+// size is the offset of the next chunk.
+message ChunkRef {
+  // The offset of this chunk within its embedding asset.
+  uint64 offset = 1;
+  // The content hash of the chunk.
+  ContentId chunk_id = 2;
+}
+
+// A list of chunks that an asset consists of. Large assets can consist of
+// multiple lists which are linked.
+message ChunkList {
+  // List of chunk references. The chunks must be ordered by increasing offset.
+  // All offsets in this list are relative to the start of this chunk list,
+  // meaning that the first chunk always starts at offset zero. The absolute
+  // offset of this ChunkList is included in the enclosing IndirectChunkList
+  // message.
+  repeated ChunkRef chunks = 1;
+}
+
+// An IndirectChunkList stores additional chunks for very large assets. They
+// contain the absolute offset of their beginning within the asset to allow a
+// fast identification of the correct chunk list for a given position.
+message IndirectChunkList {
+  // The offset within an asset where this chunk list begins.
+  uint64 offset = 1;
+  // References a ChunkList proto with additional data chunks. The chunk offsets
+  // in the referenced ChunkList are relative, which means that the absolute
+  // offset of this IndirectChunkList must be added to each chunk's offset in
+  // order to obtain the absolute offset of each chunk.
+  ContentId chunk_list_id = 2;
+}
+
+// An Asset represents a file, a directory, or a symlink. An asset can consist
+// of many chunks. Directory asserts embed other assets (directly or indirectly)
+// which describe their content.
+message Asset {
+  enum Type {
+    // Default value for an empty asset. This should never be UNKNOWN in
+    // practice.
+    UNKNOWN = 0;
+    // A regular file.
+    FILE = 1;
+    // A directory.
+    DIRECTORY = 2;
+    // A symlink.
+    SYMLINK = 3;
+  }
+
+  // The name of the asset (file or directory name).
+  string name = 1;
+  // The type of this asset.
+  Type type = 2;
+  // The last modification time of this asset, in seconds since epoche (UTC).
+  int64 mtime_seconds = 3;
+  // The permission bits for this asset (RWX for user, group, world, in that
+  // order).
+  uint32 permissions = 4;
+  // For FILE assets only, the total size of this file, in bytes.
+  uint64 file_size = 5;
+  // For FILE assets only, this is the list of chunks that make up the file
+  // contents. The chunk references must be sorted ascending by offset!
+  repeated ChunkRef file_chunks = 6;
+  // For FILE assets, an overflow list referencing additional chunks if this is
+  // very large asset. The list must be sorted ascending by offset!
+  repeated IndirectChunkList file_indirect_chunks = 7;
+  // For DIRECTORY assets only, this is the list of assets referenced by this
+  // directory.
+  repeated Asset dir_assets = 8;
+  // For DIRECTORY assets only, this list of indirect assets holds the content
+  // IDs of AssetList protos that hold additional assets which did not fit into
+  // the original message anymore due to size restrictions.
+  repeated ContentId dir_indirect_assets = 9;
+  // For SYMLINK assets only, this field holds the path to the file the symlink
+  // points to.
+  string symlink_target = 10;
+  // Indicates that this asset has not yet been fully processed and is still
+  // missing required information. This field is used for dynamic manifest
+  // updates to indicate to the client that it needs to wait for this asset to
+  // be fully processed.
+  bool in_progress = 11;
+}
+
+// A list of assets that belong to a directory. While a directory asset has a
+// list of child assets embedded, additional assets might need to overflow into
+// AssetList protos which are referenced by content ID from the parent directory
+// asset.
+message AssetList {
+  repeated Asset assets = 1;
+}
+
+// This message describes the CDC parameters that were used to create this
+// manifest.
+message CdcParameters {
+  uint64 min_chunk_size = 1;
+  uint64 avg_chunk_size = 2;
+  uint64 max_chunk_size = 3;
+}
+
+// A manifest is the entry point for a structured description of a hierarchical
+// list of assets. The assets describe a file system hierarchy. The metadata
+// describing those assets can be all embedded into the manifest, or they can be
+// split into smaller chunks for streaming.
+//
+// Manifests can be identified by their content ID just like chunks, which
+// allows them to be stored alongside the chunks.
+message Manifest {
+  // The root_dir is the entry point into the file system hierarchy described by
+  // a manifest. The root_dir asset must be of type DIRECTORY and has no name.
+  Asset root_dir = 1;
+  // The CDC parameters that were used to create this manifest.
+  CdcParameters cdc_params = 2;
+}

@@ -1,0 +1,14 @@
+The linker doesn't seem to like symbol versioning.
+
+--- a/lib/fuse_misc.h
++++ b/lib/fuse_misc.h
+@@ -15,7 +15,8 @@
+     - not supported on MacOSX (in MachO binary format)
+ */
+ #if (!defined(__UCLIBC__) && !defined(__APPLE__))
+-#define FUSE_SYMVER(x) __asm__(x)
++//#define FUSE_SYMVER(x) __asm__(x)
++#define FUSE_SYMVER(x)
+ #else
+ #define FUSE_SYMVER(x)
+ #endif

@@ -1,0 +1,182 @@
+// Copyright 2022 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "absl/flags/flag.h"
+#include "absl/flags/parse.h"
+#include "absl_helper/jedec_size_flag.h"
+#include "asset_stream_manager/asset_stream_config.h"
+#include "asset_stream_manager/background_service_impl.h"
+#include "asset_stream_manager/local_assets_stream_manager_service_impl.h"
+#include "asset_stream_manager/session_management_server.h"
+#include "asset_stream_manager/session_manager.h"
+#include "common/log.h"
+#include "common/path.h"
+#include "common/process.h"
+#include "common/sdk_util.h"
+#include "common/status_macros.h"
+#include "data_store/data_provider.h"
+#include "data_store/disk_data_store.h"
+#include "metrics/metrics.h"
+
+namespace cdc_ft {
+namespace {
+
+constexpr int kSessionManagementPort = 44432;
+
+absl::Status Run(const AssetStreamConfig& cfg) {
+  WinProcessFactory process_factory;
+  metrics::MetricsService metrics_service;
+
+  SessionManager session_manager(cfg.session_cfg(), &process_factory,
+                                 &metrics_service);
+  BackgroundServiceImpl background_service;
+  LocalAssetsStreamManagerServiceImpl session_service(
+      &session_manager, &process_factory, &metrics_service);
+
+  SessionManagementServer sm_server(&session_service, &background_service,
+                                    &session_manager);
+  background_service.SetExitCallback(
+      [&sm_server]() { return sm_server.Shutdown(); });
+
+  RETURN_IF_ERROR(sm_server.Start(kSessionManagementPort));
+  if (!cfg.src_dir().empty()) {
+    MultiSession* ms_unused;
+    metrics::SessionStartStatus status_unused;
+    RETURN_IF_ERROR(session_manager.StartSession(
+        /*instance_id=*/cfg.instance_ip(), /*project_id=*/std::string(),
+        /*organization_id=*/std::string(), cfg.instance_ip(),
+        cfg.instance_port(), cfg.src_dir(), &ms_unused, &status_unused));
+  }
+  sm_server.RunUntilShutdown();
+  return absl::OkStatus();
+}
+
+void InitLogging(bool log_to_stdout, int verbosity) {
+  LogLevel level = cdc_ft::Log::VerbosityToLogLevel(verbosity);
+  if (log_to_stdout) {
+    cdc_ft::Log::Initialize(std::make_unique<cdc_ft::ConsoleLog>(level));
+  } else {
+    SdkUtil util;
+    cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
+        level, util.GetLogPath("assets_stream_manager_v3").c_str()));
+  }
+}
+
+// Declare AS20 flags, so that AS30 can be used on older SDKs simply by
+// replacing the binary. Note that the RETIRED_FLAGS macro can't be used
+// because the flags contain dashes. This code mimics the macro.
+absl::flags_internal::RetiredFlag<int> RETIRED_FLAGS_port;
+absl::flags_internal::RetiredFlag<std::string> RETIRED_FLAGS_session_ports;
+absl::flags_internal::RetiredFlag<std::string> RETIRED_FLAGS_gm_mount_point;
+absl::flags_internal::RetiredFlag<bool> RETIRED_FLAGS_allow_edge;
+const auto RETIRED_FLAGS_REG_port =
+    (RETIRED_FLAGS_port.Retire("port"),
+     ::absl::flags_internal::FlagRegistrarEmpty{});
+const auto RETIRED_FLAGS_REG_session_ports =
+    (RETIRED_FLAGS_session_ports.Retire("session-ports"),
+     ::absl::flags_internal::FlagRegistrarEmpty{});
+const auto RETIRED_FLAGS_REG_gm_mount_point =
+    (RETIRED_FLAGS_gm_mount_point.Retire("gamelet-mount-point"),
+     ::absl::flags_internal::FlagRegistrarEmpty{});
+const auto RETIRED_FLAGS_REG_allow_edge =
+    (RETIRED_FLAGS_allow_edge.Retire("allow-edge"),
+     ::absl::flags_internal::FlagRegistrarEmpty{});
+
+}  // namespace
+}  // namespace cdc_ft
+
+ABSL_FLAG(std::string, src_dir, "",
+          "Start a streaming session immediately from the given Windows path. "
+          "Used during development. Must have exactly one gamelet reserved or "
+          "specify the target gamelet with --instance.");
+ABSL_FLAG(std::string, instance_ip, "",
+          "Connect to the instance with the given IP address for this session. "
+          "This flag is ignored unless --src_dir is set as well. Used "
+          "during development. ");
+ABSL_FLAG(uint16_t, instance_port, 0,
+          "Connect to the instance through the given SSH port. "
+          "This flag is ignored unless --src_dir is set as well. Used "
+          "during development. ");
+ABSL_FLAG(int, verbosity, 2, "Verbosity of the log output");
+ABSL_FLAG(bool, debug, false, "Run FUSE filesystem in debug mode");
+ABSL_FLAG(bool, singlethreaded, false,
+          "Run FUSE filesystem in singlethreaded mode");
+ABSL_FLAG(bool, stats, false,
+          "Collect and print detailed streaming statistics");
+ABSL_FLAG(bool, quiet, false,
+          "Do not print any output except errors and stats");
+ABSL_FLAG(int, manifest_updater_threads, 4,
+          "Number of threads used to compute file hashes on the workstation.");
+ABSL_FLAG(int, file_change_wait_duration_ms, 500,
+          "Time in milliseconds to wait until pushing a file change to the "
+          "instance after detecting it.");
+ABSL_FLAG(bool, check, false, "Check FUSE consistency and log check results");
+ABSL_FLAG(bool, log_to_stdout, false, "Log to stdout instead of to a file");
+ABSL_FLAG(cdc_ft::JedecSize, cache_capacity,
+          cdc_ft::JedecSize(cdc_ft::DiskDataStore::kDefaultCapacity),
+          "Cache capacity. Supports common unit suffixes K, M, G.");
+ABSL_FLAG(uint32_t, cleanup_timeout, cdc_ft::DataProvider::kCleanupTimeoutSec,
+          "Period in seconds at which instance cache cleanups are run");
+ABSL_FLAG(uint32_t, access_idle_timeout, cdc_ft::DataProvider::kAccessIdleSec,
+          "Do not run instance cache cleanups for this many seconds after the "
+          "last file access");
+
+int main(int argc, char* argv[]) {
+  absl::ParseCommandLine(argc, argv);
+
+  // Set up config. Allow overriding this config with
+  // %APPDATA%\GGP\services\assets_stream_manager_v3.json.
+  cdc_ft::SdkUtil sdk_util;
+  const std::string config_path = cdc_ft::path::Join(
+      sdk_util.GetServicesConfigPath(), "assets_stream_manager_v3.json");
+  cdc_ft::AssetStreamConfig cfg;
+  absl::Status cfg_load_status = cfg.LoadFromFile(config_path);
+
+  cdc_ft::InitLogging(cfg.log_to_stdout(), cfg.session_cfg().verbosity);
+
+  // Log status of loaded configuration. Errors are not critical.
+  if (cfg_load_status.ok()) {
+    LOG_INFO("Successfully loaded configuration file at '%s'", config_path);
+  } else if (absl::IsNotFound(cfg_load_status)) {
+    LOG_INFO("No configuration file found at '%s'", config_path);
+  } else {
+    LOG_ERROR("%s", cfg_load_status.message());
+  }
+
+  std::string flags_read = cfg.GetFlagsReadFromFile();
+  if (!flags_read.empty()) {
+    LOG_INFO(
+        "The following settings were read from the configuration file and "
+        "override the corresponding command line flags if set: %s",
+        flags_read);
+  }
+
+  std::string flag_errors = cfg.GetFlagReadErrors();
+  if (!flag_errors.empty()) {
+    LOG_WARNING("%s", flag_errors);
+  }
+
+  LOG_DEBUG("Configuration:\n%s", cfg.ToString());
+
+  absl::Status status = cdc_ft::Run(cfg);
+  if (!status.ok()) {
+    LOG_ERROR("%s", status.ToString());
+  } else {
+    LOG_INFO("Asset stream manager shut down successfully.");
+  }
+
+  cdc_ft::Log::Shutdown();
+  static_assert(static_cast<int>(absl::StatusCode::kOk) == 0, "kOk not 0");
+  return static_cast<int>(status.code());
+}

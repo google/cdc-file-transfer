@@ -1,0 +1,70 @@
+build:windows --cxxopt=/std:c++17
+build:windows --host_cxxopt=/std:c++17
+build:windows --linkopt="/OPT:REF"
+build:windows --linkopt="/OPT:ICF"
+build:windows --linkopt="/LTCG"
+
+build:windows --copt="/DUNICODE"
+build:windows --copt="/D_UNICODE"
+build:windows --copt="/W4"  # Warning level 4
+build:windows --copt="/WX" # Treat warnings as errors
+build:windows --copt="/Zc:forScope"  # for loop initializer goes out of scope after loop
+build:windows --copt="/EHsc"  # Catches C++ exceptions only; assuming functions with `extern "C"` linkage never throw
+build:windows --copt="/Zc:rvalueCast"  # Enforce type conversion rules
+build:windows --copt="/Zc:strictStrings"  # Disable string literal type conversion
+
+# Warnings occuring in //third_party/grpc/...
+build:windows --copt="/wd4018"  # signed/unsigned mismatch
+build:windows --copt="/wd4090"  # different 'const' qualifiers
+build:windows --copt="/wd4100"  # unreferenced formal parameter
+build:windows --copt="/wd4101"  # unreferenced local variable
+build:windows --copt="/wd4116"  # unnamed type definition in parentheses
+build:windows --copt="/wd4127"  # conditional expression is constant
+build:windows --copt="/wd4131"  # old-style declarator
+build:windows --copt="/wd4146"  # unary minus operator applied to unsigned type
+build:windows --copt="/wd4200"  # nonstandard extension used: zero-sized array in struct/union
+build:windows --copt="/wd4201"  # nonstandard extension used: nameless struct/union
+build:windows --copt="/wd4206"  # nonstandard extension used: translation unit is empty
+build:windows --copt="/wd4267"  # conversion from 'size_t' to 'type', possible loss of data
+build:windows --copt="/wd4244"  # implicit narrowing conversion
+build:windows --copt="/wd4245"  # conversion from 'int' to 'uint32_t', signed/unsigned mismatch
+build:windows --copt="/wd4310"  # cast truncates constant value
+build:windows --copt="/wd4312"  # reinterpret_cast': conversion from ... to ... of greater size
+build:windows --copt="/wd4324"  # structure was padded due to alignment specifier
+build:windows --copt="/wd4334"  # result of 32-bit shift implicitly converted to 64 bits
+build:windows --copt="/wd4389"  # signed/unsigned mismatch
+build:windows --copt="/wd4456"  # declaration of 'var' hides previous local declaration
+build:windows --copt="/wd4457"  # declaration of 'var' hides function parameter
+build:windows --copt="/wd4458"  # declaration hides class member
+build:windows --copt="/wd4459"  # declaration of 'var' hides global declaration
+build:windows --copt="/wd4646"  # function declared with 'noreturn' has non-void return type
+build:windows --copt="/wd4700"  # uninitialized local variable used
+build:windows --copt="/wd4701"  # potentially uninitialized local variable used
+build:windows --copt="/wd4702"  # unreachable code
+build:windows --copt="/wd4703"  # potentially uninitialized local pointer variable used
+build:windows --copt="/wd4706"  # assignment within conditional expression
+build:windows --copt="/wd4715"  # not all control paths return a value
+build:windows --copt="/wd4805"  # unsafe mix of type 'int' and type 'bool' in operation
+build:windows --copt="/wd4815"  # zero-sized array in stack object will have no elements
+build:windows --copt="/wd4834"  # discarding return value of function with 'nodiscard' attribute
+# Additional warnings occuring in //third_party/protobuf
+build:windows --copt="/wd4125"  # decimal digit terminates octal escape sequence
+# Additional warnings occuring in other third_party libraries
+build:windows --copt="/wd4005"  # macro redefinition
+# Additional warnings occuring in upb (opt-mode)
+build:windows --copt="/wd4189"  # local variable is initialized but not referenced
+
+# googletest uses this define.
+build:windows --define absl=1
+
+# Linux
+build:linux --cxxopt=-std=c++17
+build:linux --host_cxxopt=-std=c++17
+build:linux --define absl=1
+
+# Additional warnings occuring in //third_party/protobuf
+build:linux --copt="-Wno-stringop-overflow"
+# Additional warnings occuring in boringssl
+build:linux --copt="-Wno-array-bounds"
+
+try-import %workspace%/user.bazelrc
