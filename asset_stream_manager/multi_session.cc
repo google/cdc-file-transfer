@@ -482,15 +482,16 @@ absl::Status MultiSession::Shutdown() {
     sessions_.erase(instance_id);
   }
 
+  absl::Status status;
   if (runner_) {
-    RETURN_IF_ERROR(runner_->Shutdown());
+    status = runner_->Shutdown();
   }
 
   if (heartbeat_watcher_.joinable()) {
     heartbeat_watcher_.join();
   }
 
-  return absl::OkStatus();
+  return status;
 }
 
 absl::Status MultiSession::Status() {
