@@ -48,7 +48,6 @@ ServerExitCode GetExitCode(const absl::Status& status) {
     case Tag::kSocketEof:
       // Usually means client disconnected and shut down already.
     case Tag::kDeployServer:
-    case Tag::kInstancePickerNotAvailableInQuietMode:
     case Tag::kConnectionTimeout:
     case Tag::kCount:
       // Should not happen in server.
