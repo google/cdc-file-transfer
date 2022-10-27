@@ -21,12 +21,12 @@ namespace cdc_ft {
 
 // Server connection timed out. SSH probably stale.
 constexpr char kMsgFmtConnectionTimeout[] =
-    "Server connection timed out. Please re-run 'ggp ssh init' and verify that "
-    "the IP '%s' and the port '%i' are correct.";
+    "Server connection timed out. Verify that the IP '%s' and the port '%i' "
+    "are correct.";
 
 // Server connection timed out and IP was not passed in. Probably network error.
 constexpr char kMsgConnectionTimeoutWithIp[] =
-    "Server connection timed out. Please check your network connection.";
+    "Server connection timed out. Check your network connection.";
 
 // Receiving pipe end was shut down unexpectedly.
 constexpr char kMsgConnectionLost[] =
@@ -42,12 +42,6 @@ constexpr char kMsgAddressInUse[] =
 constexpr char kMsgDeployFailed[] =
     "Failed to deploy the instance components for unknown reasons. "
     "Please report this issue.";
-
-// Picking an instance is not allowed in quiet mode.
-constexpr char kMsgInstancePickerNotAvailableInQuietMode[] =
-    "Multiple gamelet instances are reserved, but the instance picker is not "
-    "available in quiet mode. Please specify --instance or remove -q resp. "
-    "--quiet.";
 
 }  // namespace cdc_ft
 

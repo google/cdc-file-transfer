@@ -77,14 +77,11 @@ enum class Tag : uint8_t {
   // The gamelet components need to be re-deployed.
   kDeployServer = 2,
 
-  // Something asks for user input, but we're in quiet mode.
-  kInstancePickerNotAvailableInQuietMode = 3,
-
   // Timeout while trying to connect to the gamelet component.
-  kConnectionTimeout = 4,
+  kConnectionTimeout = 3,
 
   // MUST BE LAST.
-  kCount = 5,
+  kCount = 4,
 };
 
 // Tags a status. No-op if |status| is OK. Overwrites existing tags.

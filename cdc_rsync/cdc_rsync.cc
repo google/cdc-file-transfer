@@ -40,10 +40,6 @@ ReturnCode TagToMessage(Tag tag, const Options* options, std::string* msg) {
       *msg = kMsgDeployFailed;
       return ReturnCode::kDeployFailed;
 
-    case Tag::kInstancePickerNotAvailableInQuietMode:
-      *msg = kMsgInstancePickerNotAvailableInQuietMode;
-      return ReturnCode::kInstancePickerNotAvailableInQuietMode;
-
     case Tag::kConnectionTimeout:
       *msg =
           absl::StrFormat(kMsgFmtConnectionTimeout, options->ip, options->port);

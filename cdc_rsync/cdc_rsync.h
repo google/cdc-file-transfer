@@ -87,9 +87,6 @@ enum class ReturnCode {
   // Server deployment failed. This should be rare, it means that the server
   // components were successfully copied, but the up-to-date check still fails.
   kDeployFailed = 5,
-
-  // Gamelet selection asks for user input, but we are in quiet mode.
-  kInstancePickerNotAvailableInQuietMode = 6,
 };
 
 // Calling Sync() a second time overwrites the data in |error_message|.
