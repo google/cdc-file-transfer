@@ -29,7 +29,7 @@ namespace {
 constexpr char kFuseFilename[] = "cdc_fuse_fs";
 constexpr char kLibFuseFilename[] = "libfuse.so";
 constexpr char kFuseStdoutPrefix[] = "cdc_fuse_fs_stdout";
-constexpr char kRemoteToolsBinDir[] = "/opt/developer/tools/bin/";
+constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc_file_transfer/";
 
 // Mount point for FUSE on the gamelet.
 constexpr char kMountDir[] = "/mnt/workstation";
