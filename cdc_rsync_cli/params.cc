@@ -68,7 +68,10 @@ Options:
 -R, --relative            Use relative path names
     --existing            Skip creating new files on instance
     --copy-dest dir       Use files from dir as sync base if files are missing
-                          from destination folder
+    --ssh-command         Path and arguments of SSH command to use, e.g.
+                          C:\path\to\ssh.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
+    --scp-command         Path and arguments of SSH command to use, e.g.
+                          C:\path\to\scp.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
 -h  --help                Help for cdc_rsync
 )";
 
@@ -257,6 +260,16 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   if (key == "json") {
     params->options.json = true;
     return OptionResult::kConsumedKey;
+  }
+
+  if (key == "ssh-command") {
+    params->options.ssh_command = value;
+    return OptionResult::kConsumedKeyValue;
+  }
+
+  if (key == "scp-command") {
+    params->options.scp_command = value;
+    return OptionResult::kConsumedKeyValue;
   }
 
   PrintError("Unknown option: '%s'", key);

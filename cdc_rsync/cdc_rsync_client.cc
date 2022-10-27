@@ -47,7 +47,7 @@ constexpr int kExitCodeNotFound = 127;
 constexpr int kForwardPortFirst = 44450;
 constexpr int kForwardPortLast = 44459;
 constexpr char kGgpServerFilename[] = "cdc_rsync_server";
-constexpr char kRemoteToolsBinDir[] = "/opt/developer/tools/bin/";
+constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc_file_transfer/";
 
 SetOptionsRequest::FilterRule::Type ToProtoType(PathFilter::Rule::Type type) {
   switch (type) {
@@ -109,7 +109,14 @@ GgpRsyncClient::GgpRsyncClient(const Options& options, PathFilter path_filter,
                     kForwardPortFirst, kForwardPortLast, &process_factory_,
                     &remote_util_),
       printer_(options.quiet, Util::IsTTY() && !options.json),
-      progress_(&printer_, options.verbosity, options.json) {}
+      progress_(&printer_, options.verbosity, options.json) {
+  if (options_.ssh_command) {
+    remote_util_.SetSshCommand(options_.ssh_command);
+  }
+  if (options_.scp_command) {
+    remote_util_.SetScpCommand(options_.scp_command);
+  }
+}
 
 GgpRsyncClient::~GgpRsyncClient() {
   message_pump_.StopMessagePump();
@@ -117,16 +124,11 @@ GgpRsyncClient::~GgpRsyncClient() {
 }
 
 absl::Status GgpRsyncClient::Run() {
-  absl::Status status = remote_util_.GetInitStatus();
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to initialize critical components");
-  }
-
   // Initialize |remote_util_|.
-  remote_util_.SetIpAndPort(options_.ip, options_.port);
+  remote_util_.SetHostAndPort(options_.ip, options_.port);
 
   // Start the server process.
-  status = StartServer();
+  absl::Status status = StartServer();
   if (HasTag(status, Tag::kDeployServer)) {
     // Gamelet components are not deployed or out-dated. Deploy and retry.
     status = DeployServer();
@@ -205,9 +207,11 @@ absl::Status GgpRsyncClient::StartServer() {
       std::string(kRemoteToolsBinDir) + kGgpServerFilename;
   // Test existence manually to prevent misleading bash output message
   // "bash: .../cdc_rsync_server: No such file or directory".
-  std::string remote_command = absl::StrFormat(
-      "if [ ! -f %s ]; then exit %i; fi; %s %i %s", remote_server_path,
-      kExitCodeNotFound, remote_server_path, port, component_args);
+  // Also create the bin dir because otherwise scp below might fail.
+  std::string remote_command =
+      absl::StrFormat("mkdir -p %s; if [ ! -f %s ]; then exit %i; fi; %s %i %s",
+                      kRemoteToolsBinDir, remote_server_path, kExitCodeNotFound,
+                      remote_server_path, port, component_args);
   ProcessStartInfo start_info =
       remote_util_.BuildProcessStartInfoForSshPortForwardAndCommand(
           port, port, false, remote_command);

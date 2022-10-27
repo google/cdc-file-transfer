@@ -46,7 +46,9 @@ struct Options {
   const char* copy_dest = nullptr;
   int compress_level = 6;
   int connection_timeout_sec = 10;
-
+  const char* ssh_command = nullptr;
+  const char* scp_command = nullptr;
+  
   // Compression level 0 is invalid.
   static constexpr int kMinCompressLevel = -5;
   static constexpr int kMaxCompressLevel = 22;

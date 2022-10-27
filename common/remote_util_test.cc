@@ -21,11 +21,11 @@
 namespace cdc_ft {
 namespace {
 
-constexpr int kGameletPort = 12345;
-constexpr char kGameletPortArg[] = "-p 12345";
+constexpr int kSshPort = 12345;
+constexpr char kSshPortArg[] = "-p 12345";
 
-constexpr char kGameletIp[] = "1.2.3.4";
-constexpr char kGameletIpArg[] = "cloudcast@\"1.2.3.4\"";
+constexpr char kHostname[] = "user@example.com";
+constexpr char kHostnameArg[] = "\"user@example.com\"";
 
 constexpr int kLocalPort = 23456;
 constexpr int kRemotePort = 34567;
@@ -44,7 +44,7 @@ class RemoteUtilTest : public ::testing::Test {
 
   void SetUp() override {
     Log::Initialize(std::make_unique<ConsoleLog>(LogLevel::kInfo));
-    util_.SetIpAndPort(kGameletIp, kGameletPort);
+    util_.SetHostAndPort(kHostname, kSshPort);
   }
 
   void TearDown() override { Log::Shutdown(); }
@@ -64,42 +64,37 @@ class RemoteUtilTest : public ::testing::Test {
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSsh) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSsh(kCommand);
-  ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kCommand});
+  ExpectContains(si.command, {"ssh.exe", kSshPortArg, kHostnameArg, kCommand});
 }
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForward) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSshPortForward(
       kLocalPort, kRemotePort, kRegular);
   ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kPortForwardingArg});
+                 {"ssh.exe", kSshPortArg, kHostnameArg, kPortForwardingArg});
 
   si = util_.BuildProcessStartInfoForSshPortForward(kLocalPort, kRemotePort,
                                                     kReverse);
-  ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kReversePortForwardingArg});
+  ExpectContains(si.command, {"ssh.exe", kSshPortArg, kHostnameArg,
+                              kReversePortForwardingArg});
 }
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForwardAndCommand) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSshPortForwardAndCommand(
       kLocalPort, kRemotePort, kRegular, kCommand);
-  ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kPortForwardingArg, kCommand});
+  ExpectContains(si.command, {"ssh.exe", kSshPortArg, kHostnameArg,
+                              kPortForwardingArg, kCommand});
 
   si = util_.BuildProcessStartInfoForSshPortForwardAndCommand(
       kLocalPort, kRemotePort, kReverse, kCommand);
-  ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kReversePortForwardingArg, kCommand});
+  ExpectContains(si.command, {"ssh.exe", kSshPortArg, kHostnameArg,
+                              kReversePortForwardingArg, kCommand});
+}
+TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshWithCustomCommand) {
+  constexpr char kCustomSshCmd[] = "C:\\path\\to\\ssh.exe --fooarg --bararg=42";
+  util_.SetSshCommand(kCustomSshCmd);
+  ProcessStartInfo si = util_.BuildProcessStartInfoForSsh(kCommand);
+  ExpectContains(si.command, {kCustomSshCmd});
 }
 
 }  // namespace

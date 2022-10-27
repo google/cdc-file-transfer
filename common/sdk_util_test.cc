@@ -42,13 +42,6 @@ class SdkUtilTest : public ::testing::Test {
 
  protected:
   void CheckSdkPaths(const SdkUtil& sdk_util, const std::string& sdk_dir) {
-    EXPECT_EQ(sdk_util.GetSDKPath(), sdk_dir);
-    EXPECT_EQ(sdk_util.GetSshPath(),
-              path::Join(sdk_dir, "tools\\OpenSSH-Win64"));
-    EXPECT_EQ(sdk_util.GetSshExePath(),
-              path::Join(sdk_dir, "tools\\OpenSSH-Win64\\ssh.exe"));
-    EXPECT_EQ(sdk_util.GetScpExePath(),
-              path::Join(sdk_dir, "tools\\OpenSSH-Win64\\scp.exe"));
     EXPECT_EQ(sdk_util.GetDevBinPath(), path::Join(sdk_dir, "dev", "bin"));
   }
 
@@ -81,11 +74,6 @@ TEST_F(SdkUtilTest, CheckRoamingAppDataPaths) {
   const std::string ggp_path = path::Join(appdata_dir, "GGP");
   EXPECT_EQ(sdk_util.GetUserConfigPath(), ggp_path);
   EXPECT_EQ(sdk_util.GetServicesConfigPath(), path::Join(ggp_path, "services"));
-  EXPECT_EQ(sdk_util.GetSshConfigPath(), path::Join(ggp_path, "ssh", "config"));
-  EXPECT_EQ(sdk_util.GetSshKeyFilePath(),
-            path::Join(ggp_path, "ssh", "id_rsa"));
-  EXPECT_EQ(sdk_util.GetSshKnownHostsFilePath(),
-            path::Join(ggp_path, "ssh", "known_hosts"));
 }
 
 TEST_F(SdkUtilTest, CheckSdkPathsWithoutGgpSdkPathEnv) {

@@ -51,37 +51,9 @@ class SdkUtil {
   // %APPDATA%\GGP\logs\log_base_name.20210729-125930.log.
   std::string GetLogPath(const char* log_base_name) const;
 
-  // Returns the path of the ssh configuration file, e.g.
-  // %APPDATA%\GGP\ssh\config.
-  std::string GetSshConfigPath() const;
-
-  // Returns the path of the ssh private key file in the SDK configuration, e.g.
-  // %APPDATA%\GGP\ssh\id_rsa.
-  std::string GetSshKeyFilePath() const;
-
-  // Returns the path of the ssh known_hosts file in the SDK configuration, e.g.
-  // %APPDATA%\GGP\ssh\known_hosts.
-  std::string GetSshKnownHostsFilePath() const;
-
-  // Returns the path of the installed SDK, e.g.
-  // C:\Program Files\GGP SDK.
-  std::string GetSDKPath() const;
-
   // Returns the path of the dev tools that ship with the SDK, e.g.
   // C:\Program Files\GGP SDK\dev\bin.
   std::string GetDevBinPath() const;
-
-  // Returns the path of the OpenSSH tools that ship with the SDK, e.g.
-  // C:\Program Files\GGP SDK\tools\OpenSSH-Win64.
-  std::string GetSshPath() const;
-
-  // Returns the path of ssh.exe that ships with the SDK, e.g.
-  // C:\Program Files\GGP SDK\tools\OpenSSH-Win64\ssh.exe.
-  std::string GetSshExePath() const;
-
-  // Returns the path of scp.exe that ships with the SDK, e.g.
-  // C:\Program Files\GGP SDK\tools\OpenSSH-Win64\scp.exe.
-  std::string GetScpExePath() const;
 
  private:
   std::string roaming_appdata_path_;

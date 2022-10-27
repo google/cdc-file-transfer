@@ -14,9 +14,7 @@
 
 #include "common/remote_util.h"
 
-#include <atomic>
 #include <regex>
-#include <sstream>
 
 #include "absl/strings/str_format.h"
 #include "common/path.h"
@@ -42,13 +40,17 @@ std::string QuoteArgument(const std::string& argument) {
   return absl::StrFormat("\"%s\"", EscapeForWindows(argument));
 }
 
+// Quotes and escapes a command line argument for usage in SSH.
+std::string QuoteArgumentForSsh(const std::string& argument) {
+  return absl::StrFormat(
+    "'%s'", std::regex_replace(argument, std::regex("'"), "'\\''"));
+}
+
 // Quotes and escapes a command line arguments for use in ssh command. The
 // argument is first escaped and quoted for Linux using single quotes and then
 // it is escaped to be used by the Microsoft command line parser.
 std::string QuoteAndEscapeArgumentForSsh(const std::string& argument) {
-  std::string quoted_argument = absl::StrFormat(
-      "'%s'", std::regex_replace(argument, std::regex("'"), "'\\''"));
-  return EscapeForWindows(quoted_argument);
+  return EscapeForWindows(QuoteArgumentForSsh(argument));
 }
 
 // Gets the argument for SSH (reverse) port forwarding, e.g. -L23:localhost:45.
@@ -69,9 +71,16 @@ RemoteUtil::RemoteUtil(int verbosity, bool quiet,
       process_factory_(process_factory),
       forward_output_to_log_(forward_output_to_log) {}
 
-void RemoteUtil::SetIpAndPort(const std::string& gamelet_ip, int ssh_port) {
-  gamelet_ip_ = gamelet_ip;
-  ssh_port_ = ssh_port;
+void RemoteUtil::SetHostAndPort(std::string hostname, int port) {
+  hostname_ = std::move(hostname);
+  ssh_port_ = port;
+}
+void RemoteUtil::SetScpCommand(std::string scp_command) {
+  scp_command_ = scp_command;
+}
+
+void RemoteUtil::SetSshCommand(std::string ssh_command) {
+  ssh_command_ = ssh_command;
 }
 
 absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
@@ -83,7 +92,8 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
 
   std::string source_args;
   for (const std::string& sourceFilePath : source_filepaths) {
-    source_args += QuoteArgument(sourceFilePath) + " ";
+    // Workaround for scp thinking that C is a host in C:\path\to\foo.
+    source_args += QuoteArgument("localhost:" + sourceFilePath) + " ";
   }
 
   // -p preserves timestamps. This enables timestamp-based up-to-date checks.
@@ -91,18 +101,10 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
   start_info.command = absl::StrFormat(
       "%s "
       "%s %s -p -T "
-      "-F %s "
-      "-i %s -P %i "
-      "-oStrictHostKeyChecking=yes "
-      "-oUserKnownHostsFile=\"\"\"%s\"\"\" %s "
-      "cloudcast@%s:"
+      "-P %i %s "
       "%s",
-      QuoteArgument(sdk_util_.GetScpExePath()),
-      quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
-      QuoteArgument(sdk_util_.GetSshConfigPath()),
-      QuoteArgument(sdk_util_.GetSshKeyFilePath()), ssh_port_,
-      sdk_util_.GetSshKnownHostsFilePath(), source_args,
-      QuoteArgument(gamelet_ip_), QuoteAndEscapeArgumentForSsh(dest));
+      scp_command_, quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
+      ssh_port_, source_args, QuoteArgument(hostname_ + ":" + dest));
   start_info.name = "scp";
   start_info.forward_output_to_log = forward_output_to_log_;
 
@@ -123,9 +125,9 @@ absl::Status RemoteUtil::Sync(std::vector<std::string> source_filepaths,
 
   ProcessStartInfo start_info;
   start_info.command = absl::StrFormat(
-      "%s --ip=%s --port=%i -z %s %s%s",
-      path::Join(sdk_util_.GetDevBinPath(), "cdc_rsync"),
-      QuoteArgument(gamelet_ip_), ssh_port_,
+      "cdc_rsync.exe --ip=%s --port=%i -z "
+      "%s %s%s",
+      QuoteArgument(hostname_), ssh_port_,
       quiet_ || verbosity_ < 2 ? "-q " : " ", source_args, QuoteArgument(dest));
   start_info.name = "cdc_rsync";
   start_info.forward_output_to_log = forward_output_to_log_;
@@ -201,25 +203,17 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
   start_info.command = absl::StrFormat(
       "%s "
       "%s -tt "
-      "-F %s "
-      "-i %s "
       "-oServerAliveCountMax=6 "  // Number of lost msgs before ssh terminates
       "-oServerAliveInterval=5 "  // Time interval between alive msgs
-      "-oStrictHostKeyChecking=yes "
-      "-oUserKnownHostsFile=\"\"\"%s\"\"\" %s"
-      "cloudcast@%s -p %i %s",
-      QuoteArgument(sdk_util_.GetSshExePath()),
-      quiet_ || verbosity_ < 2 ? "-q" : "",
-      QuoteArgument(sdk_util_.GetSshConfigPath()),
-      QuoteArgument(sdk_util_.GetSshKeyFilePath()),
-      sdk_util_.GetSshKnownHostsFilePath(), forward_arg,
-      QuoteArgument(gamelet_ip_), ssh_port_, remote_command_arg);
+      "%s %s -p %i %s",
+      ssh_command_, quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
+      QuoteArgument(hostname_), ssh_port_, remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
   return start_info;
 }
 
 absl::Status RemoteUtil::CheckIpPort() {
-  if (gamelet_ip_.empty() || ssh_port_ == 0) {
+  if (hostname_.empty() || ssh_port_ == 0) {
     return MakeStatus("IP or port not set");
   }
 

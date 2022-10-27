@@ -25,8 +25,8 @@
 namespace cdc_ft {
 namespace {
 
-constexpr int kGameletPort = 12345;
-constexpr char kGameletIp[] = "1.2.3.4";
+constexpr int kSshPort = 12345;
+constexpr char kHostname[] = "user@1.2.3.4";
 
 constexpr char kGuid[] = "f77bcdfe-368c-4c45-9f01-230c5e7e2132";
 constexpr int kFirstPort = 44450;
@@ -53,7 +53,7 @@ class PortManagerTest : public ::testing::Test {
 
   void SetUp() override {
     Log::Initialize(std::make_unique<ConsoleLog>(LogLevel::kInfo));
-    remote_util_.SetIpAndPort(kGameletIp, kGameletPort);
+    remote_util_.SetHostAndPort(kHostname, kSshPort);
   }
 
   void TearDown() override { Log::Shutdown(); }
