@@ -93,7 +93,7 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
   std::string source_args;
   for (const std::string& sourceFilePath : source_filepaths) {
     // Workaround for scp thinking that C is a host in C:\path\to\foo.
-    source_args += QuoteArgument("localhost:" + sourceFilePath) + " ";
+    source_args += QuoteArgument("//./" + sourceFilePath) + " ";
   }
 
   // -p preserves timestamps. This enables timestamp-based up-to-date checks.
@@ -139,14 +139,14 @@ absl::Status RemoteUtil::Chmod(const std::string& mode,
                                const std::string& remote_path, bool quiet) {
   std::string remote_command = absl::StrFormat(
       "chmod %s %s %s", QuoteArgument(mode),
-      QuoteAndEscapeArgumentForSsh(remote_path), quiet ? "-f" : "");
+    EscapeForWindows(remote_path), quiet ? "-f" : "");
 
   return Run(remote_command, "chmod");
 }
 
 absl::Status RemoteUtil::Rm(const std::string& remote_path, bool force) {
   std::string remote_command = absl::StrFormat(
-      "rm %s %s", force ? "-f" : "", QuoteAndEscapeArgumentForSsh(remote_path));
+      "rm %s %s", force ? "-f" : "", EscapeForWindows(remote_path));
 
   return Run(remote_command, "rm");
 }
@@ -154,8 +154,8 @@ absl::Status RemoteUtil::Rm(const std::string& remote_path, bool force) {
 absl::Status RemoteUtil::Mv(const std::string& old_remote_path,
                             const std::string& new_remote_path) {
   std::string remote_command =
-      absl::StrFormat("mv %s %s", QuoteAndEscapeArgumentForSsh(old_remote_path),
-                      QuoteAndEscapeArgumentForSsh(new_remote_path));
+      absl::StrFormat("mv %s %s", EscapeForWindows(old_remote_path),
+        EscapeForWindows(new_remote_path));
 
   return Run(remote_command, "mv");
 }
