@@ -190,7 +190,7 @@ absl::Status GgpRsyncClient::StartServer() {
 
   // Find available local and remote ports for port forwarding.
   absl::StatusOr<int> port_res =
-      port_manager_.ReservePort(options_.connection_timeout_sec);
+      port_manager_.ReservePort(false, options_.connection_timeout_sec);
   constexpr char kErrorMsg[] = "Failed to find available port";
   if (absl::IsDeadlineExceeded(port_res.status())) {
     // Server didn't respond in time.
@@ -229,15 +229,24 @@ absl::Status GgpRsyncClient::StartServer() {
   }
 
   // Wait until the server process is listening.
-  auto detect_listening = [is_listening = &is_server_listening_]() -> bool {
-    return *is_listening;
+  Stopwatch timeout_timer;
+  bool is_timeout = false;
+  auto detect_listening_or_timeout = [is_listening = &is_server_listening_,
+                                      timeout = options_.connection_timeout_sec,
+                                      &timeout_timer, &is_timeout]() -> bool {
+    is_timeout = timeout_timer.ElapsedSeconds() > timeout;
+    return *is_listening || is_timeout;
   };
-  status = process->RunUntil(detect_listening);
+  status = process->RunUntil(detect_listening_or_timeout);
   if (!status.ok()) {
     // Some internal process error. Note that this does NOT mean that
     // cdc_rsync_server does not exist. In that case, the ssh process exits with
     // code 127.
     return status;
+  }
+  if (is_timeout) {
+    return SetTag(absl::DeadlineExceededError("Timeout while starting server"),
+                  Tag::kConnectionTimeout);
   }
 
   if (process->HasExited()) {
