@@ -1619,20 +1619,14 @@ absl::Status SetManifest(const ContentIdProto& manifest_id)
   return absl::OkStatus();
 }
 
-absl::Status StartConfigClient(std::string instance,
-                               std::shared_ptr<grpc::Channel> channel) {
+void SetConfigClient(
+    std::unique_ptr<cdc_ft::ConfigStreamClient> config_client) {
   LOG_DEBUG("Starting configuration client");
   assert(ctx && ctx->initialized);
   if (ctx->config_stream_client) {
     ctx->config_stream_client.reset();
   }
-#ifndef USE_MOCK_LIBFUSE
-  ctx->config_stream_client = std::make_unique<ConfigStreamGrpcClient>(
-      std::move(instance), std::move(channel));
-#else
-  ctx->config_stream_client = std::make_unique<MockConfigStreamClient>();
-#endif
-  return absl::OkStatus();
+  ctx->config_stream_client = std::move(config_client);
 }
 
 // Initializes FUSE with a manifest for an empty directory:
@@ -1671,12 +1665,6 @@ absl::Status Run(DataStoreReader* data_store_reader, bool consistency_check) {
 #endif
   return absl::OkStatus();
 }
-
-#ifdef USE_MOCK_LIBFUSE
-ConfigStreamClient* GetConfigClient() {
-  return ctx ? ctx->config_stream_client.get() : nullptr;
-}
-#endif
 
 }  // namespace cdc_fuse_fs
 }  // namespace cdc_ft

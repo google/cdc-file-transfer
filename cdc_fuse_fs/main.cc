@@ -19,6 +19,7 @@
 #include "absl/flags/parse.h"
 #include "absl_helper/jedec_size_flag.h"
 #include "cdc_fuse_fs/cdc_fuse_fs.h"
+#include "cdc_fuse_fs/config_stream_client.h"
 #include "cdc_fuse_fs/constants.h"
 #include "common/gamelet_component.h"
 #include "common/log.h"
@@ -191,10 +192,9 @@ int main(int argc, char* argv[]) {
                                      prefetch_size, dp_cleanup_timeout,
                                      dp_access_idle_timeout);
 
-  if (!cdc_ft::cdc_fuse_fs::StartConfigClient(instance, grpc_channel).ok()) {
-    LOG_ERROR("Could not start reading configuration updates'");
-    return 1;
-  }
+  cdc_ft::cdc_fuse_fs::SetConfigClient(
+      std::make_unique<cdc_ft::ConfigStreamGrpcClient>(
+          std::move(instance), std::move(grpc_channel)));
 
   // Run FUSE.
   LOG_INFO("Running filesystem");
