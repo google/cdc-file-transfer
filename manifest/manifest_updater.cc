@@ -35,6 +35,16 @@
 namespace cdc_ft {
 namespace {
 
+// A generic finalizer that invokes a given function at the end of its lifetime.
+class Finalizer {
+ public:
+  explicit Finalizer(std::function<void()> finalize) : finalize_(finalize) {}
+  ~Finalizer() { finalize_(); }
+
+ private:
+  std::function<void()> finalize_;
+};
+
 // Returns AssetInfos for all files and dirs in |src_dir| + |rel_path|. Does not
 // recurse into sub-directories.
 absl::Status GetAllSrcAssets(const std::string& src_dir,
@@ -775,6 +785,9 @@ absl::Status ManifestUpdater::Update(OperationList* operations,
   cdc_params.set_max_chunk_size(cfg_.max_chunk_size);
   manifest_builder_ =
       std::make_unique<ManifestBuilder>(cdc_params, data_store_);
+
+  // Release the ManifestBuilder at the end of this function to free memory.
+  Finalizer finalizer([b = &manifest_builder_]() { b->reset(); });
 
   // Load the manifest id from the store.
   ContentIdProto manifest_id;
