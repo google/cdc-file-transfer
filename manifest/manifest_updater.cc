@@ -609,10 +609,11 @@ absl::Status ManifestUpdater::ApplyOperations(
       asset_builder.SetFileSize(ai.size);
       // Queue chunker tasks for files.
       asset_builder.SetInProgress(true);
-    } else if (recursive && ai.type == AssetProto::DIRECTORY) {
-      // We are recursing into all sub-directories, so we add queue up the
-      // child directory for scanning.
-      asset_builder.SetInProgress(true);
+    } else if (ai.type == AssetProto::DIRECTORY) {
+      asset_builder.SetPermissions(ManifestBuilder::kDefaultDirPerms);
+      // We are recursing into all sub-directories, so we queue up the child
+      // directory for scanning.
+      if (recursive) asset_builder.SetInProgress(true);
     }
 
     // If the asset is marked as in-progress, we need to queue it up.

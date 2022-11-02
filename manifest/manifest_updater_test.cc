@@ -507,6 +507,63 @@ TEST_F(ManifestUpdaterTest, ManifestId) {
   EXPECT_EQ(updater.ManifestId(), manifest_id);
 }
 
+TEST_F(ManifestUpdaterTest, VerifyPermissions) {
+  cfg_.src_dir = path::Join(base_dir_, "non_empty");
+  ManifestUpdater updater(&data_store_, cfg_);
+
+  EXPECT_OK(updater.UpdateAll(&file_chunks_));
+  ManifestIterator manifest_iter(&data_store_);
+  EXPECT_OK(manifest_iter.Open(updater.ManifestId()));
+  const AssetProto* entry;
+  while ((entry = manifest_iter.NextEntry()) != nullptr) {
+    switch (entry->type()) {
+      case AssetProto::FILE:
+        EXPECT_EQ(entry->permissions(), ManifestBuilder::kDefaultFilePerms);
+        break;
+      case AssetProto::DIRECTORY:
+        EXPECT_EQ(entry->permissions(), ManifestBuilder::kDefaultDirPerms);
+        break;
+      case AssetProto::SYMLINK:
+        // Symlinks don't have their own permissions.
+        break;
+      default:
+        FAIL() << "Unhandled type: " << AssetProto::Type_Name(entry->type());
+        break;
+    }
+  }
+}
+
+TEST_F(ManifestUpdaterTest, VerifyIntermediateFilesAreExecutable) {
+  cfg_.src_dir = path::Join(base_dir_, "non_empty");
+  ManifestUpdater updater(&data_store_, cfg_);
+
+  auto push_intermediate_manifest = [this](const ContentIdProto& manifest_id) {
+    ManifestIterator manifest_iter(&data_store_);
+    EXPECT_OK(manifest_iter.Open(manifest_id));
+    const AssetProto* entry;
+    while ((entry = manifest_iter.NextEntry()) != nullptr) {
+      switch (entry->type()) {
+        case AssetProto::FILE:
+          // While the manifest is in-progress, all files are set to be
+          // executable.
+          EXPECT_EQ(entry->permissions(), ManifestUpdater::kExecutablePerms);
+          break;
+        case AssetProto::DIRECTORY:
+          EXPECT_EQ(entry->permissions(), ManifestBuilder::kDefaultDirPerms);
+          break;
+        default:
+          FAIL() << "Unhandled type: " << AssetProto::Type_Name(entry->type());
+          break;
+      }
+    }
+  };
+
+  // Add subdir/b.txt and verify the file permissions.
+  EXPECT_OK(updater.Update(MakeUpdateOps({"subdir/b.txt"}), &file_chunks_,
+                           push_intermediate_manifest));
+  EXPECT_EQ(updater.Stats().total_files_added_or_updated, 1);
+}
+
 // Makes sure that executables are properly detected.
 TEST_F(ManifestUpdaterTest, DetectExecutables) {
   cfg_.src_dir = path::Join(base_dir_, "executables");
