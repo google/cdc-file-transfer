@@ -259,6 +259,7 @@
     <None Include="$(MSBuildThisFileDirectory)proto\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)proto\local_assets_stream_manager.proto" />
     <None Include="$(MSBuildThisFileDirectory)proto\manifest.proto" />
+    <None Include="$(MSBuildThisFileDirectory)README.md" />
     <None Include="$(MSBuildThisFileDirectory)rm_bazel_out_dir.bat" />
     <None Include="$(MSBuildThisFileDirectory)tests_asset_streaming_30\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)tests_common\BUILD" />
