@@ -4,7 +4,7 @@ VisualStudioVersion = 16.0.31702.278
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CDC RSync", "CDC RSync", "{74FA49B8-56C3-4F9E-B9D5-35FA1C9A13C8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_rsync_cli", "cdc_rsync_cli\cdc_rsync_cli.vcxproj", "{3FAC852A-00A8-4CFB-9160-07EFF2B73562}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_rsync", "cdc_rsync\cdc_rsync.vcxproj", "{3FAC852A-00A8-4CFB-9160-07EFF2B73562}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_rsync_server", "cdc_rsync_server\cdc_rsync_server.vcxproj", "{4ECE65E0-D950-4B96-8AD5-0313261B8C8D}"
 EndProject

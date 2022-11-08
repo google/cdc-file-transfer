@@ -96,7 +96,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\message_pump.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\message_pump_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\client_socket.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\dllmain.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\file_finder_and_sender.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\file_finder_and_sender_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\cdc_rsync.cc" />
@@ -107,9 +106,9 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\progress_tracker_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\zstd_stream.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\zstd_stream_test.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_cli\main.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_cli\params.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_cli\params_test.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\main.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\params.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\params_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_deleter_and_sender.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_deleter_and_sender_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_diff_generator.cc" />
@@ -209,7 +208,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\parallel_file_opener.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\progress_tracker.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\zstd_stream.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_cli\params.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\params.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_deleter_and_sender.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_diff_generator.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_finder.h" />
@@ -247,7 +246,6 @@
     <None Include="$(MSBuildThisFileDirectory)cdc_rsync\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)cdc_rsync\protos\messages.proto" />
     <None Include="$(MSBuildThisFileDirectory)cdc_rsync\README.md" />
-    <None Include="$(MSBuildThisFileDirectory)cdc_rsync_cli\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)cdc_rsync_server\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)cdc_rsync_tests\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)manifest\BUILD" />

@@ -42,12 +42,12 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)bazel-out\x64_windows-dbg\bin\cdc_rsync_cli\</OutDir>
+    <OutDir>$(SolutionDir)bazel-out\x64_windows-dbg\bin\cdc_rsync\</OutDir>
     <AdditionalOptions>/std:c++17</AdditionalOptions>
     <NMakePreprocessorDefinitions>UNICODE</NMakePreprocessorDefinitions>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)bazel-out\x64_windows-opt\bin\cdc_rsync_cli\</OutDir>
+    <OutDir>$(SolutionDir)bazel-out\x64_windows-opt\bin\cdc_rsync\</OutDir>
     <NMakePreprocessorDefinitions>UNICODE</NMakePreprocessorDefinitions>
     <AdditionalOptions>/std:c++17</AdditionalOptions>
   </PropertyGroup>
@@ -66,7 +66,7 @@
   </ItemDefinitionGroup>
   <!-- Bazel setup -->
   <PropertyGroup>
-    <BazelTargets>//cdc_rsync_cli:cdc_rsync</BazelTargets>
+    <BazelTargets>//cdc_rsync</BazelTargets>
     <BazelOutputFile>cdc_rsync.exe</BazelOutputFile>
     <BazelIncludePaths>..\;..\third_party\absl;..\third_party\blake3\c;..\bazel-stadia-file-transfer\external\com_github_zstd\lib;..\third_party\googletest\googletest\include;..\third_party\protobuf\src;$(VC_IncludePath);$(WindowsSDK_IncludePath)</BazelIncludePaths>
     <BazelSourcePathPrefix>..\/</BazelSourcePathPrefix>

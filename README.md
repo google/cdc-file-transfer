@@ -42,23 +42,25 @@ The file transfer tools require `ssh.exe` and `scp.exe`.
   ```
 * Build everything with Bazel
   ```
-  bazel build --config windows --compilation_mode=opt //cdc_rsync_cli:cdc_rsync //asset_stream_manager
+  bazel build --config windows --compilation_mode=opt //cdc_rsync //asset_stream_manager
   ```
 * Copy the Linux build output files `cdc_fuse_fs` and `libfuse.so` from 
   `bazel-bin/cdc_fuse_fs` on the Linux system to `bazel-bin\asset_stream_manager`
   on the Windows machine.
 * Copy the Linux build output file `cdc_rsync_server` from 
-  `bazel-bin/cdc_rsync_server` on the Linux system to `bazel-bin\cdc_rsync_cli`
+  `bazel-bin/cdc_rsync_server` on the Linux system to `bazel-bin\cdc_rsync`
   on the Windows machine.
 
 ## Usage
 To copy the contents of the Windows directory `C:\path\to\assets` to
-`~/assets` on the Linux device, try running
+`~/assets` on the Linux device `linux.machine.com`, try running
 ```
-cdc_rsync --ip=user@linux.machine.com --port=22 --ssh-command=C:\path\to\ssh.exe --scp-command=C:\path\to\scp.exe C:\path\to\assets\* ~/assets -vr
+cdc_rsync --ssh-command=C:\path\to\ssh.exe --scp-command=C:\path\to\scp.exe C:\path\to\assets\* user@linux.machine.com:~/assets -vr
 ```
 Depending on your setup, you may have to specify additional arguments for the
 ssh and scp commands, including proper quoting, e.g.
 ```
-cdc_rsync --ssh-command="\"C:\path with space\to\ssh.exe\" -F ssh_config_file -i id_rsa_file -oStrictHostKeyChecking=yes -oUserKnownHostsFile=\"\"\"known_hosts_file\"\"\"" --scp-command="\"C:\path with space\to\scp.exe\" -F ssh_config_file -i id_rsa_file -oStrictHostKeyChecking=yes -oUserKnownHostsFile=\"\"\"known_hosts_file\"\"\"" --ip user@linux.machine.com --port 22 C:\path\to\assets\* ~/assets -vr
+cdc_rsync --ssh-command="\"C:\path with space\to\ssh.exe\" -F ssh_config_file -i id_rsa_file -oStrictHostKeyChecking=yes -oUserKnownHostsFile=\"\"\"known_hosts_file\"\"\"" --scp-command="\"C:\path with space\to\scp.exe\" -F ssh_config_file -i id_rsa_file -oStrictHostKeyChecking=yes -oUserKnownHostsFile=\"\"\"known_hosts_file\"\"\"" C:\path\to\assets\* user@linux.machine.com:~/assets -vr
 ```
+Lengthy ssh/scp commands that rarely change can also be put into environment
+variables `CDC_SSH_COMMAND` and `CDC_SCP_COMMAND`.

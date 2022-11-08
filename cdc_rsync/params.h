@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CDC_RSYNC_CLI_PARAMS_H_
-#define CDC_RSYNC_CLI_PARAMS_H_
+#ifndef CDC_RSYNC_PARAMS_H_
+#define CDC_RSYNC_PARAMS_H_
 
 #include <string>
 #include <vector>
@@ -41,4 +41,4 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters);
 }  // namespace params
 }  // namespace cdc_ft
 
-#endif  // CDC_RSYNC_CLI_PARAMS_H_
+#endif  // CDC_RSYNC_PARAMS_H_

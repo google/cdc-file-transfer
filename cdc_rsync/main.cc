@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "cdc_rsync/cdc_rsync.h"
-#include "cdc_rsync_cli/params.h"
+#include "cdc_rsync/params.h"
 #include "common/util.h"
 
 int wmain(int argc, wchar_t* argv[]) {
