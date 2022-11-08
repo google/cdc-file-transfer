@@ -21,8 +21,8 @@ namespace cdc_ft {
 
 // Server connection timed out. SSH probably stale.
 constexpr char kMsgFmtConnectionTimeout[] =
-    "Server connection timed out. Verify that the IP '%s' and the port '%i' "
-    "are correct.";
+    "Server connection timed out. Verify that host '%s' and port '%i' are "
+    "correct, or specify a larger timeout with --contimeout.";
 
 // Server connection timed out and IP was not passed in. Probably network error.
 constexpr char kMsgConnectionTimeoutWithIp[] =

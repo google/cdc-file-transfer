@@ -17,6 +17,7 @@
 #include "absl/strings/match.h"
 #include "common/log.h"
 #include "common/path.h"
+#include "common/status_test_macros.h"
 #include "common/test_main.h"
 #include "gtest/gtest.h"
 
@@ -157,6 +158,40 @@ TEST_F(ParamsTest, ParseFailsOnContimeoutEqualsNoValue) {
   ExpectError(NeedsValueError("contimeout"));
 }
 
+TEST_F(ParamsTest, ParseSucceedsWithSshScpCommands) {
+  const char* argv[] = {"cdc_rsync.exe",        kSrc,
+                        kUserHostDst,           "--ssh-command=sshcmd",
+                        "--scp-command=scpcmd", NULL};
+  EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  EXPECT_EQ(parameters_.options.scp_command, "scpcmd");
+  EXPECT_EQ(parameters_.options.ssh_command, "sshcmd");
+}
+
+TEST_F(ParamsTest, ParseSucceedsWithSshScpCommandsByEnvVars) {
+  EXPECT_OK(path::SetEnv("CDC_SSH_COMMAND", "sshcmd"));
+  EXPECT_OK(path::SetEnv("CDC_SCP_COMMAND", "scpcmd"));
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, NULL};
+  EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  EXPECT_EQ(parameters_.options.scp_command, "scpcmd");
+  EXPECT_EQ(parameters_.options.ssh_command, "sshcmd");
+}
+
+TEST_F(ParamsTest, ParseSucceedsWithNoSshCommand) {
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst,
+                        "--ssh-command=", NULL};
+  EXPECT_FALSE(
+      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  ExpectError(NeedsValueError("ssh-command"));
+}
+
+TEST_F(ParamsTest, ParseSucceedsWithNoScpCommand) {
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, "--scp-command",
+                        NULL};
+  EXPECT_FALSE(
+      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  ExpectError(NeedsValueError("scp-command"));
+}
+
 TEST_F(ParamsTest, ParseFailsOnNoUserHost) {
   const char* argv[] = {"cdc_rsync.exe", kSrc, kDst, NULL};
   EXPECT_FALSE(
@@ -185,7 +220,7 @@ TEST_F(ParamsTest, ParseWithSingleParameterFailsOnMissingDestination) {
   ExpectError("Missing destination");
 }
 
-TEST_F(ParamsTest, ParseSuccessedsWithMultipleLetterKeyConsumed) {
+TEST_F(ParamsTest, ParseSucceedsWithMultipleLetterKeyConsumed) {
   const char* argv[] = {"cdc_rsync.exe", "-rvqWRzcn", kSrc, kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   EXPECT_TRUE(parameters_.options.recursive);
@@ -208,7 +243,7 @@ TEST_F(ParamsTest,
   ExpectError("Unknown option: 'a'");
 }
 
-TEST_F(ParamsTest, ParseSuccessedsWithMultipleLongKeyConsumedOptions) {
+TEST_F(ParamsTest, ParseSucceedsWithMultipleLongKeyConsumedOptions) {
   const char* argv[] = {"cdc_rsync.exe",
                         "--recursive",
                         "--verbosity",
@@ -247,7 +282,7 @@ TEST_F(ParamsTest, ParseFailsOnUnknownKey) {
   ExpectError("Unknown option: 'u'");
 }
 
-TEST_F(ParamsTest, ParseSuccessedsWithSupportedKeyValue) {
+TEST_F(ParamsTest, ParseSucceedsWithSupportedKeyValue) {
   const char* argv[] = {
       "cdc_rsync.exe", "--compress-level", "11", "--contimeout", "99", "--port",
       "4086",          "--copy-dest=dest", kSrc, kUserHostDst,   NULL};
@@ -259,8 +294,7 @@ TEST_F(ParamsTest, ParseSuccessedsWithSupportedKeyValue) {
   ExpectNoError();
 }
 
-TEST_F(ParamsTest,
-       ParseSuccessedsWithSupportedKeyValueWithoutEqualityForChars) {
+TEST_F(ParamsTest, ParseSucceedsWithSupportedKeyValueWithoutEqualityForChars) {
   const char* argv[] = {"cdc_rsync.exe", "--copy-dest", "dest", kSrc,
                         kUserHostDst,    NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));

@@ -73,10 +73,23 @@ Options:
     --copy-dest dir       Use files from dir as sync base if files are missing
     --ssh-command         Path and arguments of SSH command to use, e.g.
                           C:\path\to\ssh.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
+                          Can aslo be specified by the CDC_SSH_COMMAND environment variable.
     --scp-command         Path and arguments of SSH command to use, e.g.
                           C:\path\to\scp.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
+                          Can aslo be specified by the CDC_SCP_COMMAND environment variable.
 -h  --help                Help for cdc_rsync
 )";
+
+constexpr char kSshCommandEnvVar[] = "CDC_SSH_COMMAND";
+constexpr char kScpCommandEnvVar[] = "CDC_SCP_COMMAND";
+
+// Populates some parameters from environment variables.
+void PopulateFromEnvVars(Parameters* parameters) {
+  path::GetEnv(kSshCommandEnvVar, &parameters->options.ssh_command)
+      .IgnoreError();
+  path::GetEnv(kScpCommandEnvVar, &parameters->options.scp_command)
+      .IgnoreError();
+}
 
 // Handles the --exclude-from and --include-from options.
 OptionResult HandleFilterRuleFile(const std::string& option_name,
@@ -404,6 +417,9 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters) {
     std::cout << kHelpText;
     return false;
   }
+
+  // Before applying args, populate parameters from env vars.
+  PopulateFromEnvVars(parameters);
 
   bool help = false;
   for (int index = 1; index < argc; ++index) {
