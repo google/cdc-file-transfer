@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "common/remote_util.h"
+
 #ifndef CDC_RSYNC_CDC_RSYNC_H_
 #define CDC_RSYNC_CDC_RSYNC_H_
 
@@ -30,8 +32,7 @@ extern "C" {
 #endif
 
 struct Options {
-  const char* ip = nullptr;
-  int port = 0;
+  int port = RemoteUtil::kDefaultSshPort;
   bool delete_ = false;
   bool recursive = false;
   int verbosity = 0;
@@ -48,7 +49,7 @@ struct Options {
   int connection_timeout_sec = 10;
   const char* ssh_command = nullptr;
   const char* scp_command = nullptr;
-  
+
   // Compression level 0 is invalid.
   static constexpr int kMinCompressLevel = -5;
   static constexpr int kMaxCompressLevel = 22;
@@ -94,7 +95,7 @@ CDC_RSYNC_API ReturnCode Sync(const Options* options,
                               const FilterRule* filter_rules,
                               size_t filter_num_rules, const char* sources_dir,
                               const char* const* sources, size_t num_sources,
-                              const char* destination,
+                              const char* user_host, const char* destination,
                               const char** error_message);
 
 #ifdef __cplusplus

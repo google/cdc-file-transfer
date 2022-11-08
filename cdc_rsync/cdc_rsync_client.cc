@@ -97,11 +97,12 @@ absl::Status GetServerExitStatus(int exit_code, const std::string& error_msg) {
 GgpRsyncClient::GgpRsyncClient(const Options& options, PathFilter path_filter,
                                std::string sources_dir,
                                std::vector<std::string> sources,
-                               std::string destination)
+                               std::string user_host, std::string destination)
     : options_(options),
       path_filter_(std::move(path_filter)),
       sources_dir_(std::move(sources_dir)),
       sources_(std::move(sources)),
+      user_host_(std::move(user_host)),
       destination_(std::move(destination)),
       remote_util_(options.verbosity, options.quiet, &process_factory_,
                    /*forward_output_to_log=*/false),
@@ -125,7 +126,7 @@ GgpRsyncClient::~GgpRsyncClient() {
 
 absl::Status GgpRsyncClient::Run() {
   // Initialize |remote_util_|.
-  remote_util_.SetHostAndPort(options_.ip, options_.port);
+  remote_util_.SetHostAndPort(user_host_, options_.port);
 
   // Start the server process.
   absl::Status status = StartServer();

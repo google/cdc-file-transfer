@@ -29,7 +29,7 @@ namespace cdc_ft {
 // Windows-only.
 class RemoteUtil {
  public:
-   const int kDefaultSshPort = 22;
+  static constexpr int kDefaultSshPort = 22;
 
   // If |verbosity| is > 0 and |quiet| is false, output from scp, ssh etc.
   // commands is shown.
@@ -44,12 +44,14 @@ class RemoteUtil {
   void SetHostAndPort(std::string hostname, int ssh_port);
 
   // Sets the SCP command binary path and additional arguments, e.g.
-  //   C:\path\to\scp.exe -F <ssh_config> -i <key_file> -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
+  //   C:\path\to\scp.exe -F <ssh_config> -i <key_file>
+  //     -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
   // By default, searches scp.exe on the path environment variables.
   void SetScpCommand(std::string scp_command);
 
   // Sets the SSH command binary path and additional arguments, e.g.
-  //   C:\path\to\ssh.exe -F <ssh_config> -i <key_file> -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
+  //   C:\path\to\ssh.exe -F <ssh_config> -i <key_file>
+  //     -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
   // By default, searches ssh.exe on the path environment variables.
   void SetSshCommand(std::string ssh_command);
 

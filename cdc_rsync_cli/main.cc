@@ -62,8 +62,8 @@ int wmain(int argc, wchar_t* argv[]) {
   cdc_ft::ReturnCode code = cdc_ft::Sync(
       &parameters.options, filter_rules.data(), parameters.filter_rules.size(),
       parameters.sources_dir.c_str(), sources_ptr.data(),
-      parameters.sources.size(), parameters.destination.c_str(),
-      &error_message);
+      parameters.sources.size(), parameters.user_host.c_str(),
+      parameters.destination.c_str(), &error_message);
 
   if (error_message) {
     fprintf(stderr, "Error: %s\n", error_message);

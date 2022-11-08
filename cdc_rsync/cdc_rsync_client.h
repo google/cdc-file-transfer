@@ -38,7 +38,7 @@ class GgpRsyncClient {
  public:
   GgpRsyncClient(const Options& options, PathFilter filter,
                  std::string sources_dir, std::vector<std::string> sources,
-                 std::string destination);
+                 std::string user_host, std::string destination);
 
   ~GgpRsyncClient();
 
@@ -96,8 +96,8 @@ class GgpRsyncClient {
   PathFilter path_filter_;
   const std::string sources_dir_;
   std::vector<std::string> sources_;
+  const std::string user_host_;
   const std::string destination_;
-
   WinProcessFactory process_factory_;
   RemoteUtil remote_util_;
   PortManager port_manager_;

@@ -18,6 +18,7 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_split.h"
 #include "common/path.h"
 #include "lib/zstd.h"
 
@@ -39,11 +40,13 @@ Synchronizes local files and files on a gamelet. Matching files are skipped.
 For partially matching files only the deltas are transferred.
 
 Usage:
-  cdc_rsync [options] source [source]... destination
+  cdc_rsync [options] source [source]... [user@]host:destination
 
 Parameters:
   source                  Local file or folder to be copied
-  destination             Destination folder on the gamelet
+  user                    Remote SSH user name
+  host                    Remote host or IP address
+  destination             Remote destination folder
 
 Options:
     --ip string           Gamelet IP. Required.
@@ -146,11 +149,6 @@ bool LoadFilesFrom(const std::string& files_from,
 
 OptionResult HandleParameter(const std::string& key, const char* value,
                              Parameters* params, bool* help) {
-  if (key == "ip") {
-    params->options.ip = value;
-    return OptionResult::kConsumedKeyValue;
-  }
-
   if (key == "port") {
     if (value) {
       params->options.port = atoi(value);
@@ -276,9 +274,9 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   return OptionResult::kError;
 }
 
-bool CheckParameters(const Parameters& params, bool help) {
+bool ValidateParameters(const Parameters& params, bool help) {
   if (help) {
-    printf("%s", kHelpText);
+    std::cout << kHelpText;
     return false;
   }
 
@@ -287,13 +285,7 @@ bool CheckParameters(const Parameters& params, bool help) {
     return false;
   }
 
-  if (!params.options.ip || params.options.ip[0] == '\0') {
-    PrintError("--ip must specify a valid IP address");
-    return false;
-  }
-
-  if (!params.options.port || params.options.port <= 0 ||
-      params.options.port > UINT16_MAX) {
+  if (params.options.port <= 0 || params.options.port > UINT16_MAX) {
     PrintError("--port must specify a valid port");
     return false;
   }
@@ -324,6 +316,35 @@ bool CheckParameters(const Parameters& params, bool help) {
               << std::endl;
   }
 
+  if (params.sources.empty() && params.destination.empty()) {
+    PrintError("Missing source and destination");
+    return false;
+  }
+
+  if (params.destination.empty()) {
+    PrintError("Missing destination");
+    return false;
+  }
+
+  if (params.sources.empty()) {
+    // If one arg was passed on the command line, it is not clear whether it
+    // was supposed to be a source or destination. Try to infer that, e.g.
+    //   cdc_rsync *.txt          -> Missing destination
+    //   cdc_rsync /mnt/developer -> Missing source
+    bool missing_src = params.destination[0] == '/';
+
+    PrintError("Missing %s", missing_src ? "source" : "destination");
+    return false;
+  }
+
+  if (params.user_host.empty()) {
+    PrintError(
+        "No remote host specified in destination '%s'. "
+        "Expected [user@]host:dest.",
+        params.destination);
+    return false;
+  }
+
   return true;
 }
 
@@ -346,6 +367,25 @@ bool CheckOptionResult(OptionResult result, const std::string& name,
   }
 
   return true;
+}
+
+// Removes the user/host part of |destination| and puts it into |user_host|,
+// e.g. if |destination| is initially "user@foo.com:~/file", it is "~/file"
+// afterward and |user_host| is |user@foo.com|. Does not touch Windows drives,
+// e.g. C:\foo.
+void ParseUserHost(std::string* destination, std::string* user_host) {
+  std::vector<std::string> parts =
+      absl::StrSplit(*destination, absl::MaxSplits(':', 1));
+  if (parts.size() < 2) return;
+
+  // Don't mistake the C part of C:\foo as user/host.
+  if (parts[0].size() == 1 && toupper(parts[0][0]) >= 'A' &&
+      toupper(parts[0][0]) <= 'Z') {
+    return;
+  }
+
+  *user_host = parts[0];
+  *destination = parts[1];
 }
 
 }  // namespace
@@ -423,28 +463,9 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters) {
     return false;
   }
 
-  if (!CheckParameters(*parameters, help)) {
-    return false;
-  }
+  ParseUserHost(&parameters->destination, &parameters->user_host);
 
-  if (parameters->sources.empty() && parameters->destination.empty()) {
-    PrintError("Missing source and destination");
-    return false;
-  }
-
-  if (parameters->destination.empty()) {
-    PrintError("Missing destination");
-    return false;
-  }
-
-  if (parameters->sources.empty()) {
-    // If one arg was passed on the command line, it is not clear whether it
-    // was supposed to be a source or destination. Try to infer that, e.g.
-    //   cdc_rsync *.txt          -> Missing destination
-    //   cdc_rsync /mnt/developer -> Missing source
-    bool missing_src = parameters->destination[0] == '/';
-
-    PrintError("Missing %s", missing_src ? "source" : "destination");
+  if (!ValidateParameters(*parameters, help)) {
     return false;
   }
 

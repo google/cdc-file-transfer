@@ -39,6 +39,7 @@ struct Parameters {
   Options options;
   std::vector<FilterRule> filter_rules;
   std::vector<std::string> sources;
+  std::string user_host;
   std::string destination;
   const char* files_from = nullptr;
   std::string sources_dir;  // Base directory for files loaded for --files-from.

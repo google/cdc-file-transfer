@@ -25,7 +25,8 @@
 namespace cdc_ft {
 namespace {
 
-ReturnCode TagToMessage(Tag tag, const Options* options, std::string* msg) {
+ReturnCode TagToMessage(Tag tag, const char* user_host, const Options* options,
+                        std::string* msg) {
   msg->clear();
   switch (tag) {
     case Tag::kSocketEof:
@@ -42,7 +43,7 @@ ReturnCode TagToMessage(Tag tag, const Options* options, std::string* msg) {
 
     case Tag::kConnectionTimeout:
       *msg =
-          absl::StrFormat(kMsgFmtConnectionTimeout, options->ip, options->port);
+          absl::StrFormat(kMsgFmtConnectionTimeout, user_host, options->port);
       return ReturnCode::kConnectionTimeout;
 
     case Tag::kCount:
@@ -69,7 +70,8 @@ PathFilter::Rule::Type ToInternalType(FilterRule::Type type) {
 ReturnCode Sync(const Options* options, const FilterRule* filter_rules,
                 size_t num_filter_rules, const char* sources_dir,
                 const char* const* sources, size_t num_sources,
-                const char* destination, const char** error_message) {
+                const char* user_host, const char* destination,
+                const char** error_message) {
   LogLevel log_level = Log::VerbosityToLogLevel(options->verbosity);
   Log::Initialize(std::make_unique<ConsoleLog>(log_level));
 
@@ -86,7 +88,7 @@ ReturnCode Sync(const Options* options, const FilterRule* filter_rules,
 
   // Run rsync.
   GgpRsyncClient client(*options, std::move(path_filter), sources_dir,
-                        std::move(sources_vec), destination);
+                        std::move(sources_vec), user_host, destination);
   absl::Status status = client.Run();
 
   if (status.ok()) {
@@ -98,7 +100,7 @@ ReturnCode Sync(const Options* options, const FilterRule* filter_rules,
   ReturnCode code = ReturnCode::kGenericError;
   absl::optional<Tag> tag = GetTag(status);
   if (tag.has_value()) {
-    code = TagToMessage(tag.value(), options, &msg);
+    code = TagToMessage(tag.value(), user_host, options, &msg);
   }
 
   // Fall back to status message.
