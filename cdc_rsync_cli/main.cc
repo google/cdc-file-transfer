@@ -43,30 +43,13 @@ int wmain(int argc, wchar_t* argv[]) {
     return 1;
   }
 
-  // Convert sources from string-vec to c-str-vec.
-  std::vector<const char*> sources_ptr;
-  sources_ptr.reserve(parameters.sources.size());
-  for (const std::string& source : parameters.sources) {
-    sources_ptr.push_back(source.c_str());
-  }
+  std::string error_message;
+  cdc_ft::ReturnCode code =
+      cdc_ft::Sync(parameters.options, parameters.sources, parameters.user_host,
+                   parameters.destination, &error_message);
 
-  // Convert filter rules from string-structs to c-str-structs.
-  std::vector<cdc_ft::FilterRule> filter_rules;
-  filter_rules.reserve(parameters.filter_rules.size());
-  for (const cdc_ft::params::Parameters::FilterRule& rule :
-       parameters.filter_rules) {
-    filter_rules.emplace_back(rule.type, rule.pattern.c_str());
-  }
-
-  const char* error_message = nullptr;
-  cdc_ft::ReturnCode code = cdc_ft::Sync(
-      &parameters.options, filter_rules.data(), parameters.filter_rules.size(),
-      parameters.sources_dir.c_str(), sources_ptr.data(),
-      parameters.sources.size(), parameters.user_host.c_str(),
-      parameters.destination.c_str(), &error_message);
-
-  if (error_message) {
-    fprintf(stderr, "Error: %s\n", error_message);
+  if (!error_message.empty()) {
+    fprintf(stderr, "Error: %s\n", error_message.c_str());
   }
   return static_cast<int>(code);
 }

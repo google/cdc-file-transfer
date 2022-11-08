@@ -80,7 +80,7 @@ Options:
 
 // Handles the --exclude-from and --include-from options.
 OptionResult HandleFilterRuleFile(const std::string& option_name,
-                                  const char* path, FilterRule::Type type,
+                                  const char* path, PathFilter::Rule::Type type,
                                   Parameters* params) {
   if (!path) {
     PrintError("Option '%s' needs a value", option_name);
@@ -98,7 +98,7 @@ OptionResult HandleFilterRuleFile(const std::string& option_name,
   }
 
   for (std::string& pattern : patterns) {
-    params->filter_rules.emplace_back(type, std::move(pattern));
+    params->options.filter.AddRule(type, std::move(pattern));
   }
   return OptionResult::kConsumedKeyValue;
 }
@@ -182,27 +182,29 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "include") {
-    params->filter_rules.emplace_back(FilterRule::Type::kInclude, value);
+    params->options.filter.AddRule(PathFilter::Rule::Type::kInclude, value);
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "include-from") {
-    return HandleFilterRuleFile(key, value, FilterRule::Type::kInclude, params);
+    return HandleFilterRuleFile(key, value, PathFilter::Rule::Type::kInclude,
+                                params);
   }
 
   if (key == "exclude") {
-    params->filter_rules.emplace_back(FilterRule::Type::kExclude, value);
+    params->options.filter.AddRule(PathFilter::Rule::Type::kExclude, value);
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "exclude-from") {
-    return HandleFilterRuleFile(key, value, FilterRule::Type::kExclude, params);
+    return HandleFilterRuleFile(key, value, PathFilter::Rule::Type::kExclude,
+                                params);
   }
 
   if (key == "files-from") {
     // Implies -R.
     params->options.relative = true;
-    params->files_from = value;
+    params->files_from = value ? value : std::string();
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -251,7 +253,7 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "copy-dest") {
-    params->options.copy_dest = value;
+    params->options.copy_dest = value ? value : std::string();
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -261,12 +263,12 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "ssh-command") {
-    params->options.ssh_command = value;
+    params->options.ssh_command = value ? value : std::string();
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "scp-command") {
-    params->options.scp_command = value;
+    params->options.scp_command = value ? value : std::string();
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -306,9 +308,10 @@ bool ValidateParameters(const Parameters& params, bool help) {
 
   // Warn that any include rules not followed by an exclude rule are pointless
   // as the files would be included, anyway.
-  for (int n = static_cast<int>(params.filter_rules.size()) - 1; n >= 0; --n) {
-    const Parameters::FilterRule& rule = params.filter_rules[n];
-    if (rule.type == FilterRule::Type::kExclude) {
+  const std::vector<PathFilter::Rule>& rules = params.options.filter.GetRules();
+  for (int n = static_cast<int>(rules.size()) - 1; n >= 0; --n) {
+    const PathFilter::Rule& rule = rules[n];
+    if (rule.type == PathFilter::Rule::Type::kExclude) {
       break;
     }
     std::cout << "Warning: Include pattern '" << rule.pattern
@@ -457,9 +460,9 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters) {
 
   // Load files-from file (can't do it when --files-from is handled since not
   // all sources might have been read at that point.
-  if (parameters->files_from &&
+  if (!parameters->files_from.empty() &&
       !LoadFilesFrom(parameters->files_from, &parameters->sources,
-                     &parameters->sources_dir)) {
+                     &parameters->options.sources_dir)) {
     return false;
   }
 

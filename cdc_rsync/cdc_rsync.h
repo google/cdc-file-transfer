@@ -14,22 +14,13 @@
  * limitations under the License.
  */
 
+#include "common/path_filter.h"
 #include "common/remote_util.h"
 
 #ifndef CDC_RSYNC_CDC_RSYNC_H_
 #define CDC_RSYNC_CDC_RSYNC_H_
 
-#ifdef COMPILING_DLL
-#define CDC_RSYNC_API __declspec(dllexport)
-#else
-#define CDC_RSYNC_API __declspec(dllimport)
-#endif
-
 namespace cdc_ft {
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct Options {
   int port = RemoteUtil::kDefaultSshPort;
@@ -44,28 +35,17 @@ struct Options {
   bool dry_run = false;
   bool existing = false;
   bool json = false;
-  const char* copy_dest = nullptr;
+  std::string copy_dest;
   int compress_level = 6;
   int connection_timeout_sec = 10;
-  const char* ssh_command = nullptr;
-  const char* scp_command = nullptr;
+  std::string ssh_command;
+  std::string scp_command;
+  std::string sources_dir;  // Base directory for files loaded for --files-from.
+  PathFilter filter;
 
   // Compression level 0 is invalid.
   static constexpr int kMinCompressLevel = -5;
   static constexpr int kMaxCompressLevel = 22;
-};
-
-// Rule for including/excluding files.
-struct FilterRule {
-  enum class Type {
-    kInclude,
-    kExclude,
-  };
-
-  Type type;
-  const char* pattern;
-
-  FilterRule(Type type, const char* pattern) : type(type), pattern(pattern) {}
 };
 
 enum class ReturnCode {
@@ -91,16 +71,9 @@ enum class ReturnCode {
 };
 
 // Calling Sync() a second time overwrites the data in |error_message|.
-CDC_RSYNC_API ReturnCode Sync(const Options* options,
-                              const FilterRule* filter_rules,
-                              size_t filter_num_rules, const char* sources_dir,
-                              const char* const* sources, size_t num_sources,
-                              const char* user_host, const char* destination,
-                              const char** error_message);
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif
+ReturnCode Sync(const Options& options, const std::vector<std::string>& sources,
+                const std::string& user_host, const std::string& destination,
+                std::string* error_message);
 
 }  // namespace cdc_ft
 

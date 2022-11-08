@@ -103,7 +103,7 @@ TEST_F(ParamsTest, ParseSucceedsDefaults) {
   EXPECT_FALSE(parameters_.options.compress);
   EXPECT_FALSE(parameters_.options.checksum);
   EXPECT_FALSE(parameters_.options.dry_run);
-  EXPECT_EQ(parameters_.options.copy_dest, nullptr);
+  EXPECT_TRUE(parameters_.options.copy_dest.empty());
   EXPECT_EQ(6, parameters_.options.compress_level);
   EXPECT_EQ(10, parameters_.options.connection_timeout_sec);
   EXPECT_EQ(1, parameters_.sources.size());
@@ -255,7 +255,7 @@ TEST_F(ParamsTest, ParseSuccessedsWithSupportedKeyValue) {
   EXPECT_EQ(parameters_.options.compress_level, 11);
   EXPECT_EQ(parameters_.options.connection_timeout_sec, 99);
   EXPECT_EQ(parameters_.options.port, 4086);
-  EXPECT_STREQ(parameters_.options.copy_dest, "dest");
+  EXPECT_EQ(parameters_.options.copy_dest, "dest");
   ExpectNoError();
 }
 
@@ -264,7 +264,7 @@ TEST_F(ParamsTest,
   const char* argv[] = {"cdc_rsync.exe", "--copy-dest", "dest", kSrc,
                         kUserHostDst,    NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  EXPECT_STREQ(parameters_.options.copy_dest, "dest");
+  EXPECT_EQ(parameters_.options.copy_dest, "dest");
   ExpectNoError();
 }
 
@@ -337,13 +337,15 @@ TEST_F(ParamsTest, ParseSucceedsWithIncludeExclude) {
                         kUserHostDst,
                         NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ASSERT_EQ(parameters_.filter_rules.size(), 3);
-  ASSERT_EQ(parameters_.filter_rules[0].type, FilterRule::Type::kInclude);
-  ASSERT_EQ(parameters_.filter_rules[0].pattern, "*.txt");
-  ASSERT_EQ(parameters_.filter_rules[1].type, FilterRule::Type::kExclude);
-  ASSERT_EQ(parameters_.filter_rules[1].pattern, "*.dat");
-  ASSERT_EQ(parameters_.filter_rules[2].type, FilterRule::Type::kInclude);
-  ASSERT_EQ(parameters_.filter_rules[2].pattern, "*.exe");
+  const std::vector<PathFilter::Rule>& rules =
+      parameters_.options.filter.GetRules();
+  ASSERT_EQ(rules.size(), 3);
+  ASSERT_EQ(rules[0].type, PathFilter::Rule::Type::kInclude);
+  ASSERT_EQ(rules[0].pattern, "*.txt");
+  ASSERT_EQ(rules[1].type, PathFilter::Rule::Type::kExclude);
+  ASSERT_EQ(rules[1].pattern, "*.dat");
+  ASSERT_EQ(rules[2].type, PathFilter::Rule::Type::kInclude);
+  ASSERT_EQ(rules[2].pattern, "*.exe");
   ExpectNoError();
 }
 
@@ -368,7 +370,7 @@ TEST_F(ParamsTest, FilesFrom_WithoutSourceArg) {
   const char* argv[] = {"cdc_rsync.exe", "--files-from", sources_file_.c_str(),
                         kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  EXPECT_TRUE(parameters_.sources_dir.empty());
+  EXPECT_TRUE(parameters_.options.sources_dir.empty());
   EXPECT_EQ(parameters_.user_host, kUserHost);
   EXPECT_EQ(parameters_.destination, kDst);
   ExpectNoError();
@@ -382,7 +384,7 @@ TEST_F(ParamsTest, FilesFrom_WithSourceArg) {
 
   std::string expected_sources_dir = base_dir_;
   path::EnsureEndsWithPathSeparator(&expected_sources_dir);
-  EXPECT_EQ(parameters_.sources_dir, expected_sources_dir);
+  EXPECT_EQ(parameters_.options.sources_dir, expected_sources_dir);
   EXPECT_EQ(parameters_.user_host, kUserHost);
   EXPECT_EQ(parameters_.destination, kDst);
   ExpectNoError();
@@ -443,9 +445,11 @@ TEST_F(ParamsTest, IncludeFrom_ParsesFile) {
                         kUserHostDst,    NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
-  ASSERT_EQ(parameters_.filter_rules.size(), 1);
-  ASSERT_EQ(parameters_.filter_rules[0].type, FilterRule::Type::kInclude);
-  ASSERT_EQ(parameters_.filter_rules[0].pattern, "file3");
+  const std::vector<PathFilter::Rule>& rules =
+      parameters_.options.filter.GetRules();
+  ASSERT_EQ(rules.size(), 1);
+  ASSERT_EQ(rules[0].type, PathFilter::Rule::Type::kInclude);
+  ASSERT_EQ(rules[0].pattern, "file3");
   ExpectNoError();
 }
 
@@ -464,11 +468,13 @@ TEST_F(ParamsTest, ExcludeFrom_ParsesFile) {
                         kUserHostDst,    NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
-  ASSERT_EQ(parameters_.filter_rules.size(), 2);
-  EXPECT_EQ(parameters_.filter_rules[0].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[0].pattern, "file1");
-  EXPECT_EQ(parameters_.filter_rules[1].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[1].pattern, "file2");
+  const std::vector<PathFilter::Rule>& rules =
+      parameters_.options.filter.GetRules();
+  ASSERT_EQ(rules.size(), 2);
+  EXPECT_EQ(rules[0].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[0].pattern, "file1");
+  EXPECT_EQ(rules[1].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[1].pattern, "file2");
   ExpectNoError();
 }
 
@@ -488,17 +494,19 @@ TEST_F(ParamsTest, IncludeExcludeMixed_ProperOrder) {
                         NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
-  ASSERT_EQ(parameters_.filter_rules.size(), 5);
-  EXPECT_EQ(parameters_.filter_rules[0].type, FilterRule::Type::kInclude);
-  EXPECT_EQ(parameters_.filter_rules[0].pattern, "file3");
-  EXPECT_EQ(parameters_.filter_rules[1].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[1].pattern, "excl1");
-  EXPECT_EQ(parameters_.filter_rules[2].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[2].pattern, "file1");
-  EXPECT_EQ(parameters_.filter_rules[3].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[3].pattern, "file2");
-  EXPECT_EQ(parameters_.filter_rules[4].type, FilterRule::Type::kInclude);
-  EXPECT_EQ(parameters_.filter_rules[4].pattern, "incl1");
+  const std::vector<PathFilter::Rule>& rules =
+      parameters_.options.filter.GetRules();
+  ASSERT_EQ(rules.size(), 5);
+  EXPECT_EQ(rules[0].type, PathFilter::Rule::Type::kInclude);
+  EXPECT_EQ(rules[0].pattern, "file3");
+  EXPECT_EQ(rules[1].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[1].pattern, "excl1");
+  EXPECT_EQ(rules[2].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[2].pattern, "file1");
+  EXPECT_EQ(rules[3].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[3].pattern, "file2");
+  EXPECT_EQ(rules[4].type, PathFilter::Rule::Type::kInclude);
+  EXPECT_EQ(rules[4].pattern, "incl1");
   ExpectNoError();
 }
 

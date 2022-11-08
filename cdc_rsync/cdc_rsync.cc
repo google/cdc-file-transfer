@@ -19,13 +19,12 @@
 #include "cdc_rsync/cdc_rsync_client.h"
 #include "cdc_rsync/error_messages.h"
 #include "common/log.h"
-#include "common/path_filter.h"
 #include "common/status.h"
 
 namespace cdc_ft {
 namespace {
 
-ReturnCode TagToMessage(Tag tag, const char* user_host, const Options* options,
+ReturnCode TagToMessage(Tag tag, const std::string& user_host, int port,
                         std::string* msg) {
   msg->clear();
   switch (tag) {
@@ -42,8 +41,7 @@ ReturnCode TagToMessage(Tag tag, const char* user_host, const Options* options,
       return ReturnCode::kDeployFailed;
 
     case Tag::kConnectionTimeout:
-      *msg =
-          absl::StrFormat(kMsgFmtConnectionTimeout, user_host, options->port);
+      *msg = absl::StrFormat(kMsgFmtConnectionTimeout, user_host, port);
       return ReturnCode::kConnectionTimeout;
 
     case Tag::kCount:
@@ -54,68 +52,36 @@ ReturnCode TagToMessage(Tag tag, const char* user_host, const Options* options,
   return ReturnCode::kGenericError;
 }
 
-PathFilter::Rule::Type ToInternalType(FilterRule::Type type) {
-  switch (type) {
-    case FilterRule::Type::kInclude:
-      return PathFilter::Rule::Type::kInclude;
-    case FilterRule::Type::kExclude:
-      return PathFilter::Rule::Type::kExclude;
-  }
-  assert(false);
-  return PathFilter::Rule::Type::kInclude;
-}
-
 }  // namespace
 
-ReturnCode Sync(const Options* options, const FilterRule* filter_rules,
-                size_t num_filter_rules, const char* sources_dir,
-                const char* const* sources, size_t num_sources,
-                const char* user_host, const char* destination,
-                const char** error_message) {
-  LogLevel log_level = Log::VerbosityToLogLevel(options->verbosity);
+ReturnCode Sync(const Options& options, const std::vector<std::string>& sources,
+                const std::string& user_host, const std::string& destination,
+                std::string* error_message) {
+  error_message->clear();
+  LogLevel log_level = Log::VerbosityToLogLevel(options.verbosity);
   Log::Initialize(std::make_unique<ConsoleLog>(log_level));
 
-  PathFilter path_filter;
-  for (size_t n = 0; n < num_filter_rules; ++n) {
-    path_filter.AddRule(ToInternalType(filter_rules[n].type),
-                        filter_rules[n].pattern);
-  }
-
-  std::vector<std::string> sources_vec;
-  for (size_t n = 0; n < num_sources; ++n) {
-    sources_vec.push_back(sources[n]);
-  }
-
   // Run rsync.
-  GgpRsyncClient client(*options, std::move(path_filter), sources_dir,
-                        std::move(sources_vec), user_host, destination);
+  GgpRsyncClient client(options, sources, user_host, destination);
   absl::Status status = client.Run();
 
   if (status.ok()) {
-    *error_message = nullptr;
     return ReturnCode::kOk;
   }
 
-  std::string msg;
   ReturnCode code = ReturnCode::kGenericError;
   absl::optional<Tag> tag = GetTag(status);
   if (tag.has_value()) {
-    code = TagToMessage(tag.value(), user_host, options, &msg);
+    code = TagToMessage(tag.value(), user_host, options.port, error_message);
   }
 
   // Fall back to status message.
-  if (msg.empty()) {
-    msg = std::string(status.message());
-  } else if (options->verbosity >= 2) {
+  if (error_message->empty()) {
+    *error_message = status.message();
+  } else if (options.verbosity >= 2) {
     // In verbose mode, log the status as well, so nothing gets lost.
     LOG_ERROR("%s", status.ToString().c_str());
   }
-
-  // Store error message in static buffer (don't use std::string through DLL
-  // boundary!).
-  static char buf[1024] = {0};
-  strncpy_s(buf, msg.c_str(), _TRUNCATE);
-  *error_message = buf;
 
   return code;
 }

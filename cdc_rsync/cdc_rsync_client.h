@@ -36,8 +36,7 @@ class ZstdStream;
 
 class GgpRsyncClient {
  public:
-  GgpRsyncClient(const Options& options, PathFilter filter,
-                 std::string sources_dir, std::vector<std::string> sources,
+  GgpRsyncClient(const Options& options, std::vector<std::string> sources,
                  std::string user_host, std::string destination);
 
   ~GgpRsyncClient();
@@ -93,8 +92,6 @@ class GgpRsyncClient {
   absl::Status StopCompressionStream();
 
   Options options_;
-  PathFilter path_filter_;
-  const std::string sources_dir_;
   std::vector<std::string> sources_;
   const std::string user_host_;
   const std::string destination_;

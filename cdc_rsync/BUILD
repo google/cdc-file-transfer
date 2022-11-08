@@ -1,8 +1,3 @@
-load(
-    "//tools:windows_cc_library.bzl",
-    "cc_windows_shared_library",
-)
-
 package(default_visibility = [
     "//:__subpackages__",
 ])
@@ -57,7 +52,7 @@ cc_test(
     ],
 )
 
-cc_windows_shared_library(
+cc_library(
     name = "cdc_rsync",
     srcs = [
         "cdc_rsync.cc",
@@ -75,7 +70,6 @@ cc_windows_shared_library(
         ],
         "//conditions:default": [],
     }),
-    local_defines = ["COMPILING_DLL"],
     target_compatible_with = ["@platforms//os:windows"],
     deps = [
         ":client_socket",

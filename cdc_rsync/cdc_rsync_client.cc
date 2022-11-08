@@ -94,13 +94,10 @@ absl::Status GetServerExitStatus(int exit_code, const std::string& error_msg) {
 
 }  // namespace
 
-GgpRsyncClient::GgpRsyncClient(const Options& options, PathFilter path_filter,
-                               std::string sources_dir,
+GgpRsyncClient::GgpRsyncClient(const Options& options,
                                std::vector<std::string> sources,
                                std::string user_host, std::string destination)
     : options_(options),
-      path_filter_(std::move(path_filter)),
-      sources_dir_(std::move(sources_dir)),
       sources_(std::move(sources)),
       user_host_(std::move(user_host)),
       destination_(std::move(destination)),
@@ -111,10 +108,10 @@ GgpRsyncClient::GgpRsyncClient(const Options& options, PathFilter path_filter,
                     &remote_util_),
       printer_(options.quiet, Util::IsTTY() && !options.json),
       progress_(&printer_, options.verbosity, options.json) {
-  if (options_.ssh_command) {
+  if (!options_.ssh_command.empty()) {
     remote_util_.SetSshCommand(options_.ssh_command);
   }
-  if (options_.scp_command) {
+  if (!options_.scp_command.empty()) {
     remote_util_.SetScpCommand(options_.scp_command);
   }
 }
@@ -454,7 +451,7 @@ absl::Status GgpRsyncClient::SendOptions() {
   request.set_compress(options_.compress);
   request.set_relative(options_.relative);
 
-  for (const PathFilter::Rule& rule : path_filter_.GetRules()) {
+  for (const PathFilter::Rule& rule : options_.filter.GetRules()) {
     SetOptionsRequest::FilterRule* filter_rule = request.add_filter_rules();
     filter_rule->set_type(ToProtoType(rule.type));
     filter_rule->set_pattern(rule.pattern);
@@ -463,7 +460,7 @@ absl::Status GgpRsyncClient::SendOptions() {
   request.set_checksum(options_.checksum);
   request.set_dry_run(options_.dry_run);
   request.set_existing(options_.existing);
-  if (options_.copy_dest) {
+  if (!options_.copy_dest.empty()) {
     request.set_copy_dest(options_.copy_dest);
   }
 
@@ -481,8 +478,8 @@ absl::Status GgpRsyncClient::FindAndSendAllSourceFiles() {
 
   Stopwatch stopwatch;
 
-  FileFinderAndSender file_finder(&path_filter_, &message_pump_, &progress_,
-                                  sources_dir_, options_.recursive,
+  FileFinderAndSender file_finder(&options_.filter, &message_pump_, &progress_,
+                                  options_.sources_dir, options_.recursive,
                                   options_.relative);
 
   progress_.StartFindFiles();
