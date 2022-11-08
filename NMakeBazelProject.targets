@@ -32,8 +32,7 @@
     <BazelSedCommand>| sed -r &quot;s/^([^:\(]+[:\(][[:digit:]]+(,[[:digit:]]+)?[:\)])/$(BazelSourcePathPrefix)\\1/&quot;</BazelSedCommand>
     <!-- Clang prints errors to stderr, so pipe it into stdout. -->
     <BazelSedCommand Condition="'$(Platform)'=='GGP'">2&gt;&amp;1 $(BazelSedCommand)</BazelSedCommand>
-    <!-- The workspace_status_command saves about 8 seconds. "exit 0" is roughly equivalent to 'true'. -->
-    <BazelArgs>--config=$(BazelPlatform) --workspace_status_command=&quot;exit 0&quot; --bes_backend=</BazelArgs>
+    <BazelArgs>--config=$(BazelPlatform)</BazelArgs>
     <BazelArgs Condition="'$(Configuration)|$(Platform)'=='Release|GGP'">$(BazelArgs) --linkopt=-Wl,--strip-all</BazelArgs>
     <!-- Prevent protobuf recompilation (protobuf is written to "host" by default for both x84 and ggp, causing recompiles). -->
     <BazelArgs Condition="'$(Platform)'=='x64'">$(BazelArgs) --distinct_host_configuration=false</BazelArgs>
