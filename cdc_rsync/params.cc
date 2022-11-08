@@ -26,6 +26,8 @@ namespace cdc_ft {
 namespace params {
 namespace {
 
+using Options = CdcRsyncClient::Options;
+
 template <typename... Args>
 void PrintError(const absl::FormatSpec<Args...>& format, Args... args) {
   std::cerr << "Error: " << absl::StrFormat(format, args...) << std::endl;

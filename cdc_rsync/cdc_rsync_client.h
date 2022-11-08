@@ -22,9 +22,9 @@
 
 #include "absl/status/status.h"
 #include "cdc_rsync/base/message_pump.h"
-#include "cdc_rsync/cdc_rsync.h"
 #include "cdc_rsync/client_socket.h"
 #include "cdc_rsync/progress_tracker.h"
+#include "common/path_filter.h"
 #include "common/port_manager.h"
 #include "common/remote_util.h"
 
@@ -35,6 +35,32 @@ class ZstdStream;
 
 class CdcRsyncClient {
  public:
+  struct Options {
+    int port = RemoteUtil::kDefaultSshPort;
+    bool delete_ = false;
+    bool recursive = false;
+    int verbosity = 0;
+    bool quiet = false;
+    bool whole_file = false;
+    bool relative = false;
+    bool compress = false;
+    bool checksum = false;
+    bool dry_run = false;
+    bool existing = false;
+    bool json = false;
+    std::string copy_dest;
+    int compress_level = 6;
+    int connection_timeout_sec = 10;
+    std::string ssh_command;
+    std::string scp_command;
+    std::string sources_dir;  // Base dir for files loaded for --files-from.
+    PathFilter filter;
+
+    // Compression level 0 is invalid.
+    static constexpr int kMinCompressLevel = -5;
+    static constexpr int kMaxCompressLevel = 22;
+  };
+
   CdcRsyncClient(const Options& options, std::vector<std::string> sources,
                  std::string user_host, std::string destination);
 

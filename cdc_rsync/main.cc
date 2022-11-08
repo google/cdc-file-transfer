@@ -18,13 +18,93 @@
 #include <string>
 #include <vector>
 
-#include "cdc_rsync/cdc_rsync.h"
+#include "cdc_rsync/cdc_rsync_client.h"
 #include "cdc_rsync/params.h"
+#include "common/log.h"
+#include "common/status.h"
 #include "common/util.h"
 
-int wmain(int argc, wchar_t* argv[]) {
-  cdc_ft::params::Parameters parameters;
+namespace {
 
+enum class ReturnCode {
+  // No error. Will match the tool's exit code, so OK must be 0.
+  kOk = 0,
+
+  // Generic error.
+  kGenericError = 1,
+
+  // Server connection timed out.
+  kConnectionTimeout = 2,
+
+  // Connection to the server was shut down unexpectedly.
+  kConnectionLost = 3,
+
+  // Binding to the forward port failed, probably because there's another
+  // instance of cdc_rsync running.
+  kAddressInUse = 4,
+
+  // Server deployment failed. This should be rare, it means that the server
+  // components were successfully copied, but the up-to-date check still fails.
+  kDeployFailed = 5,
+};
+
+// Server connection timed out. SSH probably stale.
+constexpr char kMsgFmtConnectionTimeout[] =
+    "Server connection timed out. Verify that host '%s' and port '%i' are "
+    "correct, or specify a larger timeout with --contimeout.";
+
+// Server connection timed out and IP was not passed in. Probably network error.
+constexpr char kMsgConnectionTimeoutWithIp[] =
+    "Server connection timed out. Check your network connection.";
+
+// Receiving pipe end was shut down unexpectedly.
+constexpr char kMsgConnectionLost[] =
+    "The connection to the instance was shut down unexpectedly.";
+
+// Binding to the port failed.
+constexpr char kMsgAddressInUse[] =
+    "Failed to establish a connection to the instance. All ports are already "
+    "in use. This can happen if another instance of this command is running. "
+    "Currently, only 10 simultaneous connections are supported.";
+
+// Deployment failed even though gamelet components were copied successfully.
+constexpr char kMsgDeployFailed[] =
+    "Failed to deploy the instance components for unknown reasons. "
+    "Please report this issue.";
+
+ReturnCode TagToMessage(cdc_ft::Tag tag,
+                        const cdc_ft::params::Parameters& params,
+                        std::string* msg) {
+  msg->clear();
+  switch (tag) {
+    case cdc_ft::Tag::kSocketEof:
+      *msg = kMsgConnectionLost;
+      return ReturnCode::kConnectionLost;
+
+    case cdc_ft::Tag::kAddressInUse:
+      *msg = kMsgAddressInUse;
+      return ReturnCode::kAddressInUse;
+
+    case cdc_ft::Tag::kDeployServer:
+      *msg = kMsgDeployFailed;
+      return ReturnCode::kDeployFailed;
+
+    case cdc_ft::Tag::kConnectionTimeout:
+      *msg = absl::StrFormat(kMsgFmtConnectionTimeout, params.user_host,
+                             params.options.port);
+      return ReturnCode::kConnectionTimeout;
+
+    case cdc_ft::Tag::kCount:
+      return ReturnCode::kGenericError;
+  }
+
+  // Should not happen (TM). Will fall back to status message in this case.
+  return ReturnCode::kGenericError;
+}
+
+}  // namespace
+
+int wmain(int argc, wchar_t* argv[]) {
   // Convert args from wide to UTF8 strings.
   std::vector<std::string> utf8_str_args;
   utf8_str_args.reserve(argc);
@@ -39,14 +119,40 @@ int wmain(int argc, wchar_t* argv[]) {
     utf8_args.push_back(utf8_str_arg.c_str());
   }
 
+  // Read parameters from the environment and the command line.
+  cdc_ft::params::Parameters parameters;
   if (!cdc_ft::params::Parse(argc, utf8_args.data(), &parameters)) {
     return 1;
   }
 
+  // Initialize logging.
+  cdc_ft::LogLevel log_level =
+      cdc_ft::Log::VerbosityToLogLevel(parameters.options.verbosity);
+  cdc_ft::Log::Initialize(std::make_unique<cdc_ft::ConsoleLog>(log_level));
+
+  // Run rsync.
+  cdc_ft::CdcRsyncClient client(parameters.options, parameters.sources,
+                                parameters.user_host, parameters.destination);
+  absl::Status status = client.Run();
+  if (status.ok()) {
+    return static_cast<int>(ReturnCode::kOk);
+  }
+
+  // Get an error message from the tag associated with the status.
   std::string error_message;
-  cdc_ft::ReturnCode code =
-      cdc_ft::Sync(parameters.options, parameters.sources, parameters.user_host,
-                   parameters.destination, &error_message);
+  ReturnCode code = ReturnCode::kGenericError;
+  absl::optional<cdc_ft::Tag> tag = cdc_ft::GetTag(status);
+  if (tag.has_value()) {
+    code = TagToMessage(tag.value(), parameters, &error_message);
+  }
+
+  // Fall back to status message if there was no tag.
+  if (error_message.empty()) {
+    error_message = status.message();
+  } else if (parameters.options.verbosity >= 2) {
+    // In verbose mode, log the status as well, so nothing gets lost.
+    LOG_ERROR("%s", status.ToString());
+  }
 
   if (!error_message.empty()) {
     fprintf(stderr, "Error: %s\n", error_message.c_str());

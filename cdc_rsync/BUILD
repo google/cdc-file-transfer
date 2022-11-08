@@ -63,15 +63,8 @@ cc_test(
 
 cc_library(
     name = "cdc_rsync_client",
-    srcs = [
-        "cdc_rsync.cc",
-        "cdc_rsync_client.cc",
-    ],
-    hdrs = [
-        "cdc_rsync.h",
-        "cdc_rsync_client.h",
-        "error_messages.h",
-    ],
+    srcs = ["cdc_rsync_client.cc"],
+    hdrs = ["cdc_rsync_client.h"],
     linkopts = select({
         "//tools:windows": [
             "/DEFAULTLIB:Ws2_32.lib",  # Sockets, e.g. recv, send, WSA*.

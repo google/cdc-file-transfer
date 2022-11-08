@@ -25,6 +25,8 @@ namespace cdc_ft {
 namespace params {
 namespace {
 
+using Options = CdcRsyncClient::Options;
+
 constexpr char kSrc[] = "source";
 constexpr char kUserHostDst[] = "user@host:destination";
 constexpr char kUserHost[] = "user@host";

@@ -20,14 +20,14 @@
 #include <string>
 #include <vector>
 
-#include "cdc_rsync/cdc_rsync.h"
+#include "cdc_rsync/cdc_rsync_client.h"
 
 namespace cdc_ft {
 namespace params {
 
 // All cdc_rsync command line parameters.
 struct Parameters {
-  Options options;
+  CdcRsyncClient::Options options;
   std::vector<std::string> sources;
   std::string user_host;
   std::string destination;
