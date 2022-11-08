@@ -25,7 +25,6 @@
 #include "cdc_rsync/cdc_rsync.h"
 #include "cdc_rsync/client_socket.h"
 #include "cdc_rsync/progress_tracker.h"
-#include "common/path_filter.h"
 #include "common/port_manager.h"
 #include "common/remote_util.h"
 
@@ -34,12 +33,12 @@ namespace cdc_ft {
 class Process;
 class ZstdStream;
 
-class GgpRsyncClient {
+class CdcRsyncClient {
  public:
-  GgpRsyncClient(const Options& options, std::vector<std::string> sources,
+  CdcRsyncClient(const Options& options, std::vector<std::string> sources,
                  std::string user_host, std::string destination);
 
-  ~GgpRsyncClient();
+  ~CdcRsyncClient();
 
   // Deploys the server if necessary, starts it and runs the rsync procedure.
   absl::Status Run();

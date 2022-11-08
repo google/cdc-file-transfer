@@ -94,7 +94,7 @@ absl::Status GetServerExitStatus(int exit_code, const std::string& error_msg) {
 
 }  // namespace
 
-GgpRsyncClient::GgpRsyncClient(const Options& options,
+CdcRsyncClient::CdcRsyncClient(const Options& options,
                                std::vector<std::string> sources,
                                std::string user_host, std::string destination)
     : options_(options),
@@ -116,12 +116,12 @@ GgpRsyncClient::GgpRsyncClient(const Options& options,
   }
 }
 
-GgpRsyncClient::~GgpRsyncClient() {
+CdcRsyncClient::~CdcRsyncClient() {
   message_pump_.StopMessagePump();
   socket_.Disconnect();
 }
 
-absl::Status GgpRsyncClient::Run() {
+absl::Status CdcRsyncClient::Run() {
   // Initialize |remote_util_|.
   remote_util_.SetHostAndPort(user_host_, options_.port);
 
@@ -166,7 +166,7 @@ absl::Status GgpRsyncClient::Run() {
   return status;
 }
 
-absl::Status GgpRsyncClient::StartServer() {
+absl::Status CdcRsyncClient::StartServer() {
   assert(!server_process_);
 
   // Components are expected to reside in the same dir as the executable.
@@ -274,7 +274,7 @@ absl::Status GgpRsyncClient::StartServer() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::StopServer() {
+absl::Status CdcRsyncClient::StopServer() {
   assert(server_process_);
 
   // Close socket.
@@ -293,7 +293,7 @@ absl::Status GgpRsyncClient::StopServer() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::HandleServerOutput(const char* data) {
+absl::Status CdcRsyncClient::HandleServerOutput(const char* data) {
   // Note: This is called from a background thread!
 
   // Handle server error messages. Unfortunately, if the server prints to
@@ -330,7 +330,7 @@ absl::Status GgpRsyncClient::HandleServerOutput(const char* data) {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::Sync() {
+absl::Status CdcRsyncClient::Sync() {
   absl::Status status = SendOptions();
   if (!status.ok()) {
     return WrapStatus(status, "Failed to send options to server");
@@ -388,7 +388,7 @@ absl::Status GgpRsyncClient::Sync() {
   return status;
 }
 
-absl::Status GgpRsyncClient::DeployServer() {
+absl::Status CdcRsyncClient::DeployServer() {
   assert(!server_process_);
 
   std::string exe_dir;
@@ -439,7 +439,7 @@ absl::Status GgpRsyncClient::DeployServer() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::SendOptions() {
+absl::Status CdcRsyncClient::SendOptions() {
   LOG_INFO("Sending options");
 
   SetOptionsRequest request;
@@ -473,7 +473,7 @@ absl::Status GgpRsyncClient::SendOptions() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::FindAndSendAllSourceFiles() {
+absl::Status CdcRsyncClient::FindAndSendAllSourceFiles() {
   LOG_INFO("Finding and sending all sources files");
 
   Stopwatch stopwatch;
@@ -500,7 +500,7 @@ absl::Status GgpRsyncClient::FindAndSendAllSourceFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::ReceiveFileStats() {
+absl::Status CdcRsyncClient::ReceiveFileStats() {
   LOG_INFO("Receiving file stats");
 
   SendFileStatsResponse response;
@@ -520,7 +520,7 @@ absl::Status GgpRsyncClient::ReceiveFileStats() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::ReceiveDeletedFiles() {
+absl::Status CdcRsyncClient::ReceiveDeletedFiles() {
   LOG_INFO("Receiving path of deleted files");
   std::string current_directory;
 
@@ -551,7 +551,7 @@ absl::Status GgpRsyncClient::ReceiveDeletedFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::ReceiveFileIndices(
+absl::Status CdcRsyncClient::ReceiveFileIndices(
     const char* file_type, std::vector<uint32_t>* file_indices) {
   LOG_INFO("Receiving indices of %s files", file_type);
 
@@ -585,7 +585,7 @@ absl::Status GgpRsyncClient::ReceiveFileIndices(
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::SendMissingFiles() {
+absl::Status CdcRsyncClient::SendMissingFiles() {
   if (missing_file_indices_.empty()) {
     return absl::OkStatus();
   }
@@ -656,7 +656,7 @@ absl::Status GgpRsyncClient::SendMissingFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::ReceiveSignaturesAndSendDelta() {
+absl::Status CdcRsyncClient::ReceiveSignaturesAndSendDelta() {
   if (changed_file_indices_.empty()) {
     return absl::OkStatus();
   }
@@ -734,7 +734,7 @@ absl::Status GgpRsyncClient::ReceiveSignaturesAndSendDelta() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::StartCompressionStream() {
+absl::Status CdcRsyncClient::StartCompressionStream() {
   assert(!compression_stream_);
 
   // Notify server that data is compressed from now on.
@@ -765,7 +765,7 @@ absl::Status GgpRsyncClient::StartCompressionStream() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::StopCompressionStream() {
+absl::Status CdcRsyncClient::StopCompressionStream() {
   assert(compression_stream_);
 
   // Finish writing to |compression_process_|'s stdin and change back to

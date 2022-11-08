@@ -62,7 +62,7 @@ ReturnCode Sync(const Options& options, const std::vector<std::string>& sources,
   Log::Initialize(std::make_unique<ConsoleLog>(log_level));
 
   // Run rsync.
-  GgpRsyncClient client(options, sources, user_host, destination);
+  CdcRsyncClient client(options, sources, user_host, destination);
   absl::Status status = client.Run();
 
   if (status.ok()) {

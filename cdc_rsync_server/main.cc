@@ -81,7 +81,7 @@ int main(int argc, const char** argv) {
 
   cdc_ft::Log::Initialize(
       std::make_unique<cdc_ft::ConsoleLog>(cdc_ft::LogLevel::kWarning));
-  cdc_ft::GgpRsyncServer server;
+  cdc_ft::CdcRsyncServer server;
   if (!server.CheckComponents(components)) {
     return cdc_ft::kServerExitCodeOutOfDate;
   }
