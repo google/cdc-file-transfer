@@ -107,6 +107,25 @@ class RemoteUtil {
   // Returns whether output is suppressed.
   bool Quiet() const { return quiet_; }
 
+  // Escapes command line argument for the Microsoft command line parser in
+  // preparation for quoting. Double quotes are backslash-escaped. Literal
+  // backslashes are backslash-escaped if they are followed by a double quote,
+  // or if they are part of a sequence of backslashes that are followed by a
+  // double quote.
+  static std::string EscapeForWindows(const std::string& argument);
+
+  // Quotes and escapes a command line argument following the convention
+  // understood by the Microsoft command line parser.
+  static std::string QuoteArgument(const std::string& argument);
+
+  // Quotes and escapes a command line argument for usage in SSH.
+  static std::string QuoteArgumentForSsh(const std::string& argument);
+
+  // Quotes and escapes a command line arguments for use in ssh command. The
+  // argument is first escaped and quoted for Linux using single quotes and then
+  // it is escaped to be used by the Microsoft command line parser.
+  static std::string QuoteAndEscapeArgumentForSsh(const std::string& argument);
+
  private:
   // Verifies that both |hostname_| and |ssh_port_| are set.
   absl::Status CheckIpPort();

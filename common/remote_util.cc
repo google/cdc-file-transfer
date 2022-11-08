@@ -23,36 +23,6 @@
 namespace cdc_ft {
 namespace {
 
-// Escapes command line argument for the Microsoft command line parser in
-// preparation for quoting. Double quotes are backslash-escaped. Literal
-// backslashes are backslash-escaped if they are followed by a double quote, or
-// if they are part of a sequence of backslashes that are followed by a double
-// quote.
-std::string EscapeForWindows(const std::string& argument) {
-  std::string str =
-      std::regex_replace(argument, std::regex(R"(\\*(?=""|$))"), "$1$1");
-  return std::regex_replace(str, std::regex("\""), "\\\"");
-}
-
-// Quotes and escapes a command line argument following the convention
-// understood by the Microsoft command line parser.
-std::string QuoteArgument(const std::string& argument) {
-  return absl::StrFormat("\"%s\"", EscapeForWindows(argument));
-}
-
-// Quotes and escapes a command line argument for usage in SSH.
-std::string QuoteArgumentForSsh(const std::string& argument) {
-  return absl::StrFormat(
-    "'%s'", std::regex_replace(argument, std::regex("'"), "'\\''"));
-}
-
-// Quotes and escapes a command line arguments for use in ssh command. The
-// argument is first escaped and quoted for Linux using single quotes and then
-// it is escaped to be used by the Microsoft command line parser.
-std::string QuoteAndEscapeArgumentForSsh(const std::string& argument) {
-  return EscapeForWindows(QuoteArgumentForSsh(argument));
-}
-
 // Gets the argument for SSH (reverse) port forwarding, e.g. -L23:localhost:45.
 std::string GetPortForwardingArg(int local_port, int remote_port,
                                  bool reverse) {
@@ -137,16 +107,16 @@ absl::Status RemoteUtil::Sync(std::vector<std::string> source_filepaths,
 
 absl::Status RemoteUtil::Chmod(const std::string& mode,
                                const std::string& remote_path, bool quiet) {
-  std::string remote_command = absl::StrFormat(
-      "chmod %s %s %s", QuoteArgument(mode),
-    EscapeForWindows(remote_path), quiet ? "-f" : "");
+  std::string remote_command =
+      absl::StrFormat("chmod %s %s %s", QuoteArgument(mode),
+                      EscapeForWindows(remote_path), quiet ? "-f" : "");
 
   return Run(remote_command, "chmod");
 }
 
 absl::Status RemoteUtil::Rm(const std::string& remote_path, bool force) {
-  std::string remote_command = absl::StrFormat(
-      "rm %s %s", force ? "-f" : "", EscapeForWindows(remote_path));
+  std::string remote_command = absl::StrFormat("rm %s %s", force ? "-f" : "",
+                                               EscapeForWindows(remote_path));
 
   return Run(remote_command, "rm");
 }
@@ -155,7 +125,7 @@ absl::Status RemoteUtil::Mv(const std::string& old_remote_path,
                             const std::string& new_remote_path) {
   std::string remote_command =
       absl::StrFormat("mv %s %s", EscapeForWindows(old_remote_path),
-        EscapeForWindows(new_remote_path));
+                      EscapeForWindows(new_remote_path));
 
   return Run(remote_command, "mv");
 }
@@ -210,6 +180,26 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
       QuoteArgument(hostname_), ssh_port_, remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
   return start_info;
+}
+
+std::string RemoteUtil::EscapeForWindows(const std::string& argument) {
+  std::string str =
+      std::regex_replace(argument, std::regex(R"(\\*(?=""|$))"), "$1$1");
+  return std::regex_replace(str, std::regex("\""), "\\\"");
+}
+
+std::string RemoteUtil::QuoteArgument(const std::string& argument) {
+  return absl::StrFormat("\"%s\"", EscapeForWindows(argument));
+}
+
+std::string RemoteUtil::QuoteArgumentForSsh(const std::string& argument) {
+  return absl::StrFormat(
+      "'%s'", std::regex_replace(argument, std::regex("'"), "'\\''"));
+}
+
+std::string RemoteUtil::QuoteAndEscapeArgumentForSsh(
+    const std::string& argument) {
+  return EscapeForWindows(QuoteArgumentForSsh(argument));
 }
 
 absl::Status RemoteUtil::CheckIpPort() {

@@ -423,28 +423,20 @@ absl::Status GgpRsyncClient::DeployServer() {
     return WrapStatus(status, "Failed to copy cdc_rsync_server to instance");
   }
 
-  // Make cdc_rsync_server executable.
-  status = remote_util_.Chmod("a+x", remoteServerTmpPath);
+  // Do 3 things in one SSH command, to save time:
+  // - Make the old cdc_rsync_server writable (if it exists).
+  // - Make the new cdc_rsync_server executable.
+  // - Replace the old cdc_rsync_server by the new one.
+  std::string old_path = RemoteUtil::EscapeForWindows(
+      std::string(kRemoteToolsBinDir) + kGgpServerFilename);
+  std::string new_path = RemoteUtil::EscapeForWindows(remoteServerTmpPath);
+  std::string replace_cmd = absl::StrFormat(
+      " ([ ! -f %s ] || chmod u+w %s) && chmod a+x %s && mv %s %s", old_path,
+      old_path, new_path, new_path, old_path);
+  status = remote_util_.Run(replace_cmd, "chmod && chmod && mv");
   if (!status.ok()) {
     return WrapStatus(status,
-                      "Failed to set executable flag on cdc_rsync_server");
-  }
-
-  // Make old file writable. Mv might fail to overwrite it, e.g. if someone made
-  // it read-only.
-  std::string remoteServerPath =
-      std::string(kRemoteToolsBinDir) + kGgpServerFilename;
-  status = remote_util_.Chmod("u+w", remoteServerPath, /*quiet=*/true);
-  if (!status.ok()) {
-    LOG_DEBUG("chmod u+w %s failed (expected if file does not exist): %s",
-              remoteServerPath, status.ToString());
-  }
-
-  // Replace old file by new file.
-  status = remote_util_.Mv(remoteServerTmpPath, remoteServerPath);
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to replace '%s' by '%s'",
-                      remoteServerPath, remoteServerTmpPath);
+                      "Failed to replace old cdc_rsync_server by new one");
   }
 
   return absl::OkStatus();
