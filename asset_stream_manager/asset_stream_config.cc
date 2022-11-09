@@ -26,9 +26,6 @@
 #include "common/status_macros.h"
 #include "json/json.h"
 
-ABSL_DECLARE_FLAG(std::string, src_dir);
-ABSL_DECLARE_FLAG(std::string, instance_ip);
-ABSL_DECLARE_FLAG(uint16_t, instance_port);
 ABSL_DECLARE_FLAG(int, verbosity);
 ABSL_DECLARE_FLAG(bool, debug);
 ABSL_DECLARE_FLAG(bool, singlethreaded);
@@ -62,9 +59,6 @@ const auto RETIRED_FLAGS_REG_allow_edge =
 namespace cdc_ft {
 
 AssetStreamConfig::AssetStreamConfig() {
-  src_dir_ = absl::GetFlag(FLAGS_src_dir);
-  instance_ip_ = absl::GetFlag(FLAGS_instance_ip);
-  instance_port_ = absl::GetFlag(FLAGS_instance_port);
   session_cfg_.verbosity = absl::GetFlag(FLAGS_verbosity);
   session_cfg_.fuse_debug = absl::GetFlag(FLAGS_debug);
   session_cfg_.fuse_singlethreaded = absl::GetFlag(FLAGS_singlethreaded);
@@ -105,7 +99,6 @@ absl::Status AssetStreamConfig::LoadFromFile(const std::string& path) {
     }                                      \
   } while (0)
 
-  ASSIGN_VAR(src_dir_, src_dir, String);
   ASSIGN_VAR(session_cfg_.verbosity, verbosity, Int);
   ASSIGN_VAR(session_cfg_.fuse_debug, debug, Bool);
   ASSIGN_VAR(session_cfg_.fuse_singlethreaded, singlethreaded, Bool);
@@ -144,7 +137,6 @@ absl::Status AssetStreamConfig::LoadFromFile(const std::string& path) {
 
 std::string AssetStreamConfig::ToString() {
   std::ostringstream ss;
-  ss << "src_dir                      = " << src_dir_ << std::endl;
   ss << "verbosity                    = " << session_cfg_.verbosity
      << std::endl;
   ss << "debug                        = " << session_cfg_.fuse_debug

@@ -25,35 +25,50 @@ service LocalAssetsStreamManager {
   rpc StopSession(StopSessionRequest) returns (StopSessionResponse) {}
 }
 
-// NextID: 7
+// NextID: 12
 message StartSessionRequest {
-  // ID of assets streaming target gamelet. gamelet_id will continue to be set
-  // alongside gamelet_name for backwards compatibility, but new code should
-  // not read from the gamelet_id field.
-  string gamelet_id = 1;
   // The resource name of the assets streaming target gamelet, in the form
   // "organizations/{org-id}/projects/{proj-id}/pools/{pool-id}/gamelets/{gamelet-id}".
-  // If gamelet_name is specified, it will take precedence over gamelet_id.
+  // Only used by Stadia. Should set either this or user_host.
   string gamelet_name = 5;
-  // Path in the local workstation to stream assets from.
+  // Directory in the local workstation to stream assets from.
   string workstation_directory = 2;
-  // The user's email.
-  string account = 3;
-  // The OnePlatForm Url of the publishing API.
-  string url = 4;
-  // Caller of the SartSession request.
+  // Caller of the StartSession request.
+  // Only used by Stadia. May be left unspecified.
   enum Origin {
     ORIGIN_UNKNOWN = 0;
     ORIGIN_CLI = 1;
     ORIGIN_PARTNER_PORTAL = 2;
   }
   Origin origin = 6;
+  // Username and host, in the form [user@]host.
+  string user_host = 7;
+  // Remote directory where to mount the streamed directory.
+  string mount_dir = 8;
+  // SSH port to use while connecting to the remote instance.
+  // Optional, falls back to port 22 (default SSH port).
+  int32 port = 9;
+  // SSH command to connect to the remote instance.
+  // Optional, falls back to searching ssh.
+  string ssh_command = 10;
+  // SCP command to copy files to the remote instance.
+  // Optional, falls back to searching scp.
+  string scp_command = 11;
+
+  reserved 1, 3, 4;
 }
 
 message StartSessionResponse {}
 
+// NextID: 4
 message StopSessionRequest {
+  // ID of assets streaming target gamelet.
+  // Only used by Stadia. Should set either this or user_host_dir.
   string gamelet_id = 1;
+  // Username and host, in the form [user@]host.
+  string user_host = 2;
+  // Remote directory where the streamed directory is mounted.
+  string mount_dir = 3;
 }
 
 message StopSessionResponse {}

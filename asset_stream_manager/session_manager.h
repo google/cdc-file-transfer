@@ -30,43 +30,46 @@ namespace cdc_ft {
 
 class MultiSession;
 class ProcessFactory;
+struct SessionTarget;
 
-// Implements a service to start and stop streaming sessions as a server.
-// The corresponding clients are implemented by the ggp CLI and SDK Proxy.
-// The CLI triggers StartSession() from `ggp instance mount --local-dir` and
-// StopSession() from `ggp instance unmount`. SDK Proxy invokes StartSession()
-// when a user starts a new game from the partner portal and sets an `Asset
-// streaming directory` in the `Advanced settings` in the `Play settings`
-// dialog.
-// This service is owned by SessionManagementServer.
+// Adds logic around MultiSession to start and stop streaming sessions. Makes
+// sure that some invariants are maintained, like no two streaming sessions
+// exist to the same target user@host:dir.
 class SessionManager {
  public:
   SessionManager(SessionConfig cfg, ProcessFactory* process_factory,
                  metrics::MetricsService* metrics_service);
   ~SessionManager();
 
-  // Starts a session and populates |multi_session| and |metrics_status|.
+  // Starts a new session or reuses an existing one.
+  // |instance_id| is a unique id for the remote instance and mount directory,
+  // e.g. user@host:mount_dir.
+  // |src_dir| is the local directory to stream.
+  // |target| identifies the remote target and how to connect to it.
+  // |project_id| is the project that owns the instance. Stadia only.
+  // |organization_id| is organization that contains the instance. Stadia only.
+  // Populates |multi_session| and |metrics_status| on success.
   absl::Status StartSession(const std::string& instance_id,
+                            const std::string& src_dir,
+                            const SessionTarget& target,
                             const std::string& project_id,
                             const std::string& organization_id,
-                            const std::string& instance_ip,
-                            uint16_t instance_port, const std::string& src_dir,
                             MultiSession** multi_session,
                             metrics::SessionStartStatus* metrics_status)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
-  // Stops the session for the given |instance|. Returns a NotFound error if no
-  // session exists.
-  absl::Status StopSession(const std::string& instance)
+  // Stops the session for the given |instance_id|.
+  // Returns a NotFound error if no session exists.
+  absl::Status StopSession(const std::string& instance_id)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
   // Shuts down all existing MultiSessions.
   absl::Status Shutdown() ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
  private:
-  // Stops the session for the given |instance|. Returns a NotFound error if no
-  // session exists.
-  absl::Status StopSessionInternal(const std::string& instance)
+  // Stops the session for the given |instance_id|. Returns a NotFound error if
+  // no session exists.
+  absl::Status StopSessionInternal(const std::string& instance_id)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sessions_mutex_);
 
   // Returns the MultiSession for the given workstation directory |src_dir| or

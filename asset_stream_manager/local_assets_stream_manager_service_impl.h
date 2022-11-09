@@ -68,6 +68,10 @@ class LocalAssetsStreamManagerServiceImpl final
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
  private:
+  absl::Status LocalAssetsStreamManagerServiceImpl::StartSessionInternal(
+      const StartSessionRequest* request, std::string* instance_id,
+      MultiSession** ms, metrics::DeveloperLogEvent* evt);
+
   // Convert StartSessionRequest enum to metrics enum.
   metrics::RequestOrigin ConvertOrigin(StartSessionRequestOrigin origin) const;
 

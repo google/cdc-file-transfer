@@ -37,9 +37,20 @@ class LocalAssetsStreamManagerClient {
       std::shared_ptr<grpc::Channel> channel);
   ~LocalAssetsStreamManagerClient();
 
-  absl::Status StartSession();
+  // Starts streaming the Windows directory |src_dir| to the Linux target
+  // |user_host_dir|, which must be formatted as [user@]host:dir, e.g.
+  // jdoe@jdoe.corp.foo.com:~/assets
+  // Starting a second session to the same target will stop the first one.
+  absl::Status StartSession(const std::string& src_dir,
+                            const std::string& user_host, uint16_t ssh_port,
+                            const std::string& mount_dir,
+                            const std::string& ssh_command,
+                            const std::string& scp_command);
 
-  absl::Status StopSession();
+  // Stops the streaming session to the Linux target |user_host_dir|, which must
+  // be formatted as [user@]host:dir, e.g. jdoe@jdoe.corp.foo.com:~/assets
+  absl::Status StopSession(const std::string& user_host_dir,
+                           const std::string& mount_dir);
 
  private:
   using LocalAssetsStreamManager =

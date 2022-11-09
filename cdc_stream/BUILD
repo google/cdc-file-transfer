@@ -8,6 +8,7 @@ cc_binary(
     deps = [
         ":local_assets_stream_manager_client",
         "//common:log",
+        "//common:path",
         "@com_google_absl//absl/flags:parse",
         "@com_google_absl//absl/status",
     ],
@@ -18,6 +19,7 @@ cc_library(
     srcs = ["local_assets_stream_manager_client.cc"],
     hdrs = ["local_assets_stream_manager_client.h"],
     deps = [
+        "//common:grpc_status",
         "//proto:local_assets_stream_manager_grpc_proto",
         "@com_google_absl//absl/status",
     ],
