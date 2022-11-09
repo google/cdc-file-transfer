@@ -35,7 +35,7 @@
     <BazelArgs>--config=$(BazelPlatform)</BazelArgs>
     <BazelArgs Condition="'$(Configuration)|$(Platform)'=='Release|GGP'">$(BazelArgs) --linkopt=-Wl,--strip-all</BazelArgs>
     <!-- Prevent protobuf recompilation (protobuf is written to "host" by default for both x84 and ggp, causing recompiles). -->
-    <BazelArgs Condition="'$(Platform)'=='x64'">$(BazelArgs) --distinct_host_configuration=false</BazelArgs>
+    <!-- <BazelArgs Condition="'$(Platform)'=='x64'">$(BazelArgs) - -distinct_host_configuration=false</BazelArgs> -->
     <!-- Windows uses /LTCG (link-time code generation), but no /GL (global optimization), which is a requirement for that. -->
     <BazelArgs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(BazelArgs) --copt=/GL</BazelArgs>
     <!-- Strip unused symbols on GGP. -->

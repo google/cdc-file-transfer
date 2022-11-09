@@ -9,6 +9,7 @@ cc_binary(
     deps = [
         ":asset_stream_config",
         ":session_management_server",
+        "//cdc_stream",
         "//common:log",
         "//common:path",
         "//common:sdk_util",
