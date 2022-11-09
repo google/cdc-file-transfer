@@ -16,6 +16,7 @@
 
 #include <regex>
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "common/path.h"
@@ -64,7 +65,11 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
   std::string source_args;
   for (const std::string& sourceFilePath : source_filepaths) {
     // Workaround for scp thinking that C is a host in C:\path\to\foo.
-    source_args += QuoteArgument("//./" + sourceFilePath) + " ";
+    if (absl::StrContains(path::GetDrivePrefix(sourceFilePath), ":")) {
+      source_args += QuoteArgument("//./" + sourceFilePath) + " ";
+    } else {
+      source_args += sourceFilePath + " ";
+    }
   }
 
   // -p preserves timestamps. This enables timestamp-based up-to-date checks.
@@ -77,30 +82,6 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
       scp_command_, quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
       ssh_port_, source_args, QuoteArgument(user_host_ + ":" + dest));
   start_info.name = "scp";
-  start_info.forward_output_to_log = forward_output_to_log_;
-
-  return process_factory_->Run(start_info);
-}
-
-absl::Status RemoteUtil::Sync(std::vector<std::string> source_filepaths,
-                              const std::string& dest) {
-  absl::Status status = CheckHostPort();
-  if (!status.ok()) {
-    return status;
-  }
-
-  std::string source_args;
-  for (const std::string& sourceFilePath : source_filepaths) {
-    source_args += QuoteArgument(sourceFilePath) + " ";
-  }
-
-  ProcessStartInfo start_info;
-  start_info.command = absl::StrFormat(
-      "cdc_rsync --ip=%s --port=%i -z "
-      "%s %s%s",
-      QuoteArgument(user_host_), ssh_port_,
-      quiet_ || verbosity_ < 2 ? "-q " : " ", source_args, QuoteArgument(dest));
-  start_info.name = "cdc_rsync";
   start_info.forward_output_to_log = forward_output_to_log_;
 
   return process_factory_->Run(start_info);

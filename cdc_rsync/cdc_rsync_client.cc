@@ -47,7 +47,7 @@ constexpr int kExitCodeNotFound = 127;
 constexpr int kForwardPortFirst = 44450;
 constexpr int kForwardPortLast = 44459;
 constexpr char kCdcServerFilename[] = "cdc_rsync_server";
-constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc_file_transfer/";
+constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/";
 
 SetOptionsRequest::FilterRule::Type ToProtoType(PathFilter::Rule::Type type) {
   switch (type) {

@@ -61,11 +61,6 @@ class RemoteUtil {
   absl::Status Scp(std::vector<std::string> source_filepaths,
                    const std::string& dest, bool compress);
 
-  // Syncs |source_filepaths| to the remote folder |dest| on the gamelet using
-  // cdc_rsync. Must call SetUserHostAndPort before calling this method.
-  absl::Status Sync(std::vector<std::string> source_filepaths,
-                    const std::string& dest);
-
   // Calls 'chmod |mode| |remote_path|' on the gamelet.
   // Must call SetUserHostAndPort before calling this method.
   absl::Status Chmod(const std::string& mode, const std::string& remote_path,

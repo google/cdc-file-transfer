@@ -50,14 +50,6 @@ absl::Status Run(const AssetStreamConfig& cfg) {
       [&sm_server]() { return sm_server.Shutdown(); });
 
   RETURN_IF_ERROR(sm_server.Start(kSessionManagementPort));
-  if (!cfg.src_dir().empty()) {
-    MultiSession* ms_unused;
-    metrics::SessionStartStatus status_unused;
-    RETURN_IF_ERROR(session_manager.StartSession(
-        /*instance_id=*/cfg.instance_ip(), /*project_id=*/std::string(),
-        /*organization_id=*/std::string(), cfg.instance_ip(),
-        cfg.instance_port(), cfg.src_dir(), &ms_unused, &status_unused));
-  }
   sm_server.RunUntilShutdown();
   return absl::OkStatus();
 }
@@ -96,18 +88,6 @@ const auto RETIRED_FLAGS_REG_allow_edge =
 }  // namespace
 }  // namespace cdc_ft
 
-ABSL_FLAG(std::string, src_dir, "",
-          "Start a streaming session immediately from the given Windows path. "
-          "Used during development. Must have exactly one gamelet reserved or "
-          "specify the target gamelet with --instance.");
-ABSL_FLAG(std::string, instance_ip, "",
-          "Connect to the instance with the given IP address for this session. "
-          "This flag is ignored unless --src_dir is set as well. Used "
-          "during development. ");
-ABSL_FLAG(uint16_t, instance_port, 0,
-          "Connect to the instance through the given SSH port. "
-          "This flag is ignored unless --src_dir is set as well. Used "
-          "during development. ");
 ABSL_FLAG(int, verbosity, 2, "Verbosity of the log output");
 ABSL_FLAG(bool, debug, false, "Run FUSE filesystem in debug mode");
 ABSL_FLAG(bool, singlethreaded, false,

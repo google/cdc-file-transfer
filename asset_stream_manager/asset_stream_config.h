@@ -38,7 +38,6 @@ class AssetStreamConfig {
   // Loads a configuration from the JSON file at |path| and overrides any config
   // values that are set in this file. Sample json file:
   // {
-  //   "src_dir":"C:\\path\\to\\assets",
   //   "verbosity":3,
   //   "debug":0,
   //   "singlethreaded":0,
@@ -67,21 +66,6 @@ class AssetStreamConfig {
   // read from the JSON file.
   std::string GetFlagReadErrors();
 
-  // Workstation directory to stream. Should usually be empty since mounts are
-  // triggered by the CLI or the partner portal via a gRPC call, but useful
-  // during development.
-  const std::string& src_dir() const { return src_dir_; }
-
-  // IP address of the instance to stream to. Should usually be empty since
-  // mounts are triggered by the CLI or the partner portal via a gRPC call, but
-  // useful during development.
-  const std::string& instance_ip() const { return instance_ip_; }
-
-  // IP address of the instance to stream to. Should usually be unset (0) since
-  // mounts are triggered by the CLI or the partner portal via a gRPC call, but
-  // useful during development.
-  const uint16_t instance_port() const { return instance_port_; }
-
   // Session configuration.
   const SessionConfig session_cfg() const { return session_cfg_; }
 
@@ -89,9 +73,6 @@ class AssetStreamConfig {
   bool log_to_stdout() const { return log_to_stdout_; }
 
  private:
-  std::string src_dir_;
-  std::string instance_ip_;
-  uint16_t instance_port_ = 0;
   SessionConfig session_cfg_;
   bool log_to_stdout_ = false;
 

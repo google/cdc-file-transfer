@@ -14,14 +14,12 @@
 
 #include "data_store/data_provider.h"
 
-#include <chrono>
 #include <numeric>
 #include <thread>
 
 #include "common/path.h"
 #include "common/status_test_macros.h"
 #include "common/testing_clock.h"
-#include "common/util.h"
 #include "data_store/disk_data_store.h"
 #include "data_store/mem_data_store.h"
 #include "gtest/gtest.h"

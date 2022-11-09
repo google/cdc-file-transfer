@@ -32,17 +32,29 @@ class CdcFuseManager;
 class ProcessFactory;
 class Process;
 
-// Manages the connection of a workstation to a single gamelet.
+// Defines a remote target and how to connect to it.
+struct SessionTarget {
+  // SSH username and hostname of the remote target, formed as [user@]host.
+  std::string user_host;
+  // Port to use for SSH connections to the remote target.
+  uint16_t ssh_port;
+  // Ssh command to use to connect to the remote target.
+  std::string ssh_command;
+  // Scp command to use to copy files to the remote target.
+  std::string scp_command;
+  // Directory on the remote target where to mount the streamed directory.
+  std::string mount_dir;
+};
+
+// Manages the connection of a workstation to a single remote instance.
 class Session {
  public:
-  // |instance_id| is a unique id for the remote instance.
-  // |instance_ip| is the IP address of the remote instance.
-  // |instance_port| is the SSH tunnel port for connecting to the instance.
+  // |instance_id| is a unique idfor the remote instance.
+  // |target| identifies the remote target and how to connect to it.
   // |cfg| contains generic configuration parameters for the session.
   // |process_factory| abstracts process creation.
-  Session(std::string instance_id, std::string instance_ip,
-          uint16_t instance_port, SessionConfig cfg,
-          ProcessFactory* process_factory,
+  Session(std::string instance_id, const SessionTarget& target,
+          SessionConfig cfg, ProcessFactory* process_factory,
           std::unique_ptr<SessionMetricsRecorder> metrics_recorder);
   ~Session();
 
@@ -71,6 +83,7 @@ class Session {
 
  private:
   const std::string instance_id_;
+  const std::string mount_dir_;
   const SessionConfig cfg_;
   ProcessFactory* const process_factory_;
 

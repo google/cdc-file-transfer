@@ -59,10 +59,10 @@ absl::Status SessionManager::Shutdown() {
 }
 
 absl::Status SessionManager::StartSession(
-    const std::string& instance_id, const std::string& project_id,
-    const std::string& organization_id, const std::string& instance_ip,
-    uint16_t instance_port, const std::string& src_dir,
-    MultiSession** multi_session, metrics::SessionStartStatus* metrics_status) {
+    const std::string& instance_id, const std::string& src_dir,
+    const SessionTarget& target, const std::string& project_id,
+    const std::string& organization_id, MultiSession** multi_session,
+    metrics::SessionStartStatus* metrics_status) {
   *multi_session = nullptr;
   *metrics_status = metrics::SessionStartStatus::kOk;
 
@@ -83,7 +83,7 @@ absl::Status SessionManager::StartSession(
   // Early out if we are streaming the workstation dir to the given gamelet.
   MultiSession* ms = GetMultiSession(src_dir);
   *multi_session = ms;
-  if (ms && ms->HasSessionForInstance(instance_id)) {
+  if (ms && ms->HasSession(instance_id)) {
     if (ms->IsSessionHealthy(instance_id)) {
       LOG_INFO("Reusing existing session");
       return absl::OkStatus();
@@ -95,8 +95,8 @@ absl::Status SessionManager::StartSession(
     // We could also fall through, but this might restart the MultiSession.
     status = ms->StopSession(instance_id);
     if (status.ok()) {
-      status = ms->StartSession(instance_id, project_id, organization_id,
-                                instance_ip, instance_port);
+      status =
+          ms->StartSession(instance_id, target, project_id, organization_id);
     }
     if (!status.ok()) {
       *metrics_status = metrics::SessionStartStatus::kRestartSessionError;
@@ -129,8 +129,7 @@ absl::Status SessionManager::StartSession(
   // Start the session.
   LOG_INFO("Starting streaming session from path '%s' to instance '%s'",
            src_dir, instance_id);
-  status = ms->StartSession(instance_id, project_id, organization_id,
-                            instance_ip, instance_port);
+  status = ms->StartSession(instance_id, target, project_id, organization_id);
   if (!status.ok()) {
     *metrics_status = metrics::SessionStartStatus::kStartSessionError;
   }
@@ -164,15 +163,16 @@ absl::StatusOr<MultiSession*> SessionManager::GetOrCreateMultiSession(
   return iter->second.get();
 }
 
-absl::Status SessionManager::StopSessionInternal(const std::string& instance) {
+absl::Status SessionManager::StopSessionInternal(
+    const std::string& instance_id) {
   absl::Status status;
   for (const auto& [key, ms] : sessions_) {
-    if (!ms->HasSessionForInstance(instance)) continue;
+    if (!ms->HasSession(instance_id)) continue;
 
     LOG_INFO("Stopping session streaming from '%s' to instance '%s'",
-             ms->src_dir(), instance);
-    RETURN_IF_ERROR(ms->StopSession(instance),
-                    "Failed to stop session for instance '%s'", instance);
+             ms->src_dir(), instance_id);
+    RETURN_IF_ERROR(ms->StopSession(instance_id),
+                    "Failed to stop session for instance '%s'", instance_id);
 
     // Session was stopped. If the MultiSession is empty now, delete it.
     if (ms->Empty()) {
@@ -187,7 +187,7 @@ absl::Status SessionManager::StopSessionInternal(const std::string& instance) {
   }
 
   return absl::NotFoundError(
-      absl::StrFormat("No session for instance id '%s' found", instance));
+      absl::StrFormat("No session for instance '%s' found", instance_id));
 }
 
 }  // namespace cdc_ft

@@ -40,6 +40,7 @@ class CdcFuseManager {
   // |remote_port| to the workstation's |local_port|. Deploys the binary if
   // necessary.
   //
+  // |mount_dir| is the remote directory where to mount the FUSE.
   // |verbosity| is the log verbosity used by the filesystem.
   // |debug| puts the filesystem into debug mode if set to true. This also
   // causes the process to run in the foreground, so that logs are piped through
@@ -51,10 +52,10 @@ class CdcFuseManager {
   // |cleanup_timeout_sec| defines the data provider cleanup timeout in seconds.
   // |access_idle_timeout_sec| defines the number of seconds after which data
   // provider is considered to be access-idling.
-  absl::Status Start(uint16_t local_port, uint16_t remote_port, int verbosity,
-                     bool debug, bool singlethreaded, bool enable_stats,
-                     bool check, uint64_t cache_capacity,
-                     uint32_t cleanup_timeout_sec,
+  absl::Status Start(const std::string& mount_dir, uint16_t local_port,
+                     uint16_t remote_port, int verbosity, bool debug,
+                     bool singlethreaded, bool enable_stats, bool check,
+                     uint64_t cache_capacity, uint32_t cleanup_timeout_sec,
                      uint32_t access_idle_timeout_sec);
 
   // Stops the CDC FUSE.
