@@ -75,10 +75,10 @@
   <!-- For some reason, msbuild doesn't include this file, so copy it explicitly. -->
   <!-- TODO: Reenable once we can cross-compile these.
   <PropertyGroup>
-    <GgpRsyncServerFile>$(SolutionDir)bazel-out\k8-$(BazelCompilationMode)\bin\cdc_rsync_server\cdc_rsync_server</GgpRsyncServerFile>
+    <CdcRsyncServerFile>$(SolutionDir)bazel-out\k8-$(BazelCompilationMode)\bin\cdc_rsync_server\cdc_rsync_server</CdcRsyncServerFile>
   </PropertyGroup>
-  <Target Name="CopyServer" Inputs="$(GgpRsyncServerFile)" Outputs="$(OutDir)cdc_rsync_server" AfterTargets="Build">
-    <Copy SourceFiles="$(GgpRsyncServerFile)" DestinationFiles="$(OutDir)cdc_rsync_server" />
+  <Target Name="CopyServer" Inputs="$(CdcRsyncServerFile)" Outputs="$(OutDir)cdc_rsync_server" AfterTargets="Build">
+    <Copy SourceFiles="$(CdcRsyncServerFile)" DestinationFiles="$(OutDir)cdc_rsync_server" />
   </Target>
   -->
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

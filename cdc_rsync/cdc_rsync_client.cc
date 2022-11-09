@@ -46,7 +46,7 @@ constexpr int kExitCodeNotFound = 127;
 
 constexpr int kForwardPortFirst = 44450;
 constexpr int kForwardPortLast = 44459;
-constexpr char kGgpServerFilename[] = "cdc_rsync_server";
+constexpr char kCdcServerFilename[] = "cdc_rsync_server";
 constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc_file_transfer/";
 
 SetOptionsRequest::FilterRule::Type ToProtoType(PathFilter::Rule::Type type) {
@@ -178,7 +178,7 @@ absl::Status CdcRsyncClient::StartServer() {
 
   std::vector<GameletComponent> components;
   status = GameletComponent::Get(
-      {path::Join(component_dir, kGgpServerFilename)}, &components);
+      {path::Join(component_dir, kCdcServerFilename)}, &components);
   if (!status.ok()) {
     return MakeStatus(
         "Required instance component not found. Make sure the file "
@@ -202,7 +202,7 @@ absl::Status CdcRsyncClient::StartServer() {
   int port = *port_res;
 
   std::string remote_server_path =
-      std::string(kRemoteToolsBinDir) + kGgpServerFilename;
+      std::string(kRemoteToolsBinDir) + kCdcServerFilename;
   // Test existence manually to prevent misleading bash output message
   // "bash: .../cdc_rsync_server: No such file or directory".
   // Also create the bin dir because otherwise scp below might fail.
@@ -411,9 +411,9 @@ absl::Status CdcRsyncClient::DeployServer() {
 
   // scp cdc_rsync_server to a temp location on the gamelet.
   std::string remoteServerTmpPath =
-      absl::StrFormat("%s%s.%s", kRemoteToolsBinDir, kGgpServerFilename,
+      absl::StrFormat("%s%s.%s", kRemoteToolsBinDir, kCdcServerFilename,
                       Util::GenerateUniqueId());
-  std::string localServerPath = path::Join(exe_dir, kGgpServerFilename);
+  std::string localServerPath = path::Join(exe_dir, kCdcServerFilename);
   status = remote_util_.Scp({localServerPath}, remoteServerTmpPath,
                             /*compress=*/true);
   if (!status.ok()) {
@@ -425,7 +425,7 @@ absl::Status CdcRsyncClient::DeployServer() {
   // - Make the new cdc_rsync_server executable.
   // - Replace the old cdc_rsync_server by the new one.
   std::string old_path = RemoteUtil::EscapeForWindows(
-      std::string(kRemoteToolsBinDir) + kGgpServerFilename);
+      std::string(kRemoteToolsBinDir) + kCdcServerFilename);
   std::string new_path = RemoteUtil::EscapeForWindows(remoteServerTmpPath);
   std::string replace_cmd = absl::StrFormat(
       " ([ ! -f %s ] || chmod u+w %s) && chmod a+x %s && mv %s %s", old_path,
