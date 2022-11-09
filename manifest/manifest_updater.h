@@ -157,27 +157,29 @@ class ManifestUpdater {
   // Reads the full source directory and syncs the manifest to it. Prunes old,
   // unreferenced manifest chunks. Updates and flushes |file_chunks|.
   //
-  // If a valid |push_intermediate_manifest| is passed, then a manifest is
-  // flushed after the root directory has been added, but before all files and
+  // If a valid |push_handler| is passed, then a manifest is flushed at least
+  // twice and the handler is called:
+  // - after the root directory has been added, but before all files and
   // directories have been processed. That means, the manifest does not yet
   // contains all assets, all incomplete assets are set to in-progress.
-  absl::Status UpdateAll(
-      FileChunkMap* file_chunks,
-      PushManifestHandler push_manifest_handler = PushManifestHandler());
+  // - after an asset that was prioritized with AddPriorityAssets() has been
+  // completed.
+  // - at the end of the update process in case of success
+  absl::Status UpdateAll(FileChunkMap* file_chunks,
+                         PushManifestHandler push_handler = nullptr);
 
   // Updates the manifest by applying the |operations| list. Deletions are
   // handled first to make the outcome independent of the order in the list.
-  // Also updates and flushes |file_chunks| with the changes made. See
-  // UpdateAll() for a description of |push_intermediate_manifest|.
+  // Also updates and flushes |file_chunks| with the changes made. The
+  // |push_handler| is called at least twice during the operation and at the
+  // end, see UpdateAll() for more details.
   //
   // All paths should be Unix paths. If |recursive| is true, then a directory
   // scanner task is enqueued for each directory that is added to the manifest.
   // This is only needed during UpdateAll(). When the manifest is updated in
   // response to file watcher changes, then |recursive| should be set to false.
-  absl::Status Update(
-      OperationList* operations, FileChunkMap* file_chunks,
-      PushManifestHandler push_manifest_handler = PushManifestHandler(),
-      bool recursive = false);
+  absl::Status Update(OperationList* operations, FileChunkMap* file_chunks,
+                      PushManifestHandler push_handler, bool recursive = false);
 
   // Content id of the current manifest.
   const ContentIdProto& ManifestId() const { return manifest_id_; }

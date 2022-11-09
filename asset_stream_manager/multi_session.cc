@@ -188,19 +188,15 @@ void MultiSessionRunner::Run() {
     return;
   }
 
-  // Push an intermediate manifest containing the full directory structure, but
-  // potentially missing chunks. The purpose is that the FUSE can immediately
-  // show the structure and inode stats. FUSE will block on file reads that
-  // cannot be served due to missing chunks until the manifest is ready.
-  auto push_intermediate_manifest = [this](const ContentIdProto& manifest_id) {
+  // Push the intermediate manifest(s) and the final version with this handler.
+  auto push_handler = [this](const ContentIdProto& manifest_id) {
     SetManifest(manifest_id);
   };
 
   // Bring the manifest up to date.
   LOG_INFO("Updating manifest for '%s'...", src_dir_);
   Stopwatch sw;
-  status =
-      manifest_updater_->UpdateAll(&file_chunks_, push_intermediate_manifest);
+  status = manifest_updater_->UpdateAll(&file_chunks_, push_handler);
   RecordManifestUpdate(*manifest_updater_, sw.Elapsed(),
                        metrics::UpdateTrigger::kInitUpdateAll, status);
   if (!status.ok()) {
@@ -209,7 +205,6 @@ void MultiSessionRunner::Run() {
     return;
   }
   RecordMultiSessionStart(*manifest_updater_);
-  SetManifest(manifest_updater_->ManifestId());
   LOG_INFO("Manifest for '%s' updated in %0.3f seconds", src_dir_,
            sw.ElapsedSeconds());
 
@@ -265,8 +260,7 @@ void MultiSessionRunner::Run() {
           src_dir_);
       modified_files.clear();
       sw.Reset();
-      status = manifest_updater_->UpdateAll(&file_chunks_,
-                                            push_intermediate_manifest);
+      status = manifest_updater_->UpdateAll(&file_chunks_, push_handler);
       RecordManifestUpdate(*manifest_updater_, sw.Elapsed(),
                            metrics::UpdateTrigger::kRunningUpdateAll, status);
       if (!status.ok()) {
@@ -275,21 +269,17 @@ void MultiSessionRunner::Run() {
             "'%s'",
             src_dir_, status.ToString());
         SetManifest(manifest_updater_->DefaultManifestId());
-      } else {
-        SetManifest(manifest_updater_->ManifestId());
       }
     } else if (!modified_files.empty()) {
       ManifestUpdater::OperationList ops = GetFileOperations(modified_files);
       sw.Reset();
-      status = manifest_updater_->Update(&ops, &file_chunks_);
+      status = manifest_updater_->Update(&ops, &file_chunks_, push_handler);
       RecordManifestUpdate(*manifest_updater_, sw.Elapsed(),
                            metrics::UpdateTrigger::kRegularUpdate, status);
       if (!status.ok()) {
         LOG_WARNING("Updating manifest for '%s' failed: %s", src_dir_,
                     status.ToString());
         SetManifest(manifest_updater_->DefaultManifestId());
-      } else {
-        SetManifest(manifest_updater_->ManifestId());
       }
     }
 

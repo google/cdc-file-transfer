@@ -425,8 +425,8 @@ ManifestUpdater::ManifestUpdater(DataStoreWriter* data_store, UpdaterConfig cfg)
 
 ManifestUpdater::~ManifestUpdater() = default;
 
-absl::Status ManifestUpdater::UpdateAll(
-    FileChunkMap* file_chunks, PushManifestHandler push_manifest_handler) {
+absl::Status ManifestUpdater::UpdateAll(FileChunkMap* file_chunks,
+                                        PushManifestHandler push_handler) {
   RETURN_IF_ERROR(ManifestUpdater::IsValidDir(cfg_.src_dir));
 
   // Don't use the Windows localized time from path::GetStats.
@@ -440,7 +440,7 @@ absl::Status ManifestUpdater::UpdateAll(
 
   std::vector<Operation> operations{{Operator::kAdd, std::move(ri)}};
 
-  absl::Status status = Update(&operations, file_chunks, push_manifest_handler,
+  absl::Status status = Update(&operations, file_chunks, push_handler,
                                /*recursive=*/true);
 
   if (status.ok() || !absl::IsUnavailable(status)) return status;
@@ -454,7 +454,7 @@ absl::Status ManifestUpdater::UpdateAll(
   RETURN_IF_ERROR(data_store_->Wipe());
   file_chunks->Clear();
 
-  RETURN_IF_ERROR(Update(&operations, file_chunks, push_manifest_handler,
+  RETURN_IF_ERROR(Update(&operations, file_chunks, push_handler,
                          /*recursive=*/true),
                   "Failed to build manifest from scratch");
 
@@ -517,13 +517,12 @@ bool ManifestUpdater::WantManifestFlushed(
 absl::Status ManifestUpdater::MaybeFlushAndPushManifest(
     size_t dir_scanner_tasks_queued, FileChunkMap* file_chunks,
     std::unordered_set<ContentIdProto>* manifest_content_ids,
-    PushManifestHandler push_manifest_handler) {
+    PushManifestHandler push_manifest) {
   // Flush only if there are no DirScannerTask active.
-  if (dir_scanner_tasks_queued == 0 &&
-      WantManifestFlushed(push_manifest_handler)) {
+  if (dir_scanner_tasks_queued == 0 && WantManifestFlushed(push_manifest)) {
     flush_deadline_ = absl::InfiniteFuture();
     return FlushAndPushManifest(file_chunks, manifest_content_ids,
-                                push_manifest_handler);
+                                push_manifest);
   }
   return absl::OkStatus();
 }
@@ -755,7 +754,7 @@ absl::Status ManifestUpdater::HandleDirScannerResult(
 
 absl::Status ManifestUpdater::Update(OperationList* operations,
                                      FileChunkMap* file_chunks,
-                                     PushManifestHandler push_manifest_handler,
+                                     PushManifestHandler push_handler,
                                      bool recursive) {
   Stopwatch sw;
   LOG_INFO(
@@ -810,9 +809,9 @@ absl::Status ManifestUpdater::Update(OperationList* operations,
   size_t total_tasks_queued = 0, scanner_tasks_queued = 0;
 
   // Push intermediate manifest if there are queued tasks.
-  if (push_manifest_handler && !queue_.Empty()) {
-    RETURN_IF_ERROR(FlushAndPushManifest(file_chunks, &manifest_content_ids,
-                                         push_manifest_handler));
+  if (push_handler && !queue_.Empty()) {
+    RETURN_IF_ERROR(
+        FlushAndPushManifest(file_chunks, &manifest_content_ids, push_handler));
   }
 
   fastcdc::Config cdc_cfg = CdcConfigFromProto(cdc_params);
@@ -821,11 +820,12 @@ absl::Status ManifestUpdater::Update(OperationList* operations,
   while (!queue_.Empty() || total_tasks_queued > 0) {
     RETURN_IF_ERROR(MaybeFlushAndPushManifest(scanner_tasks_queued, file_chunks,
                                               &manifest_content_ids,
-                                              push_manifest_handler));
+                                              push_handler));
     // Flushing the manifest may invalidate the AssetProto pointers held by the
     // queued DirScannerTask. If the manifest should be flushed, we drain the
     // queue from those tasks so that the push is safe.
-    bool drain_dir_scanners = WantManifestFlushed(push_manifest_handler);
+    bool drain_dir_scanners = WantManifestFlushed(push_handler);
+
     QueueTasksResult queued = QueueTasks(drain_dir_scanners, &pool, &cdc_cfg);
     total_tasks_queued += queued.dir_scanners + queued.file_chunkers;
     scanner_tasks_queued += queued.dir_scanners;
@@ -859,6 +859,8 @@ absl::Status ManifestUpdater::Update(OperationList* operations,
     }
   }
 
+  // Don't pass in the push_handler here. We first want to write back the new
+  // manifest ID to the data store before we call the handler.
   RETURN_IF_ERROR(
       FlushAndPushManifest(file_chunks, &manifest_content_ids, nullptr));
   // Save the manifest id to the store.
@@ -866,6 +868,7 @@ absl::Status ManifestUpdater::Update(OperationList* operations,
   RETURN_IF_ERROR(
       data_store_->Put(GetManifestStoreId(), id_str.data(), id_str.size()),
       "Failed to store manifest id");
+  if (push_handler) push_handler(manifest_id_);
 
   // Remove manifest chunks that are no longer referenced when recursing through
   // all sub-directories. This also makes sure that all referenced manifest

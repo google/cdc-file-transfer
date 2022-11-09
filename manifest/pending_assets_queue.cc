@@ -1,4 +1,4 @@
-#include "pending_assets_queue.h"
+#include "manifest/pending_assets_queue.h"
 
 #include "common/log.h"
 #include "manifest/manifest_builder.h"
