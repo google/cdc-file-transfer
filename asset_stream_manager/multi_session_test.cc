@@ -65,6 +65,21 @@ class MetricsServiceForTest : public MultiSessionMetricsRecorder {
     metrics_records_.push_back(MetricsRecord(std::move(event), code));
   }
 
+  // Waits until |num_events| events of type |type| have been recorded, or until
+  // the function times out. Returns true if the condition was met and false if
+  // in case of a timeout.
+  bool WaitForEvents(metrics::EventType type, int num_events = 1,
+                     absl::Duration timeout = absl::Seconds(1)) {
+    absl::MutexLock lock(&mutex_);
+    auto cond = [this, type, num_events]() {
+      return std::count_if(metrics_records_.begin(), metrics_records_.end(),
+                           [type](const MetricsRecord& mr) {
+                             return mr.code == type;
+                           }) >= num_events;
+    };
+    return mutex_.AwaitWithTimeout(absl::Condition(&cond), timeout);
+  }
+
   std::vector<MetricsRecord> GetEventsAndClear(metrics::EventType type)
       ABSL_LOCKS_EXCLUDED(mutex_) {
     std::vector<MetricsRecord> events;
