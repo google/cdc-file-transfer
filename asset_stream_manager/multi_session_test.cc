@@ -172,8 +172,16 @@ class MultiSessionTest : public ManifestTestBase {
       metrics::ManifestUpdateData* data =
           events[i].evt.as_manager_data->manifest_update_data.get();
       EXPECT_LT(data->local_duration_ms, 60000ull);
-      manifests[i].local_duration_ms = data->local_duration_ms;
-      EXPECT_EQ(*data, manifests[i]);
+      EXPECT_EQ(data->status, manifests[i].status);
+      EXPECT_EQ(data->total_assets_added_or_updated,
+                manifests[i].total_assets_added_or_updated);
+      EXPECT_EQ(data->total_assets_deleted, manifests[i].total_assets_deleted);
+      EXPECT_EQ(data->total_chunks, manifests[i].total_chunks);
+      EXPECT_EQ(data->total_files_added_or_updated,
+                manifests[i].total_files_added_or_updated);
+      EXPECT_EQ(data->total_processed_bytes,
+                manifests[i].total_processed_bytes);
+      EXPECT_EQ(data->trigger, manifests[i].trigger);
     }
   }
 
