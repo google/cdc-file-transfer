@@ -48,50 +48,36 @@ enum class ReturnCode {
   kDeployFailed = 5,
 };
 
-// Server connection timed out. SSH probably stale.
-constexpr char kMsgFmtConnectionTimeout[] =
-    "Server connection timed out. Verify that host '%s' and port '%i' are "
-    "correct, or specify a larger timeout with --contimeout.";
-
-// Server connection timed out and IP was not passed in. Probably network error.
-constexpr char kMsgConnectionTimeoutWithIp[] =
-    "Server connection timed out. Check your network connection.";
-
-// Receiving pipe end was shut down unexpectedly.
-constexpr char kMsgConnectionLost[] =
-    "The connection to the instance was shut down unexpectedly.";
-
-// Binding to the port failed.
-constexpr char kMsgAddressInUse[] =
-    "Failed to establish a connection to the instance. All ports are already "
-    "in use. This can happen if another instance of this command is running. "
-    "Currently, only 10 simultaneous connections are supported.";
-
-// Deployment failed even though gamelet components were copied successfully.
-constexpr char kMsgDeployFailed[] =
-    "Failed to deploy the instance components for unknown reasons. "
-    "Please report this issue.";
-
 ReturnCode TagToMessage(cdc_ft::Tag tag,
                         const cdc_ft::params::Parameters& params,
                         std::string* msg) {
   msg->clear();
   switch (tag) {
     case cdc_ft::Tag::kSocketEof:
-      *msg = kMsgConnectionLost;
+      // Receiving pipe end was shut down unexpectedly.
+      *msg = "The connection to the instance was shut down unexpectedly.";
       return ReturnCode::kConnectionLost;
 
     case cdc_ft::Tag::kAddressInUse:
-      *msg = kMsgAddressInUse;
+      *msg =
+          "Failed to establish a connection to the instance. All ports are "
+          "already in use. This can happen if another instance of this command "
+          "is running. Currently, only 10 simultaneous connections are "
+          "supported.";
       return ReturnCode::kAddressInUse;
 
     case cdc_ft::Tag::kDeployServer:
-      *msg = kMsgDeployFailed;
+      *msg =
+          "Failed to deploy the instance components for unknown reasons. "
+          "Please report this issue.";
       return ReturnCode::kDeployFailed;
 
     case cdc_ft::Tag::kConnectionTimeout:
-      *msg = absl::StrFormat(kMsgFmtConnectionTimeout, params.user_host,
-                             params.options.port);
+      // Server connection timed out. SSH probably stale.
+      *msg = absl::StrFormat(
+          "Server connection timed out. Verify that host '%s' and port '%i' "
+          "are correct, or specify a larger timeout with --contimeout.",
+          params.user_host, params.options.port);
       return ReturnCode::kConnectionTimeout;
 
     case cdc_ft::Tag::kCount:

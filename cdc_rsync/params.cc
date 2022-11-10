@@ -45,10 +45,10 @@ Usage:
   cdc_rsync [options] source [source]... [user@]host:destination
 
 Parameters:
-  source                  Local file or folder to be copied
+  source                  Local file or directory to be copied
   user                    Remote SSH user name
   host                    Remote host or IP address
-  destination             Remote destination folder
+  destination             Remote destination directory
 
 Options:
     --ip string           Gamelet IP. Required.
@@ -59,7 +59,7 @@ Options:
     --json                Print JSON progress
 -n, --dry-run             Perform a trial run with no changes made
 -r, --recursive           Recurse into directories
-    --delete              Delete extraneous files from destination folder
+    --delete              Delete extraneous files from destination directory
 -z, --compress            Compress file data during the transfer
     --compress-level num  Explicitly set compression level (default: 6)
 -c, --checksum            Skip files based on checksum, not mod-time & size
@@ -75,10 +75,10 @@ Options:
     --copy-dest dir       Use files from dir as sync base if files are missing
     --ssh-command         Path and arguments of SSH command to use, e.g.
                           C:\path\to\ssh.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
-                          Can aslo be specified by the CDC_SSH_COMMAND environment variable.
+                          Can also be specified by the CDC_SSH_COMMAND environment variable.
     --scp-command         Path and arguments of SSH command to use, e.g.
                           C:\path\to\scp.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
-                          Can aslo be specified by the CDC_SCP_COMMAND environment variable.
+                          Can also be specified by the CDC_SCP_COMMAND environment variable.
 -h  --help                Help for cdc_rsync
 )";
 
@@ -346,19 +346,15 @@ bool ValidateParameters(const Parameters& params, bool help) {
 
   if (params.sources.empty()) {
     // If one arg was passed on the command line, it is not clear whether it
-    // was supposed to be a source or destination. Try to infer that, e.g.
-    //   cdc_rsync *.txt          -> Missing destination
-    //   cdc_rsync /mnt/developer -> Missing source
-    bool missing_src = params.destination[0] == '/';
-
-    PrintError("Missing %s", missing_src ? "source" : "destination");
+    // was supposed to be a source or destination.
+    PrintError("Missing source or destination");
     return false;
   }
 
   if (params.user_host.empty()) {
     PrintError(
         "No remote host specified in destination '%s'. "
-        "Expected [user@]host:dest.",
+        "Expected [user@]host:destination.",
         params.destination);
     return false;
   }
@@ -391,7 +387,7 @@ bool CheckOptionResult(OptionResult result, const std::string& name,
 // e.g. if |destination| is initially "user@foo.com:~/file", it is "~/file"
 // afterward and |user_host| is |user@foo.com|. Does not touch Windows drives,
 // e.g. C:\foo.
-void ParseUserHost(std::string* destination, std::string* user_host) {
+void PopUserHost(std::string* destination, std::string* user_host) {
   std::vector<std::string> parts =
       absl::StrSplit(*destination, absl::MaxSplits(':', 1));
   if (parts.size() < 2) return;
@@ -484,7 +480,7 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters) {
     return false;
   }
 
-  ParseUserHost(&parameters->destination, &parameters->user_host);
+  PopUserHost(&parameters->destination, &parameters->user_host);
 
   if (!ValidateParameters(*parameters, help)) {
     return false;

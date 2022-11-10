@@ -53,6 +53,7 @@ class PortManager {
   // explicitly.
   // |check_remote| determines whether the remote port should be checked as
   // well. If false, the check is skipped and a port might be returned that is
+  // still in use remotely.
   // |remote_timeout_sec| is the timeout for finding available ports on the
   // remote instance. Not used if |check_remote| is false.
   // Returns a DeadlineExceeded error if the timeout is exceeded.

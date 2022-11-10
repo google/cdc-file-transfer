@@ -123,7 +123,7 @@ CdcRsyncClient::~CdcRsyncClient() {
 
 absl::Status CdcRsyncClient::Run() {
   // Initialize |remote_util_|.
-  remote_util_.SetHostAndPort(user_host_, options_.port);
+  remote_util_.SetUserHostAndPort(user_host_, options_.port);
 
   // Start the server process.
   absl::Status status = StartServer();
@@ -187,8 +187,8 @@ absl::Status CdcRsyncClient::StartServer() {
   std::string component_args = GameletComponent::ToCommandLineArgs(components);
 
   // Find available local and remote ports for port forwarding.
-  absl::StatusOr<int> port_res =
-      port_manager_.ReservePort(false, options_.connection_timeout_sec);
+  absl::StatusOr<int> port_res = port_manager_.ReservePort(
+      /*check_remote=*/false, /*remote_timeout_sec unused*/ 0);
   constexpr char kErrorMsg[] = "Failed to find available port";
   if (absl::IsDeadlineExceeded(port_res.status())) {
     // Server didn't respond in time.

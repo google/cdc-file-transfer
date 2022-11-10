@@ -219,7 +219,7 @@ TEST_F(ParamsTest, ParseWithSingleParameterFailsOnMissingDestination) {
   const char* argv[] = {"cdc_rsync.exe", kSrc, NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError("Missing destination");
+  ExpectError("Missing source or destination");
 }
 
 TEST_F(ParamsTest, ParseSucceedsWithMultipleLetterKeyConsumed) {

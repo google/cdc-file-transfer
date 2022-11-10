@@ -16,6 +16,7 @@
 
 #include <regex>
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "common/path.h"
 #include "common/status.h"
@@ -41,21 +42,21 @@ RemoteUtil::RemoteUtil(int verbosity, bool quiet,
       process_factory_(process_factory),
       forward_output_to_log_(forward_output_to_log) {}
 
-void RemoteUtil::SetHostAndPort(std::string hostname, int port) {
-  hostname_ = std::move(hostname);
+void RemoteUtil::SetUserHostAndPort(std::string user_host, int port) {
+  user_host_ = std::move(user_host);
   ssh_port_ = port;
 }
 void RemoteUtil::SetScpCommand(std::string scp_command) {
-  scp_command_ = scp_command;
+  scp_command_ = std::move(scp_command);
 }
 
 void RemoteUtil::SetSshCommand(std::string ssh_command) {
-  ssh_command_ = ssh_command;
+  ssh_command_ = std::move(ssh_command);
 }
 
 absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
                              const std::string& dest, bool compress) {
-  absl::Status status = CheckIpPort();
+  absl::Status status = CheckHostPort();
   if (!status.ok()) {
     return status;
   }
@@ -74,7 +75,7 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
       "-P %i %s "
       "%s",
       scp_command_, quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
-      ssh_port_, source_args, QuoteArgument(hostname_ + ":" + dest));
+      ssh_port_, source_args, QuoteArgument(user_host_ + ":" + dest));
   start_info.name = "scp";
   start_info.forward_output_to_log = forward_output_to_log_;
 
@@ -83,7 +84,7 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
 
 absl::Status RemoteUtil::Sync(std::vector<std::string> source_filepaths,
                               const std::string& dest) {
-  absl::Status status = CheckIpPort();
+  absl::Status status = CheckHostPort();
   if (!status.ok()) {
     return status;
   }
@@ -95,9 +96,9 @@ absl::Status RemoteUtil::Sync(std::vector<std::string> source_filepaths,
 
   ProcessStartInfo start_info;
   start_info.command = absl::StrFormat(
-      "cdc_rsync.exe --ip=%s --port=%i -z "
+      "cdc_rsync --ip=%s --port=%i -z "
       "%s %s%s",
-      QuoteArgument(hostname_), ssh_port_,
+      QuoteArgument(user_host_), ssh_port_,
       quiet_ || verbosity_ < 2 ? "-q " : " ", source_args, QuoteArgument(dest));
   start_info.name = "cdc_rsync";
   start_info.forward_output_to_log = forward_output_to_log_;
@@ -131,7 +132,7 @@ absl::Status RemoteUtil::Mv(const std::string& old_remote_path,
 }
 
 absl::Status RemoteUtil::Run(std::string remote_command, std::string name) {
-  absl::Status status = CheckIpPort();
+  absl::Status status = CheckHostPort();
   if (!status.ok()) {
     return status;
   }
@@ -177,19 +178,19 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
       "-oServerAliveInterval=5 "  // Time interval between alive msgs
       "%s %s -p %i %s",
       ssh_command_, quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
-      QuoteArgument(hostname_), ssh_port_, remote_command_arg);
+      QuoteArgument(user_host_), ssh_port_, remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
   return start_info;
 }
 
 std::string RemoteUtil::EscapeForWindows(const std::string& argument) {
   std::string str =
-      std::regex_replace(argument, std::regex(R"(\\*(?=""|$))"), "$1$1");
-  return std::regex_replace(str, std::regex("\""), "\\\"");
+      std::regex_replace(argument, std::regex(R"(\\*(?="|$))"), "$&$&");
+  return std::regex_replace(str, std::regex(R"(")"), R"(\")");
 }
 
 std::string RemoteUtil::QuoteArgument(const std::string& argument) {
-  return absl::StrFormat("\"%s\"", EscapeForWindows(argument));
+  return absl::StrCat("\"", EscapeForWindows(argument), "\"");
 }
 
 std::string RemoteUtil::QuoteArgumentForSsh(const std::string& argument) {
@@ -202,8 +203,8 @@ std::string RemoteUtil::QuoteAndEscapeArgumentForSsh(
   return EscapeForWindows(QuoteArgumentForSsh(argument));
 }
 
-absl::Status RemoteUtil::CheckIpPort() {
-  if (hostname_.empty() || ssh_port_ == 0) {
+absl::Status RemoteUtil::CheckHostPort() {
+  if (user_host_.empty() || ssh_port_ == 0) {
     return MakeStatus("IP or port not set");
   }
 
