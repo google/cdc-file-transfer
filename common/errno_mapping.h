@@ -29,6 +29,10 @@ absl::StatusCode ErrnoToCanonicalCode(int error_number);
 absl::Status ErrnoToCanonicalStatus(int error_number,
                                     absl::string_view message);
 
+// Creates a status by converting the std |code to an absl code.
+absl::Status ErrorCodeToCanonicalStatus(const std::error_code& code,
+                                        absl::string_view message);
+
 }  // namespace cdc_ft
 
 #endif  // COMMON_ERRNO_MAPPING_H_

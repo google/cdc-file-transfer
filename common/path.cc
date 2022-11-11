@@ -974,9 +974,8 @@ absl::Status CreateSymlink(const std::string& target,
                                               error_code);
   }
   if (error_code) {
-    assert(error_code.category() == std::system_category());
-    return ErrnoToCanonicalStatus(
-        error_code.value(),
+    return ErrorCodeToCanonicalStatus(
+        error_code,
         absl::StrFormat("Failed to create symlink '%s' with target '%s'",
                         link_path, target));
   }
@@ -989,9 +988,8 @@ absl::StatusOr<std::string> GetSymlinkTarget(const std::string& link_path) {
   std::filesystem::path symlink_target =
       std::filesystem::read_symlink(link_path_u8, error_code);
   if (error_code) {
-    return ErrnoToCanonicalStatus(
-        error_code.value(),
-        absl::StrFormat("Failed to read symlink '%s'", link_path));
+    return ErrorCodeToCanonicalStatus(
+        error_code, absl::StrFormat("Failed to read symlink '%s'", link_path));
   }
   return symlink_target.u8string();
 }
@@ -1015,10 +1013,8 @@ absl::Status CreateDir(const std::string& path) {
   std::error_code error_code;
   std::filesystem::create_directory(std::filesystem::u8path(path), error_code);
   if (error_code) {
-    assert(error_code.category() == std::system_category());
-    return ErrnoToCanonicalStatus(
-        error_code.value(),
-        absl::StrFormat("Failed to create directory '%s'", path));
+    return ErrorCodeToCanonicalStatus(
+        error_code, absl::StrFormat("Failed to create directory '%s'", path));
   }
   return absl::OkStatus();
 }
@@ -1028,10 +1024,8 @@ absl::Status CreateDirRec(const std::string& path) {
   std::filesystem::create_directories(std::filesystem::u8path(path),
                                       error_code);
   if (error_code) {
-    assert(error_code.category() == std::system_category());
-    return ErrnoToCanonicalStatus(
-        error_code.value(),
-        absl::StrFormat("Failed to create directory '%s'", path));
+    return ErrorCodeToCanonicalStatus(
+        error_code, absl::StrFormat("Failed to create directory '%s'", path));
   }
   return absl::OkStatus();
 }

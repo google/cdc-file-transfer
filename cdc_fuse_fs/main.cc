@@ -43,12 +43,25 @@ absl::StatusOr<bool> IsUpToDate(const std::string& components_arg) {
 
   std::vector<GameletComponent> components =
       GameletComponent::FromCommandLineArgs(components_arg);
+  if (components.size() == 0) {
+    LOG_DEBUG("Invalid components arg '%s'", components_arg);
+    return false;
+  }
+
   std::vector<GameletComponent> our_components;
   absl::Status status =
       GameletComponent::Get({path::Join(component_dir, kFuseFilename),
                              path::Join(component_dir, kLibFuseFilename)},
                             &our_components);
-  if (!status.ok() || components != our_components) {
+  if (!status.ok()) {
+    LOG_DEBUG("Failed to get component data: %s", status.ToString())
+    return false;
+  }
+
+  if (components != our_components) {
+    LOG_DEBUG("Component mismatch, args don't match ours '%s' != '%s'",
+              GameletComponent::ToCommandLineArgs(components),
+              GameletComponent::ToCommandLineArgs(our_components));
     return false;
   }
 
