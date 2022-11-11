@@ -188,7 +188,7 @@ class AsyncFileWatcher {
   void WatchDirChanges() {
     // TODO: Adjust also if there was no directory at the beginning. Currently,
     // the directory exists; otherwise, ManifestUpdater would fail.
-    bool prev_dir_exists = true;
+    bool first_run = true, prev_run_was_success = false;
     while (true) {
       ScopedHandle read_event(CreateEvent(nullptr, /* no security attributes */
                                           TRUE,    /* manual-reset event */
@@ -202,27 +202,30 @@ class AsyncFileWatcher {
 
       FILE_BASIC_INFO dir_info;
       absl::StatusOr<ScopedHandle> status = GetValidDirHandle(&dir_info);
-      if (!status.ok()) {
-        SetStatus(status.status());
-      } else {
+      SetStatus(status.status());
+      if (status.ok()) {
         // The watched directory exists and its handle is valid.
-        if (!prev_dir_exists) {
+        if (!first_run) {
           ++dir_recreate_count_;
-          prev_dir_exists = true;
-          SetStatus(absl::OkStatus());
           if (dir_recreated_cb_) dir_recreated_cb_();
         }
+        first_run = false;
+        prev_run_was_success = true;
+        // Keep reading directory changes. This function only returns once it
+        // gets the shutdown signal, the watched directory is removed, or an
+        // error occurs while reading file changes.
         ReadDirChanges(*status, dir_info, read_event);
         if (IsShuttingDown()) {
           LOG_DEBUG("Shutting down watching '%s'.", dir_path_);
           return;
         }
         LOG_WARNING("Watched directory '%s' was possibly removed.", dir_path_);
-        ++dir_recreate_count_;
         ClearModifiedFiles();
+      } else if (prev_run_was_success) {
+        prev_run_was_success = false;
+        ++dir_recreate_count_;
         if (dir_recreated_cb_) dir_recreated_cb_();
       }
-      prev_dir_exists = false;
       // The shutdown event should be caught on both levels: when the
       // watched directory was not removed and when it was recreated. Here
       // the shutdown event is considered when the watched directory itself was
