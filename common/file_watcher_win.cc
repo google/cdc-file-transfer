@@ -14,7 +14,9 @@
 
 #include "common/file_watcher_win.h"
 
-#define WIN32_LEAN_AND_MEAN
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 1
+#endif
 #include <windows.h>
 
 #include <atomic>
@@ -98,7 +100,7 @@ class AsyncFileWatcher {
 
   ~AsyncFileWatcher() { Shutdown(); }
 
-  absl::Status GetStatus() ABSL_LOCKS_EXCLUDED(status_mutex_) const {
+  absl::Status GetStatus() const ABSL_LOCKS_EXCLUDED(status_mutex_) {
     absl::MutexLock mutex(&status_mutex_);
     return status_;
   }
@@ -145,24 +147,24 @@ class AsyncFileWatcher {
     modified_files_.clear();
   }
 
-  uint32_t GetEventCount() ABSL_LOCKS_EXCLUDED(modified_files_mutex_) const {
+  uint32_t GetEventCount() const ABSL_LOCKS_EXCLUDED(modified_files_mutex_) {
     absl::MutexLock mutex(&modified_files_mutex_);
     return event_count_;
   }
 
-  uint32_t GetDirRecreateEventCount()
-      ABSL_LOCKS_EXCLUDED(modified_files_mutex_) const {
+  uint32_t GetDirRecreateEventCount() const
+      ABSL_LOCKS_EXCLUDED(modified_files_mutex_) {
     absl::MutexLock mutex(&modified_files_mutex_);
     return dir_recreate_count_;
   }
 
-  bool IsWatching() ABSL_LOCKS_EXCLUDED(state_mutex) const {
+  bool IsWatching() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
     absl::MutexLock mutex(&state_mutex_);
     return state_ != FileWatcherState::kDefault &&
            state_ != FileWatcherState::kShuttingDown;
   }
 
-  bool IsShuttingDown() ABSL_LOCKS_EXCLUDED(state_mutex) const {
+  bool IsShuttingDown() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
     absl::MutexLock mutex(&state_mutex_);
     return state_ == FileWatcherState::kShuttingDown;
   }
@@ -530,7 +532,7 @@ class AsyncFileWatcher {
   std::thread dir_reader_;       // watching thread.
 
   mutable absl::Mutex status_mutex_;
-  absl::Status status_ = absl::OkStatus() ABSL_GUARDED_BY(status_mutex_);
+  absl::Status status_ ABSL_GUARDED_BY(status_mutex_);
 
   mutable absl::Mutex modified_files_mutex_;
   FileMap modified_files_ ABSL_GUARDED_BY(modified_files_mutex_);
@@ -538,8 +540,8 @@ class AsyncFileWatcher {
   uint32_t dir_recreate_count_ ABSL_GUARDED_BY(modified_files_mutex_) = 0;
 
   mutable absl::Mutex state_mutex_;
-  FileWatcherState state_ = FileWatcherState::kDefault ABSL_GUARDED_BY(
-      state_mutex_);  // the current watcher state.
+  FileWatcherState state_ ABSL_GUARDED_BY(state_mutex_) =
+      FileWatcherState::kDefault;  // the current watcher state.
 
   // Pointer to ReadDirectoryChangesExW function if available.
   decltype(ReadDirectoryChangesExW)* read_directory_changes_ex_ = nullptr;
