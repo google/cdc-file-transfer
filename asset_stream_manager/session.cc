@@ -51,7 +51,7 @@ Session::Session(std::string instance_id, std::string instance_ip,
                    /*forward_output_to_logging=*/true),
       metrics_recorder_(std::move(metrics_recorder)) {
   assert(metrics_recorder_);
-  remote_util_.SetIpAndPort(instance_ip, instance_port);
+  remote_util_.SetUserHostAndPort(instance_ip, instance_port);
 }
 
 Session::~Session() {

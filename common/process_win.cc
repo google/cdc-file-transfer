@@ -58,8 +58,8 @@ absl::Status CreatePipeForOverlappedIo(ScopedHandle* pipe_read_end,
                                        ScopedHandle* pipe_write_end) {
   // We need named pipes for overlapped IO, so create a unique name.
   int id = g_pipe_serial_number++;
-  std::string pipe_name = absl::StrFormat(
-      R"(\\.\Pipe\GgpRsyncIoPipe.%08x.%08x)", GetCurrentProcessId(), id);
+  std::string pipe_name = absl::StrFormat(R"(\\.\Pipe\CdcIoPipe.%08x.%08x)",
+                                          GetCurrentProcessId(), id);
 
   // Set the bInheritHandle flag so pipe handles are inherited.
   SECURITY_ATTRIBUTES security_attributes;

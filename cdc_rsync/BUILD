@@ -1,11 +1,15 @@
-load(
-    "//tools:windows_cc_library.bzl",
-    "cc_windows_shared_library",
-)
-
 package(default_visibility = [
     "//:__subpackages__",
 ])
+
+cc_binary(
+    name = "cdc_rsync",
+    srcs = ["main.cc"],
+    deps = [
+        ":cdc_rsync_client",
+        ":params",
+    ],
+)
 
 cc_library(
     name = "client_file_info",
@@ -57,25 +61,16 @@ cc_test(
     ],
 )
 
-cc_windows_shared_library(
-    name = "cdc_rsync",
-    srcs = [
-        "cdc_rsync.cc",
-        "cdc_rsync_client.cc",
-        "dllmain.cc",
-    ],
-    hdrs = [
-        "cdc_rsync.h",
-        "cdc_rsync_client.h",
-        "error_messages.h",
-    ],
+cc_library(
+    name = "cdc_rsync_client",
+    srcs = ["cdc_rsync_client.cc"],
+    hdrs = ["cdc_rsync_client.h"],
     linkopts = select({
         "//tools:windows": [
             "/DEFAULTLIB:Ws2_32.lib",  # Sockets, e.g. recv, send, WSA*.
         ],
         "//conditions:default": [],
     }),
-    local_defines = ["COMPILING_DLL"],
     target_compatible_with = ["@platforms//os:windows"],
     deps = [
         ":client_socket",
@@ -123,6 +118,28 @@ cc_test(
     srcs = ["parallel_file_opener_test.cc"],
     deps = [
         ":parallel_file_opener",
+        "//common:test_main",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+cc_library(
+    name = "params",
+    srcs = ["params.cc"],
+    hdrs = ["params.h"],
+    deps = [
+        ":cdc_rsync_client",
+        "@com_github_zstd//:zstd",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_test(
+    name = "params_test",
+    srcs = ["params_test.cc"],
+    data = ["testdata/root.txt"] + glob(["testdata/params/**"]),
+    deps = [
+        ":params",
         "//common:test_main",
         "@com_google_googletest//:gtest",
     ],

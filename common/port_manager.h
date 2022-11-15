@@ -51,10 +51,14 @@ class PortManager {
   // Reserves a port in the range passed to the constructor. The port is
   // released automatically upon destruction if ReleasePort() is not called
   // explicitly.
-  // |timeout_sec| is the timeout for finding available ports on the gamelet
-  // instance. Returns a DeadlineExceeded error if the timeout is exceeded.
+  // |check_remote| determines whether the remote port should be checked as
+  // well. If false, the check is skipped and a port might be returned that is
+  // still in use remotely.
+  // |remote_timeout_sec| is the timeout for finding available ports on the
+  // remote instance. Not used if |check_remote| is false.
+  // Returns a DeadlineExceeded error if the timeout is exceeded.
   // Returns a ResourceExhausted error if no ports are available.
-  absl::StatusOr<int> ReservePort(int timeout_sec);
+  absl::StatusOr<int> ReservePort(bool check_remote, int remote_timeout_sec);
 
   // Releases a reserved port.
   absl::Status ReleasePort(int port);

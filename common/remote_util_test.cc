@@ -21,11 +21,11 @@
 namespace cdc_ft {
 namespace {
 
-constexpr int kGameletPort = 12345;
-constexpr char kGameletPortArg[] = "-p 12345";
+constexpr int kSshPort = 12345;
+constexpr char kSshPortArg[] = "-p 12345";
 
-constexpr char kGameletIp[] = "1.2.3.4";
-constexpr char kGameletIpArg[] = "cloudcast@\"1.2.3.4\"";
+constexpr char kUserHost[] = "user@example.com";
+constexpr char kUserHostArg[] = "\"user@example.com\"";
 
 constexpr int kLocalPort = 23456;
 constexpr int kRemotePort = 34567;
@@ -44,7 +44,7 @@ class RemoteUtilTest : public ::testing::Test {
 
   void SetUp() override {
     Log::Initialize(std::make_unique<ConsoleLog>(LogLevel::kInfo));
-    util_.SetIpAndPort(kGameletIp, kGameletPort);
+    util_.SetUserHostAndPort(kUserHost, kSshPort);
   }
 
   void TearDown() override { Log::Shutdown(); }
@@ -64,42 +64,68 @@ class RemoteUtilTest : public ::testing::Test {
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSsh) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSsh(kCommand);
-  ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kCommand});
+  ExpectContains(si.command, {"ssh", kSshPortArg, kUserHostArg, kCommand});
 }
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForward) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSshPortForward(
       kLocalPort, kRemotePort, kRegular);
   ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kPortForwardingArg});
+                 {"ssh", kSshPortArg, kUserHostArg, kPortForwardingArg});
 
   si = util_.BuildProcessStartInfoForSshPortForward(kLocalPort, kRemotePort,
                                                     kReverse);
   ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kReversePortForwardingArg});
+                 {"ssh", kSshPortArg, kUserHostArg, kReversePortForwardingArg});
 }
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForwardAndCommand) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSshPortForwardAndCommand(
       kLocalPort, kRemotePort, kRegular, kCommand);
-  ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kPortForwardingArg, kCommand});
+  ExpectContains(si.command, {"ssh", kSshPortArg, kUserHostArg,
+                              kPortForwardingArg, kCommand});
 
   si = util_.BuildProcessStartInfoForSshPortForwardAndCommand(
       kLocalPort, kRemotePort, kReverse, kCommand);
-  ExpectContains(si.command,
-                 {"ssh.exe", "GGP\\ssh\\id", "oStrictHostKeyChecking=yes",
-                  "oUserKnownHostsFile", "known_hosts", kGameletPortArg,
-                  kGameletIpArg, kReversePortForwardingArg, kCommand});
+  ExpectContains(si.command, {"ssh", kSshPortArg, kUserHostArg,
+                              kReversePortForwardingArg, kCommand});
+}
+TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshWithCustomCommand) {
+  constexpr char kCustomSshCmd[] = "C:\\path\\to\\ssh.exe --fooarg --bararg=42";
+  util_.SetSshCommand(kCustomSshCmd);
+  ProcessStartInfo si = util_.BuildProcessStartInfoForSsh(kCommand);
+  ExpectContains(si.command, {kCustomSshCmd});
+}
+
+TEST_F(RemoteUtilTest, EscapeForWindows) {
+  EXPECT_EQ("foo", RemoteUtil::EscapeForWindows("foo"));
+  EXPECT_EQ("foo bar", RemoteUtil::EscapeForWindows("foo bar"));
+  EXPECT_EQ("foo\\bar", RemoteUtil::EscapeForWindows("foo\\bar"));
+  EXPECT_EQ("\\\\foo", RemoteUtil::EscapeForWindows("\\\\foo"));
+  EXPECT_EQ("foo\\\\", RemoteUtil::EscapeForWindows("foo\\"));
+  EXPECT_EQ("foo\\\\\\\\", RemoteUtil::EscapeForWindows("foo\\\\"));
+  EXPECT_EQ("foo\\\"", RemoteUtil::EscapeForWindows("foo\""));
+  EXPECT_EQ("foo\\\"bar", RemoteUtil::EscapeForWindows("foo\"bar"));
+  EXPECT_EQ("foo\\\\\\\"bar", RemoteUtil::EscapeForWindows("foo\\\"bar"));
+  EXPECT_EQ("foo\\\\\\\\\\\"bar", RemoteUtil::EscapeForWindows("foo\\\\\"bar"));
+  EXPECT_EQ("\\\"foo\\\"", RemoteUtil::EscapeForWindows("\"foo\""));
+  EXPECT_EQ("\\\" \\file.txt", RemoteUtil::EscapeForWindows("\" \\file.txt"));
+}
+
+TEST_F(RemoteUtilTest, QuoteArgument) {
+  EXPECT_EQ("\"foo\"", RemoteUtil::QuoteArgument("foo"));
+  EXPECT_EQ("\"foo bar\"", RemoteUtil::QuoteArgument("foo bar"));
+  EXPECT_EQ("\"foo\\bar\"", RemoteUtil::QuoteArgument("foo\\bar"));
+  EXPECT_EQ("\"\\\\foo\"", RemoteUtil::QuoteArgument("\\\\foo"));
+  EXPECT_EQ("\"foo\\\\\"", RemoteUtil::QuoteArgument("foo\\"));
+  EXPECT_EQ("\"foo\\\\\\\\\"", RemoteUtil::QuoteArgument("foo\\\\"));
+  EXPECT_EQ("\"foo\\\"\"", RemoteUtil::QuoteArgument("foo\""));
+  EXPECT_EQ("\"foo\\\"bar\"", RemoteUtil::QuoteArgument("foo\"bar"));
+  EXPECT_EQ("\"foo\\\\\\\"bar\"", RemoteUtil::QuoteArgument("foo\\\"bar"));
+  EXPECT_EQ("\"foo\\\\\\\\\\\"bar\"",
+            RemoteUtil::QuoteArgument("foo\\\\\"bar"));
+  EXPECT_EQ("\"\\\"foo\\\"\"", RemoteUtil::QuoteArgument("\"foo\""));
+  EXPECT_EQ("\"\\\" \\file.txt\"", RemoteUtil::QuoteArgument("\" \\file.txt"));
 }
 
 }  // namespace

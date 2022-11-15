@@ -22,7 +22,6 @@
 
 #include "absl/status/status.h"
 #include "common/process.h"
-#include "common/sdk_util.h"
 
 namespace cdc_ft {
 
@@ -30,6 +29,8 @@ namespace cdc_ft {
 // Windows-only.
 class RemoteUtil {
  public:
+  static constexpr int kDefaultSshPort = 22;
+
   // If |verbosity| is > 0 and |quiet| is false, output from scp, ssh etc.
   // commands is shown.
   // If |quiet| is true, scp, ssh etc. commands use quiet mode.
@@ -38,61 +39,67 @@ class RemoteUtil {
   RemoteUtil(int verbosity, bool quiet, ProcessFactory* process_factory,
              bool forward_output_to_log);
 
-  // Returns the initialization status. Should be OK unless in case of some rare
-  // internal error. Should be checked before accessing any members.
-  const absl::Status& GetInitStatus() const {
-    return sdk_util_.GetInitStatus();
-  }
+  // Sets the SSH username and hostname of the remote instance, as well as the
+  // SSH tunnel port. |user_host| must be of the form [user@]host.
+  void SetUserHostAndPort(std::string user_host, int port);
 
-  // Set IP of the remote instance and the ssh tunnel port.
-  void SetIpAndPort(const std::string& gamelet_ip, int ssh_port);
+  // Sets the SCP command binary path and additional arguments, e.g.
+  //   C:\path\to\scp.exe -F <ssh_config> -i <key_file>
+  //     -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
+  // By default, searches scp.exe on the path environment variables.
+  void SetScpCommand(std::string scp_command);
+
+  // Sets the SSH command binary path and additional arguments, e.g.
+  //   C:\path\to\ssh.exe -F <ssh_config> -i <key_file>
+  //     -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
+  // By default, searches ssh.exe on the path environment variables.
+  void SetSshCommand(std::string ssh_command);
 
   // Copies |source_filepaths| to the remote folder |dest| on the gamelet using
-  // scp. Must call either InitSsh or SetGameletIp before calling this method.
-  // If |compress| is true, compressed upload is used.
+  // scp. If |compress| is true, compressed upload is used.
+  // Must call SetUserHostAndPort before calling this method.
   absl::Status Scp(std::vector<std::string> source_filepaths,
                    const std::string& dest, bool compress);
 
   // Syncs |source_filepaths| to the remote folder |dest| on the gamelet using
-  // cdc_rsync. Must call either InitSsh or SetGameletIp before calling this
-  // method.
+  // cdc_rsync. Must call SetUserHostAndPort before calling this method.
   absl::Status Sync(std::vector<std::string> source_filepaths,
                     const std::string& dest);
 
   // Calls 'chmod |mode| |remote_path|' on the gamelet.
-  // Must call either InitSsh or SetGameletIp before calling this method.
+  // Must call SetUserHostAndPort before calling this method.
   absl::Status Chmod(const std::string& mode, const std::string& remote_path,
                      bool quiet = false);
 
   // Calls 'rm [-f] |remote_path|' on the gamelet.
-  // Must call either InitSsh or SetGameletIp before calling this method.
+  // Must call SetUserHostAndPort before calling this method.
   absl::Status Rm(const std::string& remote_path, bool force);
 
   // Calls `mv |old_remote_path| |new_remote_path| on the gamelet.
-  // Must call either InitSsh or SetGameletIp before calling this method.
+  // Must call SetUserHostAndPort before calling this method.
   absl::Status Mv(const std::string& old_remote_path,
                   const std::string& new_remote_path);
 
   // Runs |remote_command| on the gamelet. The command must be properly escaped.
   // |name| is the name of the command displayed in the logs.
-  // Must call either InitSsh or SetGameletIp before calling this method.
+  // Must call SetUserHostAndPort before calling this method.
   absl::Status Run(std::string remote_command, std::string name);
 
-  // Builds an ssh command that executes |remote_command| on the gamelet.
+  // Builds an SSH command that executes |remote_command| on the gamelet.
   ProcessStartInfo BuildProcessStartInfoForSsh(std::string remote_command);
 
-  // Builds an ssh command that runs SSH port forwarding to the gamelet, using
+  // Builds an SSH command that runs SSH port forwarding to the gamelet, using
   // the given |local_port| and |remote_port|.
   // If |reverse| is true, sets up reverse port forwarding.
-  // Must call either InitSsh or SetGameletIp before calling this method.
+  // Must call SetUserHostAndPort before calling this method.
   ProcessStartInfo BuildProcessStartInfoForSshPortForward(int local_port,
                                                           int remote_port,
                                                           bool reverse);
 
-  // Builds an ssh command that executes |remote_command| on the gamelet, using
+  // Builds an SSH command that executes |remote_command| on the gamelet, using
   // port forwarding with given |local_port| and |remote_port|.
   // If |reverse| is true, sets up reverse port forwarding.
-  // Must call either InitSsh or SetGameletIp before calling this method.
+  // Must call SetUserHostAndPort before calling this method.
   ProcessStartInfo BuildProcessStartInfoForSshPortForwardAndCommand(
       int local_port, int remote_port, bool reverse,
       std::string remote_command);
@@ -100,9 +107,28 @@ class RemoteUtil {
   // Returns whether output is suppressed.
   bool Quiet() const { return quiet_; }
 
+  // Escapes command line argument for the Microsoft command line parser in
+  // preparation for quoting. Double quotes are backslash-escaped. One or more
+  // backslashes are backslash-escaped if they are followed by a double quote,
+  // or if they occur at the end of the string, e.g.
+  // foo\bar -> foo\bar, foo\ -> foo\\, foo\\"bar -> foo\\\\\"bar.
+  static std::string EscapeForWindows(const std::string& argument);
+
+  // Quotes and escapes a command line argument following the convention
+  // understood by the Microsoft command line parser.
+  static std::string QuoteArgument(const std::string& argument);
+
+  // Quotes and escapes a command line argument for usage in SSH.
+  static std::string QuoteArgumentForSsh(const std::string& argument);
+
+  // Quotes and escapes a command line arguments for use in SSH command. The
+  // argument is first escaped and quoted for Linux using single quotes and then
+  // it is escaped to be used by the Microsoft command line parser.
+  static std::string QuoteAndEscapeArgumentForSsh(const std::string& argument);
+
  private:
-  // Verifies that both |gamelet_ip_| and |ssh_port_| are set.
-  absl::Status CheckIpPort();
+  // Verifies that both || and |ssh_port_| are set.
+  absl::Status CheckHostPort();
 
   // Common code for BuildProcessStartInfoForSsh*.
   ProcessStartInfo BuildProcessStartInfoForSshInternal(
@@ -113,9 +139,10 @@ class RemoteUtil {
   ProcessFactory* const process_factory_;
   const bool forward_output_to_log_;
 
-  SdkUtil sdk_util_;
-  std::string gamelet_ip_;
-  int ssh_port_ = 0;
+  std::string scp_command_ = "scp";
+  std::string ssh_command_ = "ssh";
+  std::string user_host_;
+  int ssh_port_ = kDefaultSshPort;
 };
 
 }  // namespace cdc_ft

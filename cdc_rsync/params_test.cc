@@ -12,17 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cdc_rsync_cli/params.h"
+#include "cdc_rsync/params.h"
 
 #include "absl/strings/match.h"
 #include "common/log.h"
 #include "common/path.h"
+#include "common/status_test_macros.h"
 #include "common/test_main.h"
 #include "gtest/gtest.h"
 
 namespace cdc_ft {
 namespace params {
 namespace {
+
+using Options = CdcRsyncClient::Options;
+
+constexpr char kSrc[] = "source";
+constexpr char kUserHostDst[] = "user@host:destination";
+constexpr char kUserHost[] = "user@host";
+constexpr char kDst[] = "destination";
 
 class TestLog : public Log {
  public:
@@ -44,14 +52,26 @@ std::string NeedsValueError(const char* option_name) {
 
 class ParamsTest : public ::testing::Test {
  public:
-  void SetUp() override { prev_stderr_ = std::cerr.rdbuf(errors_.rdbuf()); }
+  void SetUp() override {
+    prev_stdout_ = std::cout.rdbuf(output_.rdbuf());
+    prev_stderr_ = std::cerr.rdbuf(errors_.rdbuf());
+  }
 
-  void TearDown() override { std::cerr.rdbuf(prev_stderr_); }
+  void TearDown() override {
+    std::cout.rdbuf(prev_stdout_);
+    std::cerr.rdbuf(prev_stderr_);
+  }
 
  protected:
   void ExpectNoError() const {
     EXPECT_TRUE(errors_.str().empty())
         << "Expected empty stderr but got\n'" << errors_.str() << "'";
+  }
+
+  void ExpectOutput(const std::string& expected) const {
+    EXPECT_TRUE(absl::StrContains(output_.str(), expected))
+        << "Expected stdout to contain '" << expected << "' but got\n'"
+        << output_.str() << "'";
   }
 
   void ExpectError(const std::string& expected) const {
@@ -68,16 +88,16 @@ class ParamsTest : public ::testing::Test {
       path::Join(base_dir_, "empty_source_files.txt");
 
   Parameters parameters_;
+  std::stringstream output_;
   std::stringstream errors_;
+  std::streambuf* prev_stdout_;
   std::streambuf* prev_stderr_;
 };
 
 TEST_F(ParamsTest, ParseSucceedsDefaults) {
-  const char* argv[] = {"cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234",
-                        "source",        "destination",  NULL};
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  EXPECT_STREQ("1.2.3.4", parameters_.options.ip);
-  EXPECT_EQ(1234, parameters_.options.port);
+  EXPECT_EQ(RemoteUtil::kDefaultSshPort, parameters_.options.port);
   EXPECT_FALSE(parameters_.options.delete_);
   EXPECT_FALSE(parameters_.options.recursive);
   EXPECT_EQ(0, parameters_.options.verbosity);
@@ -86,19 +106,19 @@ TEST_F(ParamsTest, ParseSucceedsDefaults) {
   EXPECT_FALSE(parameters_.options.compress);
   EXPECT_FALSE(parameters_.options.checksum);
   EXPECT_FALSE(parameters_.options.dry_run);
-  EXPECT_EQ(parameters_.options.copy_dest, nullptr);
+  EXPECT_TRUE(parameters_.options.copy_dest.empty());
   EXPECT_EQ(6, parameters_.options.compress_level);
   EXPECT_EQ(10, parameters_.options.connection_timeout_sec);
   EXPECT_EQ(1, parameters_.sources.size());
-  EXPECT_EQ(parameters_.sources[0], "source");
-  EXPECT_EQ(parameters_.destination, "destination");
+  EXPECT_EQ(parameters_.sources[0], kSrc);
+  EXPECT_EQ(parameters_.user_host, kUserHost);
+  EXPECT_EQ(parameters_.destination, kDst);
   ExpectNoError();
 }
 
 TEST_F(ParamsTest, ParseSucceedsWithOptionFromTwoArguments) {
   const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "--compress-level", "2",
-      "source",        "destination",  NULL};
+      "cdc_rsync.exe", "--compress-level", "2", kSrc, kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   EXPECT_EQ(parameters_.options.compress_level, 2);
   ExpectNoError();
@@ -106,68 +126,104 @@ TEST_F(ParamsTest, ParseSucceedsWithOptionFromTwoArguments) {
 
 TEST_F(ParamsTest,
        ParseSucceedsWithOptionFromOneArgumentWithEqualityWithValue) {
-  const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "--compress-level=2",
-      "source",        "destination",  NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--compress-level=2", kSrc,
+                        kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ASSERT_EQ(parameters_.sources.size(), 1);
   EXPECT_EQ(parameters_.options.compress_level, 2);
-  EXPECT_EQ(parameters_.sources[0], "source");
-  EXPECT_EQ(parameters_.destination, "destination");
+  EXPECT_EQ(parameters_.sources[0], kSrc);
+  EXPECT_EQ(parameters_.user_host, kUserHost);
+  EXPECT_EQ(parameters_.destination, kDst);
   ExpectNoError();
 }
 
 TEST_F(ParamsTest, ParseFailsOnCompressLevelEqualsNoValue) {
-  const char* argv[] = {"cdc_rsync.exe", "--compress-level=", "source",
-                        "destination", NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--compress-level=", kSrc,
+                        kUserHostDst, NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(NeedsValueError("compress-level"));
 }
 
 TEST_F(ParamsTest, ParseFailsOnPortEqualsNoValue) {
-  const char* argv[] = {"cdc_rsync.exe", "--port=", "source", "destination",
-                        NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--port=", kSrc, kUserHostDst, NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(NeedsValueError("port"));
 }
 
 TEST_F(ParamsTest, ParseFailsOnContimeoutEqualsNoValue) {
-  const char* argv[] = {"cdc_rsync.exe", "--contimeout=", "source",
-                        "destination", NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--contimeout=", kSrc, kUserHostDst,
+                        NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(NeedsValueError("contimeout"));
 }
 
-TEST_F(ParamsTest, ParseFailsOnIpEqualsNoValue) {
-  const char* argv[] = {"cdc_rsync.exe", "--ip=", "source", "destination",
+TEST_F(ParamsTest, ParseSucceedsWithSshScpCommands) {
+  const char* argv[] = {"cdc_rsync.exe",        kSrc,
+                        kUserHostDst,           "--ssh-command=sshcmd",
+                        "--scp-command=scpcmd", NULL};
+  EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  EXPECT_EQ(parameters_.options.scp_command, "scpcmd");
+  EXPECT_EQ(parameters_.options.ssh_command, "sshcmd");
+}
+
+TEST_F(ParamsTest, ParseSucceedsWithSshScpCommandsByEnvVars) {
+  EXPECT_OK(path::SetEnv("CDC_SSH_COMMAND", "sshcmd"));
+  EXPECT_OK(path::SetEnv("CDC_SCP_COMMAND", "scpcmd"));
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, NULL};
+  EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  EXPECT_EQ(parameters_.options.scp_command, "scpcmd");
+  EXPECT_EQ(parameters_.options.ssh_command, "sshcmd");
+}
+
+TEST_F(ParamsTest, ParseSucceedsWithNoSshCommand) {
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst,
+                        "--ssh-command=", NULL};
+  EXPECT_FALSE(
+      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  ExpectError(NeedsValueError("ssh-command"));
+}
+
+TEST_F(ParamsTest, ParseSucceedsWithNoScpCommand) {
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, "--scp-command",
                         NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError(NeedsValueError("ip"));
+  ExpectError(NeedsValueError("scp-command"));
+}
+
+TEST_F(ParamsTest, ParseFailsOnNoUserHost) {
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kDst, NULL};
+  EXPECT_FALSE(
+      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  ExpectError("No remote host specified");
+}
+
+TEST_F(ParamsTest, ParseDoesNotThinkCIsAHost) {
+  const char* argv[] = {"cdc_rsync.exe", kSrc, "C:\\foo", NULL};
+  EXPECT_FALSE(
+      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  ExpectError("No remote host specified");
 }
 
 TEST_F(ParamsTest, ParseWithoutParametersFailsOnMissingSourceAndDestination) {
-  const char* argv[] = {"cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", NULL};
+  const char* argv[] = {"cdc_rsync.exe", NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError("Missing source");
+  ExpectOutput("Usage:");
 }
 
 TEST_F(ParamsTest, ParseWithSingleParameterFailsOnMissingDestination) {
-  const char* argv[] = {"cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234",
-                        "source", NULL};
+  const char* argv[] = {"cdc_rsync.exe", kSrc, NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError("Missing destination");
+  ExpectError("Missing source or destination");
 }
 
-TEST_F(ParamsTest, ParseSuccessedsWithMultipleLetterKeyConsumed) {
-  const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "-rvqWRzcn",
-      "source",        "destination",  NULL};
+TEST_F(ParamsTest, ParseSucceedsWithMultipleLetterKeyConsumed) {
+  const char* argv[] = {"cdc_rsync.exe", "-rvqWRzcn", kSrc, kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   EXPECT_TRUE(parameters_.options.recursive);
   EXPECT_EQ(parameters_.options.verbosity, 1);
@@ -182,17 +238,15 @@ TEST_F(ParamsTest, ParseSuccessedsWithMultipleLetterKeyConsumed) {
 
 TEST_F(ParamsTest,
        ParseFailsOnMultipleLetterKeyConsumedOptionsWithUnsupportedOne) {
-  const char* argv[] = {"cdc_rsync.exe", "-rvqaWRzcn", "source", "destination",
+  const char* argv[] = {"cdc_rsync.exe", "-rvqaWRzcn", kSrc, kUserHostDst,
                         NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError("Unknown option: 'a'");
 }
 
-TEST_F(ParamsTest, ParseSuccessedsWithMultipleLongKeyConsumedOptions) {
+TEST_F(ParamsTest, ParseSucceedsWithMultipleLongKeyConsumedOptions) {
   const char* argv[] = {"cdc_rsync.exe",
-                        "--ip=1.2.3.4",
-                        "--port=1234",
                         "--recursive",
                         "--verbosity",
                         "--quiet",
@@ -204,8 +258,8 @@ TEST_F(ParamsTest, ParseSuccessedsWithMultipleLongKeyConsumedOptions) {
                         "--dry-run",
                         "--existing",
                         "--json",
-                        "source",
-                        "destination",
+                        kSrc,
+                        kUserHostDst,
                         NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   EXPECT_TRUE(parameters_.options.recursive);
@@ -223,51 +277,42 @@ TEST_F(ParamsTest, ParseSuccessedsWithMultipleLongKeyConsumedOptions) {
 }
 
 TEST_F(ParamsTest, ParseFailsOnUnknownKey) {
-  const char* argv[] = {"cdc_rsync.exe", "-unknownKey", "source", "destination",
+  const char* argv[] = {"cdc_rsync.exe", "-unknownKey", kSrc, kUserHostDst,
                         NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError("Unknown option: 'u'");
 }
 
-TEST_F(ParamsTest, ParseSuccessedsWithSupportedKeyValue) {
+TEST_F(ParamsTest, ParseSucceedsWithSupportedKeyValue) {
   const char* argv[] = {
-      "cdc_rsync.exe",  "--compress-level", "11", "--port=4086",
-      "--ip=127.0.0.1", "--contimeout",     "99", "--copy-dest=dest",
-      "source",         "destination",      NULL};
+      "cdc_rsync.exe", "--compress-level", "11", "--contimeout", "99", "--port",
+      "4086",          "--copy-dest=dest", kSrc, kUserHostDst,   NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   EXPECT_EQ(parameters_.options.compress_level, 11);
   EXPECT_EQ(parameters_.options.connection_timeout_sec, 99);
   EXPECT_EQ(parameters_.options.port, 4086);
-  EXPECT_STREQ(parameters_.options.ip, "127.0.0.1");
-  EXPECT_STREQ(parameters_.options.copy_dest, "dest");
+  EXPECT_EQ(parameters_.options.copy_dest, "dest");
   ExpectNoError();
 }
 
-TEST_F(ParamsTest,
-       ParseSuccessedsWithSupportedKeyValueWithoutEqualityForChars) {
-  const char* argv[] = {"cdc_rsync.exe", "--port",      "4086", "--ip",
-                        "127.0.0.1",     "--copy-dest", "dest", "source",
-                        "destination",   NULL};
+TEST_F(ParamsTest, ParseSucceedsWithSupportedKeyValueWithoutEqualityForChars) {
+  const char* argv[] = {"cdc_rsync.exe", "--copy-dest", "dest", kSrc,
+                        kUserHostDst,    NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  EXPECT_EQ(parameters_.options.port, 4086);
-  EXPECT_STREQ(parameters_.options.ip, "127.0.0.1");
-  EXPECT_STREQ(parameters_.options.copy_dest, "dest");
+  EXPECT_EQ(parameters_.options.copy_dest, "dest");
   ExpectNoError();
 }
 
-TEST_F(ParamsTest, ParseFailsOnGameletIpNeedsPort) {
-  const char* argv[] = {"cdc_rsync.exe", "--ip=127.0.0.1", "source",
-                        "destination", NULL};
+TEST_F(ParamsTest, ParseFailsOnInvalidPort) {
+  const char* argv[] = {"cdc_rsync.exe", "--port=0", kSrc, kUserHostDst, NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError("--port must specify a valid port");
 }
 
 TEST_F(ParamsTest, ParseFailsOnDeleteNeedsRecursive) {
-  const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "--delete",
-      "source",        "destination",  NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--delete", kSrc, kUserHostDst, NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError("--delete does not work without --recursive (-r)");
@@ -281,10 +326,10 @@ TEST_F(ParamsTest, ParseChecksCompressLevel) {
 
   for (int n = 0; n < std::size(levels); ++n) {
     std::string level = "--compress-level=" + std::to_string(levels[n]);
-    const char* argv[] = {"cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234",
-                          level.c_str(),   "source",       "destination"};
-    EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv,
-                      &parameters_) == valid[n]);
+    const char* argv[] = {"cdc_rsync.exe", level.c_str(), kSrc, kUserHostDst,
+                          NULL};
+    EXPECT_EQ(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_),
+              valid[n]);
     if (valid[n]) {
       ExpectNoError();
     } else {
@@ -295,94 +340,95 @@ TEST_F(ParamsTest, ParseChecksCompressLevel) {
 }
 
 TEST_F(ParamsTest, ParseFailsOnUnknownKeyValue) {
-  const char* argv[] = {"cdc_rsync.exe", "--unknownKey=5", "source",
-                        "destination", NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--unknownKey=5", kSrc, kUserHostDst,
+                        NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError("unknownKey");
 }
 
 TEST_F(ParamsTest, ParseFailsWithHelpOption) {
-  const char* argv[] = {"cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234",
-                        "source",        "destination",  NULL};
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
-  const char* argv2[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "source",
-      "destination",   "--help",       NULL};
+  const char* argv2[] = {"cdc_rsync.exe", kSrc, kUserHostDst, "--help", NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv2)) - 1, argv2, &parameters_));
   ExpectNoError();
 
-  const char* argv3[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "source",
-      "destination",   "-h",           NULL};
+  const char* argv3[] = {"cdc_rsync.exe", kSrc, kUserHostDst, "-h", NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv3)) - 1, argv3, &parameters_));
   ExpectNoError();
 }
 
 TEST_F(ParamsTest, ParseSucceedsWithIncludeExclude) {
-  const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "--include=*.txt",
-      "--exclude",     "*.dat",        "--include",   "*.exe",
-      "source",        "destination",  NULL};
+  const char* argv[] = {"cdc_rsync.exe",
+                        "--include=*.txt",
+                        "--exclude",
+                        "*.dat",
+                        "--include",
+                        "*.exe",
+                        kSrc,
+                        kUserHostDst,
+                        NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ASSERT_EQ(parameters_.filter_rules.size(), 3);
-  ASSERT_EQ(parameters_.filter_rules[0].type, FilterRule::Type::kInclude);
-  ASSERT_EQ(parameters_.filter_rules[0].pattern, "*.txt");
-  ASSERT_EQ(parameters_.filter_rules[1].type, FilterRule::Type::kExclude);
-  ASSERT_EQ(parameters_.filter_rules[1].pattern, "*.dat");
-  ASSERT_EQ(parameters_.filter_rules[2].type, FilterRule::Type::kInclude);
-  ASSERT_EQ(parameters_.filter_rules[2].pattern, "*.exe");
+  const std::vector<PathFilter::Rule>& rules =
+      parameters_.options.filter.GetRules();
+  ASSERT_EQ(rules.size(), 3);
+  ASSERT_EQ(rules[0].type, PathFilter::Rule::Type::kInclude);
+  ASSERT_EQ(rules[0].pattern, "*.txt");
+  ASSERT_EQ(rules[1].type, PathFilter::Rule::Type::kExclude);
+  ASSERT_EQ(rules[1].pattern, "*.dat");
+  ASSERT_EQ(rules[2].type, PathFilter::Rule::Type::kInclude);
+  ASSERT_EQ(rules[2].pattern, "*.exe");
   ExpectNoError();
 }
 
 TEST_F(ParamsTest, FilesFrom_NoFile) {
-  const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "source",
-      "destination",   "--files-from", NULL};
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, "--files-from",
+                        NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(NeedsValueError("files-from"));
 }
 
 TEST_F(ParamsTest, FilesFrom_ImpliesRelative) {
-  const char* argv[] = {
-      "cdc_rsync.exe",       "--ip=1.2.3.4",    "--port=1234", "--files-from",
-      sources_file_.c_str(), base_dir_.c_str(), "destination", NULL};
+  const char* argv[] = {"cdc_rsync.exe",       "--files-from",
+                        sources_file_.c_str(), base_dir_.c_str(),
+                        kUserHostDst,          NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   EXPECT_TRUE(parameters_.options.relative);
   ExpectNoError();
 }
 
 TEST_F(ParamsTest, FilesFrom_WithoutSourceArg) {
-  const char* argv[] = {
-      "cdc_rsync.exe",       "--ip=1.2.3.4", "--port=1234", "--files-from",
-      sources_file_.c_str(), "destination",  NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--files-from", sources_file_.c_str(),
+                        kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  EXPECT_TRUE(parameters_.sources_dir.empty());
-  EXPECT_EQ(parameters_.destination, "destination");
+  EXPECT_TRUE(parameters_.options.sources_dir.empty());
+  EXPECT_EQ(parameters_.user_host, kUserHost);
+  EXPECT_EQ(parameters_.destination, kDst);
   ExpectNoError();
 }
 
 TEST_F(ParamsTest, FilesFrom_WithSourceArg) {
-  const char* argv[] = {
-      "cdc_rsync.exe",       "--ip=1.2.3.4",    "--port=1234", "--files-from",
-      sources_file_.c_str(), base_dir_.c_str(), "destination", NULL};
+  const char* argv[] = {"cdc_rsync.exe",       "--files-from",
+                        sources_file_.c_str(), base_dir_.c_str(),
+                        kUserHostDst,          NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
   std::string expected_sources_dir = base_dir_;
   path::EnsureEndsWithPathSeparator(&expected_sources_dir);
-  EXPECT_EQ(parameters_.sources_dir, expected_sources_dir);
-  EXPECT_EQ(parameters_.destination, "destination");
+  EXPECT_EQ(parameters_.options.sources_dir, expected_sources_dir);
+  EXPECT_EQ(parameters_.user_host, kUserHost);
+  EXPECT_EQ(parameters_.destination, kDst);
   ExpectNoError();
 }
 
 TEST_F(ParamsTest, FilesFrom_ParsesFile) {
-  const char* argv[] = {
-      "cdc_rsync.exe",       "--ip=1.2.3.4", "--port=1234", "--files-from",
-      sources_file_.c_str(), "destination",  NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--files-from", sources_file_.c_str(),
+                        kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
   std::vector<const char*> expected = {"file1", "file2", "file3"};
@@ -394,13 +440,8 @@ TEST_F(ParamsTest, FilesFrom_ParsesFile) {
 }
 
 TEST_F(ParamsTest, FilesFrom_EmptyFile_WithoutSourceArg) {
-  const char* argv[] = {"cdc_rsync.exe",
-                        "--ip=1.2.3.4",
-                        "--port=1234",
-                        "--files-from",
-                        empty_sources_file_.c_str(),
-                        "destination",
-                        NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--files-from",
+                        empty_sources_file_.c_str(), kUserHostDst, NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(empty_sources_file_);
@@ -408,14 +449,9 @@ TEST_F(ParamsTest, FilesFrom_EmptyFile_WithoutSourceArg) {
 }
 
 TEST_F(ParamsTest, FilesFrom_EmptyFile_WithSourceArg) {
-  const char* argv[] = {"cdc_rsync.exe",
-                        "--ip=1.2.3.4",
-                        "--port=1234",
-                        "--files-from",
-                        empty_sources_file_.c_str(),
-                        base_dir_.c_str(),
-                        "destination",
-                        NULL};
+  const char* argv[] = {
+      "cdc_rsync.exe",   "--files-from", empty_sources_file_.c_str(),
+      base_dir_.c_str(), kUserHostDst,   NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(empty_sources_file_);
@@ -423,17 +459,16 @@ TEST_F(ParamsTest, FilesFrom_EmptyFile_WithSourceArg) {
 }
 
 TEST_F(ParamsTest, FilesFrom_NoDestination) {
-  const char* argv[] = {"cdc_rsync.exe", "--ip=1.2.3.4",        "--port=1234",
-                        "--files-from",  sources_file_.c_str(), NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--files-from", sources_file_.c_str(),
+                        NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError("Missing destination");
 }
 
 TEST_F(ParamsTest, IncludeFrom_NoFile) {
-  const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4",   "--port=1234", "source",
-      "destination",   "--include-from", NULL};
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, "--include-from",
+                        NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(NeedsValueError("include-from"));
@@ -441,20 +476,22 @@ TEST_F(ParamsTest, IncludeFrom_NoFile) {
 
 TEST_F(ParamsTest, IncludeFrom_ParsesFile) {
   std::string file = path::Join(base_dir_, "include_files.txt");
-  const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "--include-from",
-      file.c_str(),    "source",       "destination", NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--include-from",
+                        file.c_str(),    kSrc,
+                        kUserHostDst,    NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
-  ASSERT_EQ(parameters_.filter_rules.size(), 1);
-  ASSERT_EQ(parameters_.filter_rules[0].type, FilterRule::Type::kInclude);
-  ASSERT_EQ(parameters_.filter_rules[0].pattern, "file3");
+  const std::vector<PathFilter::Rule>& rules =
+      parameters_.options.filter.GetRules();
+  ASSERT_EQ(rules.size(), 1);
+  ASSERT_EQ(rules[0].type, PathFilter::Rule::Type::kInclude);
+  ASSERT_EQ(rules[0].pattern, "file3");
   ExpectNoError();
 }
 
 TEST_F(ParamsTest, ExcludeFrom_NoFile) {
-  const char* argv[] = {"cdc_rsync.exe", "source", "destination",
-                        "--exclude-from", NULL};
+  const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, "--exclude-from",
+                        NULL};
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(NeedsValueError("exclude-from"));
@@ -462,16 +499,18 @@ TEST_F(ParamsTest, ExcludeFrom_NoFile) {
 
 TEST_F(ParamsTest, ExcludeFrom_ParsesFile) {
   std::string file = path::Join(base_dir_, "exclude_files.txt");
-  const char* argv[] = {
-      "cdc_rsync.exe", "--ip=1.2.3.4", "--port=1234", "--exclude-from",
-      file.c_str(),    "source",       "destination", NULL};
+  const char* argv[] = {"cdc_rsync.exe", "--exclude-from",
+                        file.c_str(),    kSrc,
+                        kUserHostDst,    NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
-  ASSERT_EQ(parameters_.filter_rules.size(), 2);
-  EXPECT_EQ(parameters_.filter_rules[0].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[0].pattern, "file1");
-  EXPECT_EQ(parameters_.filter_rules[1].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[1].pattern, "file2");
+  const std::vector<PathFilter::Rule>& rules =
+      parameters_.options.filter.GetRules();
+  ASSERT_EQ(rules.size(), 2);
+  EXPECT_EQ(rules[0].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[0].pattern, "file1");
+  EXPECT_EQ(rules[1].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[1].pattern, "file2");
   ExpectNoError();
 }
 
@@ -479,31 +518,31 @@ TEST_F(ParamsTest, IncludeExcludeMixed_ProperOrder) {
   std::string exclude_file = path::Join(base_dir_, "exclude_files.txt");
   std::string include_file = path::Join(base_dir_, "include_files.txt");
   const char* argv[] = {"cdc_rsync.exe",
-                        "--ip=1.2.3.4",
-                        "--port=1234",
                         "--include-from",
                         include_file.c_str(),
                         "--exclude=excl1",
-                        "source",
+                        kSrc,
                         "--exclude-from",
                         exclude_file.c_str(),
-                        "destination",
+                        kUserHostDst,
                         "--include",
                         "incl1",
                         NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 
-  ASSERT_EQ(parameters_.filter_rules.size(), 5);
-  EXPECT_EQ(parameters_.filter_rules[0].type, FilterRule::Type::kInclude);
-  EXPECT_EQ(parameters_.filter_rules[0].pattern, "file3");
-  EXPECT_EQ(parameters_.filter_rules[1].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[1].pattern, "excl1");
-  EXPECT_EQ(parameters_.filter_rules[2].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[2].pattern, "file1");
-  EXPECT_EQ(parameters_.filter_rules[3].type, FilterRule::Type::kExclude);
-  EXPECT_EQ(parameters_.filter_rules[3].pattern, "file2");
-  EXPECT_EQ(parameters_.filter_rules[4].type, FilterRule::Type::kInclude);
-  EXPECT_EQ(parameters_.filter_rules[4].pattern, "incl1");
+  const std::vector<PathFilter::Rule>& rules =
+      parameters_.options.filter.GetRules();
+  ASSERT_EQ(rules.size(), 5);
+  EXPECT_EQ(rules[0].type, PathFilter::Rule::Type::kInclude);
+  EXPECT_EQ(rules[0].pattern, "file3");
+  EXPECT_EQ(rules[1].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[1].pattern, "excl1");
+  EXPECT_EQ(rules[2].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[2].pattern, "file1");
+  EXPECT_EQ(rules[3].type, PathFilter::Rule::Type::kExclude);
+  EXPECT_EQ(rules[3].pattern, "file2");
+  EXPECT_EQ(rules[4].type, PathFilter::Rule::Type::kInclude);
+  EXPECT_EQ(rules[4].pattern, "incl1");
   ExpectNoError();
 }
 

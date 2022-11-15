@@ -146,14 +146,14 @@ PathFilter::Rule::Type ToInternalType(
 
 }  // namespace
 
-GgpRsyncServer::GgpRsyncServer() = default;
+CdcRsyncServer::CdcRsyncServer() = default;
 
-GgpRsyncServer::~GgpRsyncServer() {
+CdcRsyncServer::~CdcRsyncServer() {
   message_pump_.reset();
   socket_.reset();
 }
 
-bool GgpRsyncServer::CheckComponents(
+bool CdcRsyncServer::CheckComponents(
     const std::vector<GameletComponent>& components) {
   // Components are expected to reside in the same dir as the executable.
   std::string component_dir;
@@ -172,7 +172,7 @@ bool GgpRsyncServer::CheckComponents(
   return true;
 }
 
-absl::Status GgpRsyncServer::Run(int port) {
+absl::Status CdcRsyncServer::Run(int port) {
   socket_ = std::make_unique<ServerSocket>();
   absl::Status status = socket_->StartListening(port);
   if (!status.ok()) {
@@ -205,7 +205,7 @@ absl::Status GgpRsyncServer::Run(int port) {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::Sync() {
+absl::Status CdcRsyncServer::Sync() {
   // First, the client sends us options, e.g. the |destination_| directory.
   absl::Status status = HandleSetOptions();
   if (!status.ok()) {
@@ -281,7 +281,7 @@ absl::Status GgpRsyncServer::Sync() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::HandleSetOptions() {
+absl::Status CdcRsyncServer::HandleSetOptions() {
   LOG_INFO("Receiving options");
 
   SetOptionsRequest request;
@@ -324,7 +324,7 @@ absl::Status GgpRsyncServer::HandleSetOptions() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::FindFiles() {
+absl::Status CdcRsyncServer::FindFiles() {
   Stopwatch stopwatch;
   FileFinder finder;
 
@@ -350,7 +350,7 @@ absl::Status GgpRsyncServer::FindFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::HandleSendAllFiles() {
+absl::Status CdcRsyncServer::HandleSendAllFiles() {
   std::string current_directory;
 
   for (;;) {
@@ -385,7 +385,7 @@ absl::Status GgpRsyncServer::HandleSendAllFiles() {
   }
 }
 
-absl::Status GgpRsyncServer::DiffFiles() {
+absl::Status CdcRsyncServer::DiffFiles() {
   LOG_INFO("Diffing files");
 
   // Be sure to move the data. It can grow quite large with millions of files.
@@ -412,7 +412,7 @@ absl::Status GgpRsyncServer::DiffFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::RemoveExtraneousFilesAndDirs() {
+absl::Status CdcRsyncServer::RemoveExtraneousFilesAndDirs() {
   FileDeleterAndSender deleter(message_pump_.get());
 
   // To guarantee that the folders are empty before they are removed, files are
@@ -451,7 +451,7 @@ absl::Status GgpRsyncServer::RemoveExtraneousFilesAndDirs() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::CreateMissingDirs() {
+absl::Status CdcRsyncServer::CreateMissingDirs() {
   for (const DirInfo& dir : diff_.missing_dirs) {
     // Make directory.
     std::string path = path::Join(destination_, dir.filepath);
@@ -475,7 +475,7 @@ absl::Status GgpRsyncServer::CreateMissingDirs() {
 }
 
 template <typename T>
-absl::Status GgpRsyncServer::SendFileIndices(const char* file_type,
+absl::Status CdcRsyncServer::SendFileIndices(const char* file_type,
                                              const std::vector<T>& files) {
   LOG_INFO("Sending indices of missing files to client");
   constexpr char error_fmt[] = "Failed to send indices of %s files.";
@@ -516,7 +516,7 @@ absl::Status GgpRsyncServer::SendFileIndices(const char* file_type,
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::HandleSendMissingFileData() {
+absl::Status CdcRsyncServer::HandleSendMissingFileData() {
   if (diff_.missing_files.empty()) {
     return absl::OkStatus();
   }
@@ -641,7 +641,7 @@ absl::Status GgpRsyncServer::HandleSendMissingFileData() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::SyncChangedFiles() {
+absl::Status CdcRsyncServer::SyncChangedFiles() {
   if (diff_.changed_files.empty()) {
     return absl::OkStatus();
   }
@@ -729,7 +729,7 @@ absl::Status GgpRsyncServer::SyncChangedFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncServer::HandleShutdown() {
+absl::Status CdcRsyncServer::HandleShutdown() {
   ShutdownRequest request;
   absl::Status status =
       message_pump_->ReceiveMessage(PacketType::kShutdown, &request);
@@ -746,7 +746,7 @@ absl::Status GgpRsyncServer::HandleShutdown() {
   return absl::OkStatus();
 }
 
-void GgpRsyncServer::Thread_OnPackageReceived(PacketType type) {
+void CdcRsyncServer::Thread_OnPackageReceived(PacketType type) {
   if (type != PacketType::kToggleCompression) {
     return;
   }

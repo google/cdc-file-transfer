@@ -14,42 +14,15 @@
 
 #include "common/remote_util.h"
 
-#include <atomic>
 #include <regex>
-#include <sstream>
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "common/path.h"
 #include "common/status.h"
 
 namespace cdc_ft {
 namespace {
-
-// Escapes command line argument for the Microsoft command line parser in
-// preparation for quoting. Double quotes are backslash-escaped. Literal
-// backslashes are backslash-escaped if they are followed by a double quote, or
-// if they are part of a sequence of backslashes that are followed by a double
-// quote.
-std::string EscapeForWindows(const std::string& argument) {
-  std::string str =
-      std::regex_replace(argument, std::regex(R"(\\*(?=""|$))"), "$1$1");
-  return std::regex_replace(str, std::regex("\""), "\\\"");
-}
-
-// Quotes and escapes a command line argument following the convention
-// understood by the Microsoft command line parser.
-std::string QuoteArgument(const std::string& argument) {
-  return absl::StrFormat("\"%s\"", EscapeForWindows(argument));
-}
-
-// Quotes and escapes a command line arguments for use in ssh command. The
-// argument is first escaped and quoted for Linux using single quotes and then
-// it is escaped to be used by the Microsoft command line parser.
-std::string QuoteAndEscapeArgumentForSsh(const std::string& argument) {
-  std::string quoted_argument = absl::StrFormat(
-      "'%s'", std::regex_replace(argument, std::regex("'"), "'\\''"));
-  return EscapeForWindows(quoted_argument);
-}
 
 // Gets the argument for SSH (reverse) port forwarding, e.g. -L23:localhost:45.
 std::string GetPortForwardingArg(int local_port, int remote_port,
@@ -69,21 +42,29 @@ RemoteUtil::RemoteUtil(int verbosity, bool quiet,
       process_factory_(process_factory),
       forward_output_to_log_(forward_output_to_log) {}
 
-void RemoteUtil::SetIpAndPort(const std::string& gamelet_ip, int ssh_port) {
-  gamelet_ip_ = gamelet_ip;
-  ssh_port_ = ssh_port;
+void RemoteUtil::SetUserHostAndPort(std::string user_host, int port) {
+  user_host_ = std::move(user_host);
+  ssh_port_ = port;
+}
+void RemoteUtil::SetScpCommand(std::string scp_command) {
+  scp_command_ = std::move(scp_command);
+}
+
+void RemoteUtil::SetSshCommand(std::string ssh_command) {
+  ssh_command_ = std::move(ssh_command);
 }
 
 absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
                              const std::string& dest, bool compress) {
-  absl::Status status = CheckIpPort();
+  absl::Status status = CheckHostPort();
   if (!status.ok()) {
     return status;
   }
 
   std::string source_args;
   for (const std::string& sourceFilePath : source_filepaths) {
-    source_args += QuoteArgument(sourceFilePath) + " ";
+    // Workaround for scp thinking that C is a host in C:\path\to\foo.
+    source_args += QuoteArgument("//./" + sourceFilePath) + " ";
   }
 
   // -p preserves timestamps. This enables timestamp-based up-to-date checks.
@@ -91,18 +72,10 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
   start_info.command = absl::StrFormat(
       "%s "
       "%s %s -p -T "
-      "-F %s "
-      "-i %s -P %i "
-      "-oStrictHostKeyChecking=yes "
-      "-oUserKnownHostsFile=\"\"\"%s\"\"\" %s "
-      "cloudcast@%s:"
+      "-P %i %s "
       "%s",
-      QuoteArgument(sdk_util_.GetScpExePath()),
-      quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
-      QuoteArgument(sdk_util_.GetSshConfigPath()),
-      QuoteArgument(sdk_util_.GetSshKeyFilePath()), ssh_port_,
-      sdk_util_.GetSshKnownHostsFilePath(), source_args,
-      QuoteArgument(gamelet_ip_), QuoteAndEscapeArgumentForSsh(dest));
+      scp_command_, quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
+      ssh_port_, source_args, QuoteArgument(user_host_ + ":" + dest));
   start_info.name = "scp";
   start_info.forward_output_to_log = forward_output_to_log_;
 
@@ -111,7 +84,7 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
 
 absl::Status RemoteUtil::Sync(std::vector<std::string> source_filepaths,
                               const std::string& dest) {
-  absl::Status status = CheckIpPort();
+  absl::Status status = CheckHostPort();
   if (!status.ok()) {
     return status;
   }
@@ -123,9 +96,9 @@ absl::Status RemoteUtil::Sync(std::vector<std::string> source_filepaths,
 
   ProcessStartInfo start_info;
   start_info.command = absl::StrFormat(
-      "%s --ip=%s --port=%i -z %s %s%s",
-      path::Join(sdk_util_.GetDevBinPath(), "cdc_rsync"),
-      QuoteArgument(gamelet_ip_), ssh_port_,
+      "cdc_rsync --ip=%s --port=%i -z "
+      "%s %s%s",
+      QuoteArgument(user_host_), ssh_port_,
       quiet_ || verbosity_ < 2 ? "-q " : " ", source_args, QuoteArgument(dest));
   start_info.name = "cdc_rsync";
   start_info.forward_output_to_log = forward_output_to_log_;
@@ -135,16 +108,16 @@ absl::Status RemoteUtil::Sync(std::vector<std::string> source_filepaths,
 
 absl::Status RemoteUtil::Chmod(const std::string& mode,
                                const std::string& remote_path, bool quiet) {
-  std::string remote_command = absl::StrFormat(
-      "chmod %s %s %s", QuoteArgument(mode),
-      QuoteAndEscapeArgumentForSsh(remote_path), quiet ? "-f" : "");
+  std::string remote_command =
+      absl::StrFormat("chmod %s %s %s", QuoteArgument(mode),
+                      EscapeForWindows(remote_path), quiet ? "-f" : "");
 
   return Run(remote_command, "chmod");
 }
 
 absl::Status RemoteUtil::Rm(const std::string& remote_path, bool force) {
-  std::string remote_command = absl::StrFormat(
-      "rm %s %s", force ? "-f" : "", QuoteAndEscapeArgumentForSsh(remote_path));
+  std::string remote_command = absl::StrFormat("rm %s %s", force ? "-f" : "",
+                                               EscapeForWindows(remote_path));
 
   return Run(remote_command, "rm");
 }
@@ -152,14 +125,14 @@ absl::Status RemoteUtil::Rm(const std::string& remote_path, bool force) {
 absl::Status RemoteUtil::Mv(const std::string& old_remote_path,
                             const std::string& new_remote_path) {
   std::string remote_command =
-      absl::StrFormat("mv %s %s", QuoteAndEscapeArgumentForSsh(old_remote_path),
-                      QuoteAndEscapeArgumentForSsh(new_remote_path));
+      absl::StrFormat("mv %s %s", EscapeForWindows(old_remote_path),
+                      EscapeForWindows(new_remote_path));
 
   return Run(remote_command, "mv");
 }
 
 absl::Status RemoteUtil::Run(std::string remote_command, std::string name) {
-  absl::Status status = CheckIpPort();
+  absl::Status status = CheckHostPort();
   if (!status.ok()) {
     return status;
   }
@@ -201,25 +174,37 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
   start_info.command = absl::StrFormat(
       "%s "
       "%s -tt "
-      "-F %s "
-      "-i %s "
       "-oServerAliveCountMax=6 "  // Number of lost msgs before ssh terminates
       "-oServerAliveInterval=5 "  // Time interval between alive msgs
-      "-oStrictHostKeyChecking=yes "
-      "-oUserKnownHostsFile=\"\"\"%s\"\"\" %s"
-      "cloudcast@%s -p %i %s",
-      QuoteArgument(sdk_util_.GetSshExePath()),
-      quiet_ || verbosity_ < 2 ? "-q" : "",
-      QuoteArgument(sdk_util_.GetSshConfigPath()),
-      QuoteArgument(sdk_util_.GetSshKeyFilePath()),
-      sdk_util_.GetSshKnownHostsFilePath(), forward_arg,
-      QuoteArgument(gamelet_ip_), ssh_port_, remote_command_arg);
+      "%s %s -p %i %s",
+      ssh_command_, quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
+      QuoteArgument(user_host_), ssh_port_, remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
   return start_info;
 }
 
-absl::Status RemoteUtil::CheckIpPort() {
-  if (gamelet_ip_.empty() || ssh_port_ == 0) {
+std::string RemoteUtil::EscapeForWindows(const std::string& argument) {
+  std::string str =
+      std::regex_replace(argument, std::regex(R"(\\*(?="|$))"), "$&$&");
+  return std::regex_replace(str, std::regex(R"(")"), R"(\")");
+}
+
+std::string RemoteUtil::QuoteArgument(const std::string& argument) {
+  return absl::StrCat("\"", EscapeForWindows(argument), "\"");
+}
+
+std::string RemoteUtil::QuoteArgumentForSsh(const std::string& argument) {
+  return absl::StrFormat(
+      "'%s'", std::regex_replace(argument, std::regex("'"), "'\\''"));
+}
+
+std::string RemoteUtil::QuoteAndEscapeArgumentForSsh(
+    const std::string& argument) {
+  return EscapeForWindows(QuoteArgumentForSsh(argument));
+}
+
+absl::Status RemoteUtil::CheckHostPort() {
+  if (user_host_.empty() || ssh_port_ == 0) {
     return MakeStatus("IP or port not set");
   }
 

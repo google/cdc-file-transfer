@@ -48,7 +48,6 @@ ServerExitCode GetExitCode(const absl::Status& status) {
     case Tag::kSocketEof:
       // Usually means client disconnected and shut down already.
     case Tag::kDeployServer:
-    case Tag::kInstancePickerNotAvailableInQuietMode:
     case Tag::kConnectionTimeout:
     case Tag::kCount:
       // Should not happen in server.
@@ -82,7 +81,7 @@ int main(int argc, const char** argv) {
 
   cdc_ft::Log::Initialize(
       std::make_unique<cdc_ft::ConsoleLog>(cdc_ft::LogLevel::kWarning));
-  cdc_ft::GgpRsyncServer server;
+  cdc_ft::CdcRsyncServer server;
   if (!server.CheckComponents(components)) {
     return cdc_ft::kServerExitCodeOutOfDate;
   }

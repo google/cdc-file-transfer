@@ -47,7 +47,7 @@ constexpr int kExitCodeNotFound = 127;
 constexpr int kForwardPortFirst = 44450;
 constexpr int kForwardPortLast = 44459;
 constexpr char kGgpServerFilename[] = "cdc_rsync_server";
-constexpr char kRemoteToolsBinDir[] = "/opt/developer/tools/bin/";
+constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc_file_transfer/";
 
 SetOptionsRequest::FilterRule::Type ToProtoType(PathFilter::Rule::Type type) {
   switch (type) {
@@ -94,14 +94,12 @@ absl::Status GetServerExitStatus(int exit_code, const std::string& error_msg) {
 
 }  // namespace
 
-GgpRsyncClient::GgpRsyncClient(const Options& options, PathFilter path_filter,
-                               std::string sources_dir,
+CdcRsyncClient::CdcRsyncClient(const Options& options,
                                std::vector<std::string> sources,
-                               std::string destination)
+                               std::string user_host, std::string destination)
     : options_(options),
-      path_filter_(std::move(path_filter)),
-      sources_dir_(std::move(sources_dir)),
       sources_(std::move(sources)),
+      user_host_(std::move(user_host)),
       destination_(std::move(destination)),
       remote_util_(options.verbosity, options.quiet, &process_factory_,
                    /*forward_output_to_log=*/false),
@@ -109,24 +107,26 @@ GgpRsyncClient::GgpRsyncClient(const Options& options, PathFilter path_filter,
                     kForwardPortFirst, kForwardPortLast, &process_factory_,
                     &remote_util_),
       printer_(options.quiet, Util::IsTTY() && !options.json),
-      progress_(&printer_, options.verbosity, options.json) {}
+      progress_(&printer_, options.verbosity, options.json) {
+  if (!options_.ssh_command.empty()) {
+    remote_util_.SetSshCommand(options_.ssh_command);
+  }
+  if (!options_.scp_command.empty()) {
+    remote_util_.SetScpCommand(options_.scp_command);
+  }
+}
 
-GgpRsyncClient::~GgpRsyncClient() {
+CdcRsyncClient::~CdcRsyncClient() {
   message_pump_.StopMessagePump();
   socket_.Disconnect();
 }
 
-absl::Status GgpRsyncClient::Run() {
-  absl::Status status = remote_util_.GetInitStatus();
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to initialize critical components");
-  }
-
+absl::Status CdcRsyncClient::Run() {
   // Initialize |remote_util_|.
-  remote_util_.SetIpAndPort(options_.ip, options_.port);
+  remote_util_.SetUserHostAndPort(user_host_, options_.port);
 
   // Start the server process.
-  status = StartServer();
+  absl::Status status = StartServer();
   if (HasTag(status, Tag::kDeployServer)) {
     // Gamelet components are not deployed or out-dated. Deploy and retry.
     status = DeployServer();
@@ -166,7 +166,7 @@ absl::Status GgpRsyncClient::Run() {
   return status;
 }
 
-absl::Status GgpRsyncClient::StartServer() {
+absl::Status CdcRsyncClient::StartServer() {
   assert(!server_process_);
 
   // Components are expected to reside in the same dir as the executable.
@@ -187,8 +187,8 @@ absl::Status GgpRsyncClient::StartServer() {
   std::string component_args = GameletComponent::ToCommandLineArgs(components);
 
   // Find available local and remote ports for port forwarding.
-  absl::StatusOr<int> port_res =
-      port_manager_.ReservePort(options_.connection_timeout_sec);
+  absl::StatusOr<int> port_res = port_manager_.ReservePort(
+      /*check_remote=*/false, /*remote_timeout_sec unused*/ 0);
   constexpr char kErrorMsg[] = "Failed to find available port";
   if (absl::IsDeadlineExceeded(port_res.status())) {
     // Server didn't respond in time.
@@ -205,9 +205,11 @@ absl::Status GgpRsyncClient::StartServer() {
       std::string(kRemoteToolsBinDir) + kGgpServerFilename;
   // Test existence manually to prevent misleading bash output message
   // "bash: .../cdc_rsync_server: No such file or directory".
-  std::string remote_command = absl::StrFormat(
-      "if [ ! -f %s ]; then exit %i; fi; %s %i %s", remote_server_path,
-      kExitCodeNotFound, remote_server_path, port, component_args);
+  // Also create the bin dir because otherwise scp below might fail.
+  std::string remote_command =
+      absl::StrFormat("mkdir -p %s; if [ ! -f %s ]; then exit %i; fi; %s %i %s",
+                      kRemoteToolsBinDir, remote_server_path, kExitCodeNotFound,
+                      remote_server_path, port, component_args);
   ProcessStartInfo start_info =
       remote_util_.BuildProcessStartInfoForSshPortForwardAndCommand(
           port, port, false, remote_command);
@@ -225,15 +227,24 @@ absl::Status GgpRsyncClient::StartServer() {
   }
 
   // Wait until the server process is listening.
-  auto detect_listening = [is_listening = &is_server_listening_]() -> bool {
-    return *is_listening;
+  Stopwatch timeout_timer;
+  bool is_timeout = false;
+  auto detect_listening_or_timeout = [is_listening = &is_server_listening_,
+                                      timeout = options_.connection_timeout_sec,
+                                      &timeout_timer, &is_timeout]() -> bool {
+    is_timeout = timeout_timer.ElapsedSeconds() > timeout;
+    return *is_listening || is_timeout;
   };
-  status = process->RunUntil(detect_listening);
+  status = process->RunUntil(detect_listening_or_timeout);
   if (!status.ok()) {
     // Some internal process error. Note that this does NOT mean that
     // cdc_rsync_server does not exist. In that case, the ssh process exits with
     // code 127.
     return status;
+  }
+  if (is_timeout) {
+    return SetTag(absl::DeadlineExceededError("Timeout while starting server"),
+                  Tag::kConnectionTimeout);
   }
 
   if (process->HasExited()) {
@@ -263,7 +274,7 @@ absl::Status GgpRsyncClient::StartServer() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::StopServer() {
+absl::Status CdcRsyncClient::StopServer() {
   assert(server_process_);
 
   // Close socket.
@@ -282,7 +293,7 @@ absl::Status GgpRsyncClient::StopServer() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::HandleServerOutput(const char* data) {
+absl::Status CdcRsyncClient::HandleServerOutput(const char* data) {
   // Note: This is called from a background thread!
 
   // Handle server error messages. Unfortunately, if the server prints to
@@ -319,7 +330,7 @@ absl::Status GgpRsyncClient::HandleServerOutput(const char* data) {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::Sync() {
+absl::Status CdcRsyncClient::Sync() {
   absl::Status status = SendOptions();
   if (!status.ok()) {
     return WrapStatus(status, "Failed to send options to server");
@@ -377,7 +388,7 @@ absl::Status GgpRsyncClient::Sync() {
   return status;
 }
 
-absl::Status GgpRsyncClient::DeployServer() {
+absl::Status CdcRsyncClient::DeployServer() {
   assert(!server_process_);
 
   std::string exe_dir;
@@ -409,34 +420,26 @@ absl::Status GgpRsyncClient::DeployServer() {
     return WrapStatus(status, "Failed to copy cdc_rsync_server to instance");
   }
 
-  // Make cdc_rsync_server executable.
-  status = remote_util_.Chmod("a+x", remoteServerTmpPath);
+  // Do 3 things in one SSH command, to save time:
+  // - Make the old cdc_rsync_server writable (if it exists).
+  // - Make the new cdc_rsync_server executable.
+  // - Replace the old cdc_rsync_server by the new one.
+  std::string old_path = RemoteUtil::EscapeForWindows(
+      std::string(kRemoteToolsBinDir) + kGgpServerFilename);
+  std::string new_path = RemoteUtil::EscapeForWindows(remoteServerTmpPath);
+  std::string replace_cmd = absl::StrFormat(
+      " ([ ! -f %s ] || chmod u+w %s) && chmod a+x %s && mv %s %s", old_path,
+      old_path, new_path, new_path, old_path);
+  status = remote_util_.Run(replace_cmd, "chmod && chmod && mv");
   if (!status.ok()) {
     return WrapStatus(status,
-                      "Failed to set executable flag on cdc_rsync_server");
-  }
-
-  // Make old file writable. Mv might fail to overwrite it, e.g. if someone made
-  // it read-only.
-  std::string remoteServerPath =
-      std::string(kRemoteToolsBinDir) + kGgpServerFilename;
-  status = remote_util_.Chmod("u+w", remoteServerPath, /*quiet=*/true);
-  if (!status.ok()) {
-    LOG_DEBUG("chmod u+w %s failed (expected if file does not exist): %s",
-              remoteServerPath, status.ToString());
-  }
-
-  // Replace old file by new file.
-  status = remote_util_.Mv(remoteServerTmpPath, remoteServerPath);
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to replace '%s' by '%s'",
-                      remoteServerPath, remoteServerTmpPath);
+                      "Failed to replace old cdc_rsync_server by new one");
   }
 
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::SendOptions() {
+absl::Status CdcRsyncClient::SendOptions() {
   LOG_INFO("Sending options");
 
   SetOptionsRequest request;
@@ -448,7 +451,7 @@ absl::Status GgpRsyncClient::SendOptions() {
   request.set_compress(options_.compress);
   request.set_relative(options_.relative);
 
-  for (const PathFilter::Rule& rule : path_filter_.GetRules()) {
+  for (const PathFilter::Rule& rule : options_.filter.GetRules()) {
     SetOptionsRequest::FilterRule* filter_rule = request.add_filter_rules();
     filter_rule->set_type(ToProtoType(rule.type));
     filter_rule->set_pattern(rule.pattern);
@@ -457,7 +460,7 @@ absl::Status GgpRsyncClient::SendOptions() {
   request.set_checksum(options_.checksum);
   request.set_dry_run(options_.dry_run);
   request.set_existing(options_.existing);
-  if (options_.copy_dest) {
+  if (!options_.copy_dest.empty()) {
     request.set_copy_dest(options_.copy_dest);
   }
 
@@ -470,13 +473,13 @@ absl::Status GgpRsyncClient::SendOptions() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::FindAndSendAllSourceFiles() {
+absl::Status CdcRsyncClient::FindAndSendAllSourceFiles() {
   LOG_INFO("Finding and sending all sources files");
 
   Stopwatch stopwatch;
 
-  FileFinderAndSender file_finder(&path_filter_, &message_pump_, &progress_,
-                                  sources_dir_, options_.recursive,
+  FileFinderAndSender file_finder(&options_.filter, &message_pump_, &progress_,
+                                  options_.sources_dir, options_.recursive,
                                   options_.relative);
 
   progress_.StartFindFiles();
@@ -497,7 +500,7 @@ absl::Status GgpRsyncClient::FindAndSendAllSourceFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::ReceiveFileStats() {
+absl::Status CdcRsyncClient::ReceiveFileStats() {
   LOG_INFO("Receiving file stats");
 
   SendFileStatsResponse response;
@@ -517,7 +520,7 @@ absl::Status GgpRsyncClient::ReceiveFileStats() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::ReceiveDeletedFiles() {
+absl::Status CdcRsyncClient::ReceiveDeletedFiles() {
   LOG_INFO("Receiving path of deleted files");
   std::string current_directory;
 
@@ -548,7 +551,7 @@ absl::Status GgpRsyncClient::ReceiveDeletedFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::ReceiveFileIndices(
+absl::Status CdcRsyncClient::ReceiveFileIndices(
     const char* file_type, std::vector<uint32_t>* file_indices) {
   LOG_INFO("Receiving indices of %s files", file_type);
 
@@ -582,7 +585,7 @@ absl::Status GgpRsyncClient::ReceiveFileIndices(
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::SendMissingFiles() {
+absl::Status CdcRsyncClient::SendMissingFiles() {
   if (missing_file_indices_.empty()) {
     return absl::OkStatus();
   }
@@ -653,7 +656,7 @@ absl::Status GgpRsyncClient::SendMissingFiles() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::ReceiveSignaturesAndSendDelta() {
+absl::Status CdcRsyncClient::ReceiveSignaturesAndSendDelta() {
   if (changed_file_indices_.empty()) {
     return absl::OkStatus();
   }
@@ -731,7 +734,7 @@ absl::Status GgpRsyncClient::ReceiveSignaturesAndSendDelta() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::StartCompressionStream() {
+absl::Status CdcRsyncClient::StartCompressionStream() {
   assert(!compression_stream_);
 
   // Notify server that data is compressed from now on.
@@ -762,7 +765,7 @@ absl::Status GgpRsyncClient::StartCompressionStream() {
   return absl::OkStatus();
 }
 
-absl::Status GgpRsyncClient::StopCompressionStream() {
+absl::Status CdcRsyncClient::StopCompressionStream() {
   assert(compression_stream_);
 
   // Finish writing to |compression_process_|'s stdin and change back to

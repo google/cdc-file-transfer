@@ -121,7 +121,8 @@ PortManager::~PortManager() {
   }
 }
 
-absl::StatusOr<int> PortManager::ReservePort(int timeout_sec) {
+absl::StatusOr<int> PortManager::ReservePort(bool check_remote,
+                                             int remote_timeout_sec) {
   // Find available port on workstation.
   std::unordered_set<int> local_ports;
   ASSIGN_OR_RETURN(local_ports,
@@ -129,13 +130,16 @@ absl::StatusOr<int> PortManager::ReservePort(int timeout_sec) {
                                            process_factory_, false),
                    "Failed to find available ports on workstation");
 
-  // Find available port on remote gamelet.
-  std::unordered_set<int> remote_ports;
-  ASSIGN_OR_RETURN(remote_ports,
-                   FindAvailableRemotePorts(first_port_, last_port_, "0.0.0.0",
-                                            process_factory_, remote_util_,
-                                            timeout_sec, false, steady_clock_),
-                   "Failed to find available ports on instance");
+  // Find available port on remote instance.
+  std::unordered_set<int> remote_ports = local_ports;
+  if (check_remote) {
+    ASSIGN_OR_RETURN(
+        remote_ports,
+        FindAvailableRemotePorts(first_port_, last_port_, "0.0.0.0",
+                                 process_factory_, remote_util_,
+                                 remote_timeout_sec, false, steady_clock_),
+        "Failed to find available ports on instance");
+  }
 
   // Fetch shared memory.
   void* mem;

@@ -33,10 +33,10 @@ namespace cdc_ft {
 class MessagePump;
 class ServerSocket;
 
-class GgpRsyncServer {
+class CdcRsyncServer {
  public:
-  GgpRsyncServer();
-  ~GgpRsyncServer();
+  CdcRsyncServer();
+  ~CdcRsyncServer();
 
   // Checks that the gamelet components (cdc_rsync_server binary etc.) are
   // up-to-date by checking their sizes and timestamps.

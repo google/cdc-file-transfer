@@ -12,18 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cdc_rsync_cli/params.h"
+#include "cdc_rsync/params.h"
 
 #include <cassert>
 
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_split.h"
 #include "common/path.h"
 #include "lib/zstd.h"
 
 namespace cdc_ft {
 namespace params {
 namespace {
+
+using Options = CdcRsyncClient::Options;
 
 template <typename... Args>
 void PrintError(const absl::FormatSpec<Args...>& format, Args... args) {
@@ -39,11 +42,13 @@ Synchronizes local files and files on a gamelet. Matching files are skipped.
 For partially matching files only the deltas are transferred.
 
 Usage:
-  cdc_rsync [options] source [source]... destination
+  cdc_rsync [options] source [source]... [user@]host:destination
 
 Parameters:
-  source                  Local file or folder to be copied
-  destination             Destination folder on the gamelet
+  source                  Local file or directory to be copied
+  user                    Remote SSH user name
+  host                    Remote host or IP address
+  destination             Remote destination directory
 
 Options:
     --ip string           Gamelet IP. Required.
@@ -54,7 +59,7 @@ Options:
     --json                Print JSON progress
 -n, --dry-run             Perform a trial run with no changes made
 -r, --recursive           Recurse into directories
-    --delete              Delete extraneous files from destination folder
+    --delete              Delete extraneous files from destination directory
 -z, --compress            Compress file data during the transfer
     --compress-level num  Explicitly set compression level (default: 6)
 -c, --checksum            Skip files based on checksum, not mod-time & size
@@ -68,13 +73,29 @@ Options:
 -R, --relative            Use relative path names
     --existing            Skip creating new files on instance
     --copy-dest dir       Use files from dir as sync base if files are missing
-                          from destination folder
+    --ssh-command         Path and arguments of SSH command to use, e.g.
+                          C:\path\to\ssh.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
+                          Can also be specified by the CDC_SSH_COMMAND environment variable.
+    --scp-command         Path and arguments of SSH command to use, e.g.
+                          C:\path\to\scp.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
+                          Can also be specified by the CDC_SCP_COMMAND environment variable.
 -h  --help                Help for cdc_rsync
 )";
 
+constexpr char kSshCommandEnvVar[] = "CDC_SSH_COMMAND";
+constexpr char kScpCommandEnvVar[] = "CDC_SCP_COMMAND";
+
+// Populates some parameters from environment variables.
+void PopulateFromEnvVars(Parameters* parameters) {
+  path::GetEnv(kSshCommandEnvVar, &parameters->options.ssh_command)
+      .IgnoreError();
+  path::GetEnv(kScpCommandEnvVar, &parameters->options.scp_command)
+      .IgnoreError();
+}
+
 // Handles the --exclude-from and --include-from options.
 OptionResult HandleFilterRuleFile(const std::string& option_name,
-                                  const char* path, FilterRule::Type type,
+                                  const char* path, PathFilter::Rule::Type type,
                                   Parameters* params) {
   if (!path) {
     PrintError("Option '%s' needs a value", option_name);
@@ -92,7 +113,7 @@ OptionResult HandleFilterRuleFile(const std::string& option_name,
   }
 
   for (std::string& pattern : patterns) {
-    params->filter_rules.emplace_back(type, std::move(pattern));
+    params->options.filter.AddRule(type, std::move(pattern));
   }
   return OptionResult::kConsumedKeyValue;
 }
@@ -143,11 +164,6 @@ bool LoadFilesFrom(const std::string& files_from,
 
 OptionResult HandleParameter(const std::string& key, const char* value,
                              Parameters* params, bool* help) {
-  if (key == "ip") {
-    params->options.ip = value;
-    return OptionResult::kConsumedKeyValue;
-  }
-
   if (key == "port") {
     if (value) {
       params->options.port = atoi(value);
@@ -181,27 +197,29 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "include") {
-    params->filter_rules.emplace_back(FilterRule::Type::kInclude, value);
+    params->options.filter.AddRule(PathFilter::Rule::Type::kInclude, value);
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "include-from") {
-    return HandleFilterRuleFile(key, value, FilterRule::Type::kInclude, params);
+    return HandleFilterRuleFile(key, value, PathFilter::Rule::Type::kInclude,
+                                params);
   }
 
   if (key == "exclude") {
-    params->filter_rules.emplace_back(FilterRule::Type::kExclude, value);
+    params->options.filter.AddRule(PathFilter::Rule::Type::kExclude, value);
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "exclude-from") {
-    return HandleFilterRuleFile(key, value, FilterRule::Type::kExclude, params);
+    return HandleFilterRuleFile(key, value, PathFilter::Rule::Type::kExclude,
+                                params);
   }
 
   if (key == "files-from") {
     // Implies -R.
     params->options.relative = true;
-    params->files_from = value;
+    params->files_from = value ? value : std::string();
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -250,7 +268,7 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "copy-dest") {
-    params->options.copy_dest = value;
+    params->options.copy_dest = value ? value : std::string();
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -259,13 +277,23 @@ OptionResult HandleParameter(const std::string& key, const char* value,
     return OptionResult::kConsumedKey;
   }
 
+  if (key == "ssh-command") {
+    params->options.ssh_command = value ? value : std::string();
+    return OptionResult::kConsumedKeyValue;
+  }
+
+  if (key == "scp-command") {
+    params->options.scp_command = value ? value : std::string();
+    return OptionResult::kConsumedKeyValue;
+  }
+
   PrintError("Unknown option: '%s'", key);
   return OptionResult::kError;
 }
 
-bool CheckParameters(const Parameters& params, bool help) {
+bool ValidateParameters(const Parameters& params, bool help) {
   if (help) {
-    printf("%s", kHelpText);
+    std::cout << kHelpText;
     return false;
   }
 
@@ -274,13 +302,7 @@ bool CheckParameters(const Parameters& params, bool help) {
     return false;
   }
 
-  if (!params.options.ip || params.options.ip[0] == '\0') {
-    PrintError("--ip must specify a valid IP address");
-    return false;
-  }
-
-  if (!params.options.port || params.options.port <= 0 ||
-      params.options.port > UINT16_MAX) {
+  if (params.options.port <= 0 || params.options.port > UINT16_MAX) {
     PrintError("--port must specify a valid port");
     return false;
   }
@@ -301,14 +323,40 @@ bool CheckParameters(const Parameters& params, bool help) {
 
   // Warn that any include rules not followed by an exclude rule are pointless
   // as the files would be included, anyway.
-  for (int n = static_cast<int>(params.filter_rules.size()) - 1; n >= 0; --n) {
-    const Parameters::FilterRule& rule = params.filter_rules[n];
-    if (rule.type == FilterRule::Type::kExclude) {
+  const std::vector<PathFilter::Rule>& rules = params.options.filter.GetRules();
+  for (int n = static_cast<int>(rules.size()) - 1; n >= 0; --n) {
+    const PathFilter::Rule& rule = rules[n];
+    if (rule.type == PathFilter::Rule::Type::kExclude) {
       break;
     }
     std::cout << "Warning: Include pattern '" << rule.pattern
               << "' has no effect, not followed by exclude pattern"
               << std::endl;
+  }
+
+  if (params.sources.empty() && params.destination.empty()) {
+    PrintError("Missing source and destination");
+    return false;
+  }
+
+  if (params.destination.empty()) {
+    PrintError("Missing destination");
+    return false;
+  }
+
+  if (params.sources.empty()) {
+    // If one arg was passed on the command line, it is not clear whether it
+    // was supposed to be a source or destination.
+    PrintError("Missing source or destination");
+    return false;
+  }
+
+  if (params.user_host.empty()) {
+    PrintError(
+        "No remote host specified in destination '%s'. "
+        "Expected [user@]host:destination.",
+        params.destination);
+    return false;
   }
 
   return true;
@@ -335,6 +383,25 @@ bool CheckOptionResult(OptionResult result, const std::string& name,
   return true;
 }
 
+// Removes the user/host part of |destination| and puts it into |user_host|,
+// e.g. if |destination| is initially "user@foo.com:~/file", it is "~/file"
+// afterward and |user_host| is |user@foo.com|. Does not touch Windows drives,
+// e.g. C:\foo.
+void PopUserHost(std::string* destination, std::string* user_host) {
+  std::vector<std::string> parts =
+      absl::StrSplit(*destination, absl::MaxSplits(':', 1));
+  if (parts.size() < 2) return;
+
+  // Don't mistake the C part of C:\foo as user/host.
+  if (parts[0].size() == 1 && toupper(parts[0][0]) >= 'A' &&
+      toupper(parts[0][0]) <= 'Z') {
+    return;
+  }
+
+  *user_host = parts[0];
+  *destination = parts[1];
+}
+
 }  // namespace
 
 const char* HelpText() { return kHelpText; }
@@ -348,6 +415,9 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters) {
     std::cout << kHelpText;
     return false;
   }
+
+  // Before applying args, populate parameters from env vars.
+  PopulateFromEnvVars(parameters);
 
   bool help = false;
   for (int index = 1; index < argc; ++index) {
@@ -404,34 +474,15 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters) {
 
   // Load files-from file (can't do it when --files-from is handled since not
   // all sources might have been read at that point.
-  if (parameters->files_from &&
+  if (!parameters->files_from.empty() &&
       !LoadFilesFrom(parameters->files_from, &parameters->sources,
-                     &parameters->sources_dir)) {
+                     &parameters->options.sources_dir)) {
     return false;
   }
 
-  if (!CheckParameters(*parameters, help)) {
-    return false;
-  }
+  PopUserHost(&parameters->destination, &parameters->user_host);
 
-  if (parameters->sources.empty() && parameters->destination.empty()) {
-    PrintError("Missing source and destination");
-    return false;
-  }
-
-  if (parameters->destination.empty()) {
-    PrintError("Missing destination");
-    return false;
-  }
-
-  if (parameters->sources.empty()) {
-    // If one arg was passed on the command line, it is not clear whether it
-    // was supposed to be a source or destination. Try to infer that, e.g.
-    //   cdc_rsync *.txt          -> Missing destination
-    //   cdc_rsync /mnt/developer -> Missing source
-    bool missing_src = parameters->destination[0] == '/';
-
-    PrintError("Missing %s", missing_src ? "source" : "destination");
+  if (!ValidateParameters(*parameters, help)) {
     return false;
   }
 

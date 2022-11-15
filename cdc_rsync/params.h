@@ -14,34 +14,24 @@
  * limitations under the License.
  */
 
-#ifndef CDC_RSYNC_CLI_PARAMS_H_
-#define CDC_RSYNC_CLI_PARAMS_H_
+#ifndef CDC_RSYNC_PARAMS_H_
+#define CDC_RSYNC_PARAMS_H_
 
 #include <string>
 #include <vector>
 
-#include "cdc_rsync/cdc_rsync.h"
+#include "cdc_rsync/cdc_rsync_client.h"
 
 namespace cdc_ft {
 namespace params {
 
 // All cdc_rsync command line parameters.
 struct Parameters {
-  // Copy of cdc_ft::FilterRule with std::string instead of const char*.
-  struct FilterRule {
-    using Type = ::cdc_ft::FilterRule::Type;
-    FilterRule(Type type, std::string pattern)
-        : type(type), pattern(std::move(pattern)) {}
-    Type type;
-    std::string pattern;
-  };
-
-  Options options;
-  std::vector<FilterRule> filter_rules;
+  CdcRsyncClient::Options options;
   std::vector<std::string> sources;
+  std::string user_host;
   std::string destination;
-  const char* files_from = nullptr;
-  std::string sources_dir;  // Base directory for files loaded for --files-from.
+  std::string files_from;
 };
 
 // Parses sources, destination and options from the command line args.
@@ -51,4 +41,4 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters);
 }  // namespace params
 }  // namespace cdc_ft
 
-#endif  // CDC_RSYNC_CLI_PARAMS_H_
+#endif  // CDC_RSYNC_PARAMS_H_
