@@ -35,16 +35,18 @@ cc_library(
             # Additional warnings from @com_github_dirent
             "/wd4505",  # unreferenced function with internal linkage has been removed
         ],
-        "//conditions:default": ["/wd4505"],
+        "//conditions:default": [],
     }),
     deps = [
         ":path",
         ":platform",
-        "@com_github_dirent//:dirent",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
-    ],
+    ] + select({
+        "//tools:windows": ["@com_github_dirent//:dirent"],
+        "//conditions:default": [],
+    }),
 )
 
 cc_test(
