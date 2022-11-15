@@ -7,10 +7,10 @@ to split up files into chunks.
 
 ## CDC RSync
 
-CDC RSync is a ool to sync files to a remote machine, similar to the standard
-Linux [rsync](https://linux.die.net/man/1/rsync). It is basically a copy tool,
-but optimized for the case where there is already an old version of the files
-available in the target directory.
+CDC RSync is a tool to sync files from a Windows machine to a Linux device,
+similar to the standard Linux [rsync](https://linux.die.net/man/1/rsync). It is
+basically a copy tool, but optimized for the case where there is already an old
+version of the files available in the target directory.
 * It skips files quickly if timestamp and file size match.
 * It uses fast compression for all data transfer.
 * If a file changed, it determines which parts changed and only transfers the
