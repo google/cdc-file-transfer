@@ -334,8 +334,7 @@ void Indexer::Worker::Run() {
 absl::Status Indexer::Worker::IndexFile(const std::string& filepath) {
   std::FILE* fin = std::fopen(filepath.c_str(), "rb");
   if (!fin) {
-    return ErrnoToCanonicalStatus(
-        errno, absl::StrFormat("failed to open file '%s'", filepath));
+    return ErrnoToCanonicalStatus(errno, "failed to open file '%s'", filepath);
   }
   path::FileCloser closer(fin);
   std::fseek(fin, 0, SEEK_SET);
@@ -349,8 +348,8 @@ absl::Status Indexer::Worker::IndexFile(const std::string& filepath) {
     size_t cnt = std::fread(buf.data(), sizeof(uint8_t), buf.size(), fin);
     err = std::ferror(fin);
     if (err) {
-      return ErrnoToCanonicalStatus(
-          err, absl::StrFormat("failed to read from file '%s'", filepath));
+      return ErrnoToCanonicalStatus(err, "failed to read from file '%s'",
+                                    filepath);
     }
     if (cnt) {
       chunker.Process(buf.data(), cnt);

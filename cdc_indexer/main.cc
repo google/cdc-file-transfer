@@ -273,8 +273,8 @@ absl::Status WriteResultsFile(const std::string& filepath,
   bool exists = path::FileExists(filepath);
   std::FILE* fout = std::fopen(filepath.c_str(), "a");
   if (!fout) {
-    return ErrnoToCanonicalStatus(
-        errno, absl::StrFormat("Couldn't write to file '%s'", filepath));
+    return ErrnoToCanonicalStatus(errno, "Couldn't write to file '%s'",
+                                  filepath);
   }
 
   path::FileCloser closer(fout);

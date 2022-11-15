@@ -470,8 +470,7 @@ absl::StatusOr<FILE*> OpenFile(const std::string& path, const char* mode) {
 #endif
   if (!file) {
     int err = errno;
-    return ErrnoToCanonicalStatus(
-        err, absl::StrFormat("Failed to open file '%s'", path));
+    return ErrnoToCanonicalStatus(err, "Failed to open file '%s'", path);
   }
   return file;
 }
@@ -914,8 +913,7 @@ absl::Status GetStats(const std::string& path, Stats* stats) {
   if (!result) {
     int err = errno;
     *stats = Stats();
-    return ErrnoToCanonicalStatus(err,
-                                  absl::StrFormat("Failed to stat '%s'", path));
+    return ErrnoToCanonicalStatus(err, "Failed to stat '%s'", path);
   }
 
   stats->mode = os_stats.st_mode;
@@ -973,14 +971,9 @@ absl::Status CreateSymlink(const std::string& target,
     std::filesystem::create_directory_symlink(target_u8, link_path_u8,
                                               error_code);
   }
-  if (error_code) {
-    assert(error_code.category() == std::system_category());
-    return ErrnoToCanonicalStatus(
-        error_code.value(),
-        absl::StrFormat("Failed to create symlink '%s' with target '%s'",
-                        link_path, target));
-  }
-  return absl::OkStatus();
+  return ErrorCodeToCanonicalStatus(
+      error_code, "Failed to create symlink '%s' with target '%s'", link_path,
+      target);
 }
 
 absl::StatusOr<std::string> GetSymlinkTarget(const std::string& link_path) {
@@ -989,9 +982,8 @@ absl::StatusOr<std::string> GetSymlinkTarget(const std::string& link_path) {
   std::filesystem::path symlink_target =
       std::filesystem::read_symlink(link_path_u8, error_code);
   if (error_code) {
-    return ErrnoToCanonicalStatus(
-        error_code.value(),
-        absl::StrFormat("Failed to read symlink '%s'", link_path));
+    return ErrorCodeToCanonicalStatus(error_code, "Failed to read symlink '%s'",
+                                      link_path);
   }
   return symlink_target.u8string();
 }
@@ -1014,26 +1006,16 @@ bool Exists(const std::string& path) {
 absl::Status CreateDir(const std::string& path) {
   std::error_code error_code;
   std::filesystem::create_directory(std::filesystem::u8path(path), error_code);
-  if (error_code) {
-    assert(error_code.category() == std::system_category());
-    return ErrnoToCanonicalStatus(
-        error_code.value(),
-        absl::StrFormat("Failed to create directory '%s'", path));
-  }
-  return absl::OkStatus();
+  return ErrorCodeToCanonicalStatus(error_code,
+                                    "Failed to create directory '%s'", path);
 }
 
 absl::Status CreateDirRec(const std::string& path) {
   std::error_code error_code;
   std::filesystem::create_directories(std::filesystem::u8path(path),
                                       error_code);
-  if (error_code) {
-    assert(error_code.category() == std::system_category());
-    return ErrnoToCanonicalStatus(
-        error_code.value(),
-        absl::StrFormat("Failed to create directory '%s'", path));
-  }
-  return absl::OkStatus();
+  return ErrorCodeToCanonicalStatus(error_code,
+                                    "Failed to create directory '%s'", path);
 }
 
 absl::Status RenameFile(const std::string& from_path,

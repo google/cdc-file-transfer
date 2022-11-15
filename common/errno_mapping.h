@@ -17,8 +17,10 @@
 #ifndef COMMON_ERRNO_MAPPING_H_
 #define COMMON_ERRNO_MAPPING_H_
 
+#include <string>
+
 #include "absl/status/status.h"
-#include "absl/strings/string_view.h"
+#include "absl/strings/str_format.h"
 
 namespace cdc_ft {
 
@@ -26,8 +28,27 @@ namespace cdc_ft {
 absl::StatusCode ErrnoToCanonicalCode(int error_number);
 
 // Creates a status by converting the errno |error_number| to an absl code.
+template <typename... Args>
 absl::Status ErrnoToCanonicalStatus(int error_number,
-                                    absl::string_view message);
+                                    const absl::FormatSpec<Args...>& format,
+                                    Args... args) {
+  if (error_number == 0) return absl::OkStatus();
+  std::string msg = absl::StrFormat(format, args...);
+  return absl::Status(ErrnoToCanonicalCode(error_number),
+                      absl::StrCat(msg, ": ", strerror(error_number)));
+}
+
+template <typename... Args>
+absl::Status ErrorCodeToCanonicalStatus(const std::error_code& code,
+                                        const absl::FormatSpec<Args...>& format,
+                                        Args... args) {
+  if (!code) return absl::OkStatus();
+  std::string msg = absl::StrFormat(format, args...);
+  absl::StatusCode absl_code = code.category() == std::system_category()
+                                   ? ErrnoToCanonicalCode(code.value())
+                                   : absl::StatusCode::kUnknown;
+  return absl::Status(absl_code, absl::StrCat(msg, ": ", code.message()));
+}
 
 }  // namespace cdc_ft
 
