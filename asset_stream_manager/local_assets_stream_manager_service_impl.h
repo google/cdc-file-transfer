@@ -57,15 +57,13 @@ class LocalAssetsStreamManagerServiceImpl final
   // if it exists.
   grpc::Status StartSession(grpc::ServerContext* context,
                             const StartSessionRequest* request,
-                            StartSessionResponse* response) override
-      ABSL_LOCKS_EXCLUDED(sessions_mutex_);
+                            StartSessionResponse* response) override;
 
   // Stops the streaming session to the instance with id
   // |request->gamelet_id()|. Returns a NotFound error if no session exists.
   grpc::Status StopSession(grpc::ServerContext* context,
                            const StopSessionRequest* request,
-                           StopSessionResponse* response) override
-      ABSL_LOCKS_EXCLUDED(sessions_mutex_);
+                           StopSessionResponse* response) override;
 
  private:
   // Convert StartSessionRequest enum to metrics enum.
