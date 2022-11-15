@@ -199,22 +199,34 @@ TEST_F(PathTest, GetKnownFolderPath) {
 }
 #endif
 
+TEST_F(PathTest, ExpandPathVariables) {
 #if PLATFORM_WINDOWS
-TEST_F(PathTest, ExpandEnvironmentPathVariables) {
   std::string path = u8"%userPROfile%\\fOo\U0001F964";
-  EXPECT_OK(path::ExpandEnvironmentPathVariables(&path));
+  EXPECT_OK(path::ExpandPathVariables(&path));
   EXPECT_TRUE(absl::StartsWith(path, "C:\\Users\\")) << path;
   EXPECT_TRUE(absl::EndsWith(path, u8"\\fOo\U0001F964")) << path;
 
   path = "%ProgramFiles(x86)%\\Foo";
-  EXPECT_OK(path::ExpandEnvironmentPathVariables(&path));
+  EXPECT_OK(path::ExpandPathVariables(&path));
   EXPECT_EQ(path, "C:\\Program Files (x86)\\Foo");
 
   path = "%unrelated%\\fOo";
-  EXPECT_OK(path::ExpandEnvironmentPathVariables(&path));
+  EXPECT_OK(path::ExpandPathVariables(&path));
   EXPECT_EQ(path, "%unrelated%\\fOo") << path;
-}
+#else
+  std::string path = u8"fooU0001F964";
+  EXPECT_OK(path::ExpandPathVariables(&path));
+  EXPECT_EQ(path, u8"fooU0001F964");
+
+  path = "~/foo";
+  EXPECT_OK(path::ExpandPathVariables(&path));
+  EXPECT_TRUE(absl::StrContains(path, "home")) << path;
+
+  path = "*";
+  EXPECT_ERROR_MSG(InvalidArgument, "multiple results",
+                   path::ExpandPathVariables(&path));
 #endif
+}
 
 TEST_F(PathTest, GetEnv_DoesNotExist) {
   std::string value;
