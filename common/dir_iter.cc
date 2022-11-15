@@ -221,8 +221,8 @@ bool DirectoryIterator::Open(const std::string& path,
     impl_->PushDir(dir, path::BaseName(path));
     return true;
   }
-  impl_->SetStatus(ErrnoToCanonicalStatus(
-      errno, absl::StrFormat("Failed to open directory '%s'", path)));
+  impl_->SetStatus(
+      ErrnoToCanonicalStatus(errno, "Failed to open directory '%s'", path));
   return false;
 }
 
@@ -259,7 +259,7 @@ bool DirectoryIterator::NextEntry(DirectoryEntry* entry) {
           // Ignore access errors and proceed.
         } else {
           impl_->SetStatus(ErrnoToCanonicalStatus(
-              errno, absl::StrFormat("Failed to open directory '%s'", subdir)));
+              errno, "Failed to open directory '%s'", subdir));
           return false;
         }
       }
@@ -278,8 +278,7 @@ bool DirectoryIterator::NextEntry(DirectoryEntry* entry) {
 
   if (errno) {
     impl_->SetStatus(ErrnoToCanonicalStatus(
-        errno, absl::StrFormat("Failed to iterate over directory '%s'",
-                               impl_->DirsPath())));
+        errno, "Failed to iterate over directory '%s'", impl_->DirsPath()));
   }
   return false;
 }

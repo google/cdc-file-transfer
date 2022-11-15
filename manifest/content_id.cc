@@ -78,7 +78,7 @@ bool ContentId::FromHexString(const std::string& str,
   std::string* hash = content_id->mutable_blake3_sum_160();
   hash->clear();
   hash->reserve(kHashSize);
-  for (int n = 0; n < str.size(); n += 2) {
+  for (size_t n = 0; n < str.size(); n += 2) {
     int high = HexToInt(str[n]);
     int low = HexToInt(str[n + 1]);
     if (high == -1 || low == -1) {

@@ -16,8 +16,6 @@
 
 #include <errno.h>
 
-#include <string>
-
 namespace cdc_ft {
 
 absl::StatusCode ErrnoToCanonicalCode(int error_number) {
@@ -158,20 +156,6 @@ absl::StatusCode ErrnoToCanonicalCode(int error_number) {
     default:
       return absl::StatusCode::kUnknown;
   }
-}
-
-absl::Status ErrnoToCanonicalStatus(int error_number,
-                                    absl::string_view message) {
-  return absl::Status(ErrnoToCanonicalCode(error_number),
-                      absl::StrCat(message, ": ", strerror(error_number)));
-}
-
-absl::Status ErrorCodeToCanonicalStatus(const std::error_code& code,
-                                        absl::string_view message) {
-  absl::StatusCode absl_code = code.category() == std::system_category()
-                                   ? ErrnoToCanonicalCode(code.value())
-                                   : absl::StatusCode::kUnknown;
-  return absl::Status(absl_code, absl::StrCat(message, ": ", code.message()));
 }
 
 }  // namespace cdc_ft

@@ -36,10 +36,15 @@ namespace {
 constexpr char kFuseFilename[] = "cdc_fuse_fs";
 constexpr char kLibFuseFilename[] = "libfuse.so";
 
-absl::StatusOr<bool> IsUpToDate(const std::string& components_arg) {
+bool IsUpToDate(const std::string& components_arg) {
   // Components are expected to reside in the same dir as the executable.
   std::string component_dir;
-  RETURN_IF_ERROR(path::GetExeDir(&component_dir));
+  absl::Status status = path::GetExeDir(&component_dir);
+  if (!status.ok()) {
+    // Should(TM) be super rare, so just log an error.
+    LOG_DEBUG("Failed to exe dir: %s", status.ToString());
+    return false;
+  }
 
   std::vector<GameletComponent> components =
       GameletComponent::FromCommandLineArgs(components_arg);
@@ -49,10 +54,9 @@ absl::StatusOr<bool> IsUpToDate(const std::string& components_arg) {
   }
 
   std::vector<GameletComponent> our_components;
-  absl::Status status =
-      GameletComponent::Get({path::Join(component_dir, kFuseFilename),
-                             path::Join(component_dir, kLibFuseFilename)},
-                            &our_components);
+  status = GameletComponent::Get({path::Join(component_dir, kFuseFilename),
+                                  path::Join(component_dir, kLibFuseFilename)},
+                                 &our_components);
   if (!status.ok()) {
     LOG_DEBUG("Failed to get component data: %s", status.ToString())
     return false;
@@ -125,13 +129,7 @@ int main(int argc, char* argv[]) {
       cdc_ft::Log::VerbosityToLogLevel(verbosity)));
 
   // Perform up-to-date check.
-  absl::StatusOr<bool> is_up_to_date = cdc_ft::IsUpToDate(components);
-  if (!is_up_to_date.ok()) {
-    LOG_ERROR("Failed to check file system freshness: %s",
-              is_up_to_date.status().ToString());
-    return static_cast<int>(is_up_to_date.status().code());
-  }
-  if (!*is_up_to_date) {
+  if (!cdc_ft::IsUpToDate(components)) {
     printf("%s\n", cdc_ft::kFuseNotUpToDate);
     return 0;
   }
