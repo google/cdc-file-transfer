@@ -445,7 +445,7 @@ absl::Status MultiSession::Initialize() {
       ports,
       PortManager::FindAvailableLocalPorts(kAssetStreamPortFirst,
                                            kAssetStreamPortLast, "127.0.0.1",
-                                           process_factory_, true),
+                                           process_factory_),
       "Failed to find an available local port in the range [%d, %d]",
       kAssetStreamPortFirst, kAssetStreamPortLast);
   assert(!ports.empty());

@@ -135,6 +135,10 @@ int main(int argc, char* argv[]) {
 
     status = client.StartSession(src_dir, user_host, ssh_port, mount_dir,
                                  ssh_command, scp_command);
+    if (status.ok()) {
+      LOG_INFO("Started streaming directory '%s' to '%s:%s'", src_dir,
+               user_host, mount_dir);
+    }
   } else /* if (command == "stop") */ {
     if (args.size() < 3) {
       LOG_ERROR(
@@ -147,6 +151,9 @@ int main(int argc, char* argv[]) {
     if (!ParseUserHostDir(args[2], &user_host, &mount_dir)) return 1;
 
     status = client.StopSession(user_host, mount_dir);
+    if (status.ok()) {
+      LOG_INFO("Stopped streaming session to '%s:%s'", user_host, mount_dir);
+    }
   }
 
   if (!status.ok()) {
