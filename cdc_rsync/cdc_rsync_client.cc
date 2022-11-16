@@ -47,7 +47,7 @@ constexpr int kExitCodeNotFound = 127;
 constexpr int kForwardPortFirst = 44450;
 constexpr int kForwardPortLast = 44459;
 constexpr char kCdcServerFilename[] = "cdc_rsync_server";
-constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/";
+constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/bin/";
 
 SetOptionsRequest::FilterRule::Type ToProtoType(PathFilter::Rule::Type type) {
   switch (type) {
@@ -424,9 +424,9 @@ absl::Status CdcRsyncClient::DeployServer() {
   // - Make the old cdc_rsync_server writable (if it exists).
   // - Make the new cdc_rsync_server executable.
   // - Replace the old cdc_rsync_server by the new one.
-  std::string old_path = RemoteUtil::EscapeForWindows(
-      std::string(kRemoteToolsBinDir) + kCdcServerFilename);
-  std::string new_path = RemoteUtil::EscapeForWindows(remoteServerTmpPath);
+  std::string old_path =
+      RemoteUtil::Quote(std::string(kRemoteToolsBinDir) + kCdcServerFilename);
+  std::string new_path = RemoteUtil::Quote(remoteServerTmpPath);
   std::string replace_cmd = absl::StrFormat(
       " ([ ! -f %s ] || chmod u+w %s) && chmod a+x %s && mv %s %s", old_path,
       old_path, new_path, new_path, old_path);

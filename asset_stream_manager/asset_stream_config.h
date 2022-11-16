@@ -23,6 +23,7 @@
 
 #include "absl/status/status.h"
 #include "asset_stream_manager/session_config.h"
+#include "session.h"
 
 namespace cdc_ft {
 
@@ -67,7 +68,15 @@ class AssetStreamConfig {
   std::string GetFlagReadErrors();
 
   // Session configuration.
-  const SessionConfig session_cfg() const { return session_cfg_; }
+  const SessionConfig& session_cfg() const { return session_cfg_; }
+
+  // Workstation directory to be streamed. Used for development purposes only
+  // to start a session right away when the service starts up. See dev CLI args.
+  const std::string& dev_src_dir() const { return dev_src_dir_; }
+
+  // Session target. Used for development purposes only to start a session right
+  // away when the service starts up. See dev CLI args.
+  const SessionTarget& dev_target() const { return dev_target_; }
 
   // Whether to log to a file or to stdout.
   bool log_to_stdout() const { return log_to_stdout_; }
@@ -75,6 +84,11 @@ class AssetStreamConfig {
  private:
   SessionConfig session_cfg_;
   bool log_to_stdout_ = false;
+
+  // Configuration used for development. Allows users to specify a session
+  // via the service's command line.
+  std::string dev_src_dir_;
+  SessionTarget dev_target_;
 
   // Use a set, so the flags are sorted alphabetically.
   std::set<std::string> flags_read_from_file_;

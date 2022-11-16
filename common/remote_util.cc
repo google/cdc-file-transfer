@@ -47,6 +47,7 @@ void RemoteUtil::SetUserHostAndPort(std::string user_host, int port) {
   user_host_ = std::move(user_host);
   ssh_port_ = port;
 }
+
 void RemoteUtil::SetScpCommand(std::string scp_command) {
   scp_command_ = std::move(scp_command);
 }
@@ -57,7 +58,7 @@ void RemoteUtil::SetSshCommand(std::string ssh_command) {
 
 absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
                              const std::string& dest, bool compress) {
-  absl::Status status = CheckHostPort();
+  absl::Status status = CheckUserHostPort();
   if (!status.ok()) {
     return status;
   }
@@ -66,9 +67,9 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
   for (const std::string& sourceFilePath : source_filepaths) {
     // Workaround for scp thinking that C is a host in C:\path\to\foo.
     if (absl::StrContains(path::GetDrivePrefix(sourceFilePath), ":")) {
-      source_args += QuoteArgument("//./" + sourceFilePath) + " ";
+      source_args += Quote("//./" + sourceFilePath) + " ";
     } else {
-      source_args += sourceFilePath + " ";
+      source_args += Quote(sourceFilePath) + " ";
     }
   }
 
@@ -78,9 +79,10 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
       "%s "
       "%s %s -p -T "
       "-P %i %s "
-      "%s",
-      scp_command_, quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
-      ssh_port_, source_args, QuoteArgument(user_host_ + ":" + dest));
+      "%s:%s",
+      Quote(scp_command_), quiet_ || verbosity_ < 2 ? "-q" : "",
+      compress ? "-C" : "", ssh_port_, source_args, Quote(user_host_),
+      Quote(dest));
   start_info.name = "scp";
   start_info.forward_output_to_log = forward_output_to_log_;
 
@@ -90,30 +92,14 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
 absl::Status RemoteUtil::Chmod(const std::string& mode,
                                const std::string& remote_path, bool quiet) {
   std::string remote_command =
-      absl::StrFormat("chmod %s %s %s", QuoteArgument(mode),
-                      EscapeForWindows(remote_path), quiet ? "-f" : "");
+      absl::StrFormat("chmod %s %s %s", QuoteForSsh(mode),
+                      QuoteForSsh(remote_path), quiet ? "-f" : "");
 
   return Run(remote_command, "chmod");
 }
 
-absl::Status RemoteUtil::Rm(const std::string& remote_path, bool force) {
-  std::string remote_command = absl::StrFormat("rm %s %s", force ? "-f" : "",
-                                               EscapeForWindows(remote_path));
-
-  return Run(remote_command, "rm");
-}
-
-absl::Status RemoteUtil::Mv(const std::string& old_remote_path,
-                            const std::string& new_remote_path) {
-  std::string remote_command =
-      absl::StrFormat("mv %s %s", EscapeForWindows(old_remote_path),
-                      EscapeForWindows(new_remote_path));
-
-  return Run(remote_command, "mv");
-}
-
 absl::Status RemoteUtil::Run(std::string remote_command, std::string name) {
-  absl::Status status = CheckHostPort();
+  absl::Status status = CheckUserHostPort();
   if (!status.ok()) {
     return status;
   }
@@ -158,33 +144,61 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
       "-oServerAliveCountMax=6 "  // Number of lost msgs before ssh terminates
       "-oServerAliveInterval=5 "  // Time interval between alive msgs
       "%s %s -p %i %s",
-      ssh_command_, quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
-      QuoteArgument(user_host_), ssh_port_, remote_command_arg);
+      Quote(ssh_command_), quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
+      Quote(user_host_), ssh_port_, remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
   return start_info;
 }
 
-std::string RemoteUtil::EscapeForWindows(const std::string& argument) {
-  std::string str =
+std::string RemoteUtil::Quote(const std::string& argument) {
+  // Escape certain backslashes (see doc of this function).
+  std::string escaped =
       std::regex_replace(argument, std::regex(R"(\\*(?="|$))"), "$&$&");
-  return std::regex_replace(str, std::regex(R"(")"), R"(\")");
+  // Escape " -> \".
+  escaped = std::regex_replace(escaped, std::regex(R"(")"), R"(\")");
+  // Quote.
+  return absl::StrCat("\"", escaped, "\"");
 }
 
-std::string RemoteUtil::QuoteArgument(const std::string& argument) {
-  return absl::StrCat("\"", EscapeForWindows(argument), "\"");
+std::string RemoteUtil::QuoteForSsh(const std::string& argument) {
+  // Escape \ ->: \\.
+  std::string escaped =
+      std::regex_replace(argument, std::regex(R"(\\)"), R"(\\)");
+  // Escape " -> \".
+  escaped = std::regex_replace(escaped, std::regex(R"(")"), R"(\")");
+
+  // Quote, but handle special case for ~.
+  if (escaped.empty() || escaped[0] != '~') {
+    return Quote(absl::StrCat("\"", escaped, "\""));
+  }
+
+  // Simple special cases. Quote() isn't required, but called for consistency.
+  if (escaped == "~" || escaped == "~/") {
+    return Quote(escaped);
+  }
+
+  // Check whether the username contains only valid characters.
+  // E.g. ~user name/foo -> Quote(~user name/foo)
+  size_t slash_pos = escaped.find('/');
+  size_t username_end_pos =
+      slash_pos == std::string::npos ? escaped.size() : slash_pos;
+  if (username_end_pos > 1 &&
+      !std::regex_match(escaped.substr(1, username_end_pos - 1),
+                        std::regex("^[a-z][-a-z0-9]*"))) {
+    return Quote(absl::StrCat("\"", escaped, "\""));
+  }
+
+  if (slash_pos == std::string::npos) {
+    // E.g. ~username -> Quote(~username)
+    return Quote(escaped);
+  }
+
+  // E.g.  or ~username/foo -> Quote(~username/"foo")
+  return Quote(absl::StrCat(escaped.substr(0, slash_pos + 1), "\"",
+                            escaped.substr(slash_pos + 1), "\""));
 }
 
-std::string RemoteUtil::QuoteArgumentForSsh(const std::string& argument) {
-  return absl::StrFormat(
-      "'%s'", std::regex_replace(argument, std::regex("'"), "'\\''"));
-}
-
-std::string RemoteUtil::QuoteAndEscapeArgumentForSsh(
-    const std::string& argument) {
-  return EscapeForWindows(QuoteArgumentForSsh(argument));
-}
-
-absl::Status RemoteUtil::CheckHostPort() {
+absl::Status RemoteUtil::CheckUserHostPort() {
   if (user_host_.empty() || ssh_port_ == 0) {
     return MakeStatus("IP or port not set");
   }

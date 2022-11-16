@@ -33,13 +33,14 @@ ABSL_FLAG(
     "Port to use while connecting to the remote instance being streamed to.");
 ABSL_FLAG(std::string, ssh_command, "",
           "Path and arguments of ssh command to use, e.g. "
-          "C:\\path\\to\\ssh.exe -F config_file. Can also be specified by the "
-          "CDC_SSH_COMMAND environment variable.");
+          "\"C:\\path\\to\\ssh.exe -F config_file\". Can also be specified by "
+          "the CDC_SSH_COMMAND environment variable.");
 ABSL_FLAG(std::string, scp_command, "",
           "Path and arguments of scp command to use, e.g. "
-          "C:\\path\\to\\scp.exe -F config_file. Can also be specified by the "
-          "CDC_SCP_COMMAND environment variable.");
-ABSL_FLAG(int, verbosity, 2, "Verbosity of the log output");
+          "\"C:\\path\\to\\scp.exe -F config_file\". Can also be specified by "
+          "the CDC_SCP_COMMAND environment variable.");
+ABSL_FLAG(int, verbosity, 2,
+          "Verbosity of the log output. Increase to make logs more verbose.");
 
 namespace {
 
@@ -49,8 +50,10 @@ Usage: cdc_stream [flags] start windows_dir [user@]host:linux_dir
        Streams the Windows directory windows_dir to directory linux_dir on the
        Linux host using SSH username user.
  
-       cdc_stream [flags] stop host
-       Stops the streaming session to the given Linux host.)!";
+       cdc_stream [flags] stop [user@]host:linux_dir
+       Stops the streaming session to the given Linux target.
+
+Type cdc_stream --helpfull for available flags.)!";
 
 // Splits |user_host_dir| = [user@]host:dir up into [user@]host and dir.
 // Does not touch Windows drives, e.g. C:\foo.

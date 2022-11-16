@@ -49,7 +49,7 @@ struct SessionTarget {
 // Manages the connection of a workstation to a single remote instance.
 class Session {
  public:
-  // |instance_id| is a unique idfor the remote instance.
+  // |instance_id| is a unique id for the remote instance.
   // |target| identifies the remote target and how to connect to it.
   // |cfg| contains generic configuration parameters for the session.
   // |process_factory| abstracts process creation.

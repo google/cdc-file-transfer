@@ -29,10 +29,10 @@ namespace {
 constexpr char kFuseFilename[] = "cdc_fuse_fs";
 constexpr char kLibFuseFilename[] = "libfuse.so";
 constexpr char kFuseStdoutPrefix[] = "cdc_fuse_fs_stdout";
-constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/";
+constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/bin/";
 
 // Cache directory on the gamelet to store data chunks.
-constexpr char kCacheDir[] = "~/.cache/cdc-file-transfer/cdc_stream_chunks";
+constexpr char kCacheDir[] = "~/.cache/cdc-file-transfer/chunks";
 
 }  // namespace
 
@@ -103,15 +103,18 @@ absl::Status CdcFuseManager::Start(const std::string& mount_dir,
   // Build the remote command.
   std::string remotePath = path::JoinUnix(kRemoteToolsBinDir, kFuseFilename);
   std::string remote_command = absl::StrFormat(
-      "LD_LIBRARY_PATH=%s %s --instance=\"\\\"%s\\\"\" "
-      "--components=\"\\\"%s\\\"\" --port=%i --cache_dir=%s "
+      "mkdir -p %s; LD_LIBRARY_PATH=%s %s "
+      "--instance=%s "
+      "--components=%s --port=%i --cache_dir=%s "
       "--verbosity=%i --cleanup_timeout=%i --access_idle_timeout=%i --stats=%i "
       "--check=%i --cache_capacity=%u -- -o allow_root -o ro -o nonempty -o "
       "auto_unmount %s%s%s",
-      kRemoteToolsBinDir, remotePath, instance_, component_args, remote_port,
-      kCacheDir, verbosity, cleanup_timeout_sec, access_idle_timeout_sec,
-      enable_stats, check, cache_capacity, mount_dir, debug ? " -d" : "",
-      singlethreaded ? " -s" : "");
+      kRemoteToolsBinDir, kRemoteToolsBinDir, remotePath,
+      RemoteUtil::QuoteForSsh(instance_),
+      RemoteUtil::QuoteForSsh(component_args), remote_port, kCacheDir,
+      verbosity, cleanup_timeout_sec, access_idle_timeout_sec, enable_stats,
+      check, cache_capacity, RemoteUtil::QuoteForSsh(mount_dir),
+      debug ? " -d" : "", singlethreaded ? " -s" : "");
 
   bool needs_deploy = false;
   RETURN_IF_ERROR(

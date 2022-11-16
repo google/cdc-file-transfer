@@ -52,7 +52,6 @@
     <BazelTargets>//cdc_fuse_fs</BazelTargets>
     <BazelOutputFile>cdc_fuse_fs</BazelOutputFile>
     <BazelIncludePaths>..\;..\third_party\absl;..\third_party\blake3\c;..\third_party\googletest\googletest\include;..\third_party\protobuf\src;..\third_party\grpc\include;$(AdditionalIncludeDirectories)</BazelIncludePaths>
-    <BazelSourcePathPrefix>..\/</BazelSourcePathPrefix>
   </PropertyGroup>
   <Import Project="..\NMakeBazelProject.targets" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

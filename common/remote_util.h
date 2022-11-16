@@ -66,15 +66,6 @@ class RemoteUtil {
   absl::Status Chmod(const std::string& mode, const std::string& remote_path,
                      bool quiet = false);
 
-  // Calls 'rm [-f] |remote_path|' on the gamelet.
-  // Must call SetUserHostAndPort before calling this method.
-  absl::Status Rm(const std::string& remote_path, bool force);
-
-  // Calls `mv |old_remote_path| |new_remote_path| on the gamelet.
-  // Must call SetUserHostAndPort before calling this method.
-  absl::Status Mv(const std::string& old_remote_path,
-                  const std::string& new_remote_path);
-
   // Runs |remote_command| on the gamelet. The command must be properly escaped.
   // |name| is the name of the command displayed in the logs.
   // Must call SetUserHostAndPort before calling this method.
@@ -102,28 +93,32 @@ class RemoteUtil {
   // Returns whether output is suppressed.
   bool Quiet() const { return quiet_; }
 
-  // Escapes command line argument for the Microsoft command line parser in
-  // preparation for quoting. Double quotes are backslash-escaped. One or more
-  // backslashes are backslash-escaped if they are followed by a double quote,
-  // or if they occur at the end of the string, e.g.
-  // foo\bar -> foo\bar, foo\ -> foo\\, foo\\"bar -> foo\\\\\"bar.
-  static std::string EscapeForWindows(const std::string& argument);
-
   // Quotes and escapes a command line argument following the convention
   // understood by the Microsoft command line parser.
-  static std::string QuoteArgument(const std::string& argument);
-
-  // Quotes and escapes a command line argument for usage in SSH.
-  static std::string QuoteArgumentForSsh(const std::string& argument);
+  // Double quotes are backslash-escaped. One or more backslashes are backslash-
+  // escaped if they are followed by a double quote, or if they occur at the end
+  // of the string, e.g.
+  // foo       -> "foo"
+  // foo\bar   -> "foo\bar"
+  // foo\      -> "foo\\"
+  // foo\\"bar -> "foo\\\\\"bar".
+  static std::string Quote(const std::string& argument);
 
   // Quotes and escapes a command line arguments for use in SSH command. The
-  // argument is first escaped and quoted for Linux using single quotes and then
+  // argument is first escaped and quoted for Linux using double quotes and then
   // it is escaped to be used by the Microsoft command line parser.
-  static std::string QuoteAndEscapeArgumentForSsh(const std::string& argument);
+  // Properly supports path starting with ~ and ~username.
+  // foo       -> "\"foo\""
+  // foo\bar   -> "\"foo\bar\""
+  // foo\      -> "\"foo\\\\\""
+  // foo\"bar  -> "\"foo\\\\\\\"bar\"".
+  // ~/foo     -> "~/\"foo\""
+  // ~user/foo -> "~user/\"foo\""
+  static std::string QuoteForSsh(const std::string& argument);
 
  private:
-  // Verifies that both || and |ssh_port_| are set.
-  absl::Status CheckHostPort();
+  // Verifies that both |user_host_| and |ssh_port_| are set.
+  absl::Status CheckUserHostPort();
 
   // Common code for BuildProcessStartInfoForSsh*.
   ProcessStartInfo BuildProcessStartInfoForSshInternal(

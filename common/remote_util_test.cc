@@ -97,35 +97,37 @@ TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshWithCustomCommand) {
   ExpectContains(si.command, {kCustomSshCmd});
 }
 
-TEST_F(RemoteUtilTest, EscapeForWindows) {
-  EXPECT_EQ("foo", RemoteUtil::EscapeForWindows("foo"));
-  EXPECT_EQ("foo bar", RemoteUtil::EscapeForWindows("foo bar"));
-  EXPECT_EQ("foo\\bar", RemoteUtil::EscapeForWindows("foo\\bar"));
-  EXPECT_EQ("\\\\foo", RemoteUtil::EscapeForWindows("\\\\foo"));
-  EXPECT_EQ("foo\\\\", RemoteUtil::EscapeForWindows("foo\\"));
-  EXPECT_EQ("foo\\\\\\\\", RemoteUtil::EscapeForWindows("foo\\\\"));
-  EXPECT_EQ("foo\\\"", RemoteUtil::EscapeForWindows("foo\""));
-  EXPECT_EQ("foo\\\"bar", RemoteUtil::EscapeForWindows("foo\"bar"));
-  EXPECT_EQ("foo\\\\\\\"bar", RemoteUtil::EscapeForWindows("foo\\\"bar"));
-  EXPECT_EQ("foo\\\\\\\\\\\"bar", RemoteUtil::EscapeForWindows("foo\\\\\"bar"));
-  EXPECT_EQ("\\\"foo\\\"", RemoteUtil::EscapeForWindows("\"foo\""));
-  EXPECT_EQ("\\\" \\file.txt", RemoteUtil::EscapeForWindows("\" \\file.txt"));
+TEST_F(RemoteUtilTest, Quote) {
+  EXPECT_EQ(RemoteUtil::Quote("foo"), "\"foo\"");
+  EXPECT_EQ(RemoteUtil::Quote("foo bar"), "\"foo bar\"");
+  EXPECT_EQ(RemoteUtil::Quote("foo\\bar"), "\"foo\\bar\"");
+  EXPECT_EQ(RemoteUtil::Quote("\\\\foo"), "\"\\\\foo\"");
+  EXPECT_EQ(RemoteUtil::Quote("foo\\"), "\"foo\\\\\"");
+  EXPECT_EQ(RemoteUtil::Quote("foo\\\\"), "\"foo\\\\\\\\\"");
+  EXPECT_EQ(RemoteUtil::Quote("foo\""), "\"foo\\\"\"");
+  EXPECT_EQ(RemoteUtil::Quote("foo\"bar"), "\"foo\\\"bar\"");
+  EXPECT_EQ(RemoteUtil::Quote("foo\\\"bar"), "\"foo\\\\\\\"bar\"");
+  EXPECT_EQ(RemoteUtil::Quote("foo\\\\\"bar"), "\"foo\\\\\\\\\\\"bar\"");
+  EXPECT_EQ(RemoteUtil::Quote("\"foo\""), "\"\\\"foo\\\"\"");
+  EXPECT_EQ(RemoteUtil::Quote("\" \\file.txt"), "\"\\\" \\file.txt\"");
 }
 
-TEST_F(RemoteUtilTest, QuoteArgument) {
-  EXPECT_EQ("\"foo\"", RemoteUtil::QuoteArgument("foo"));
-  EXPECT_EQ("\"foo bar\"", RemoteUtil::QuoteArgument("foo bar"));
-  EXPECT_EQ("\"foo\\bar\"", RemoteUtil::QuoteArgument("foo\\bar"));
-  EXPECT_EQ("\"\\\\foo\"", RemoteUtil::QuoteArgument("\\\\foo"));
-  EXPECT_EQ("\"foo\\\\\"", RemoteUtil::QuoteArgument("foo\\"));
-  EXPECT_EQ("\"foo\\\\\\\\\"", RemoteUtil::QuoteArgument("foo\\\\"));
-  EXPECT_EQ("\"foo\\\"\"", RemoteUtil::QuoteArgument("foo\""));
-  EXPECT_EQ("\"foo\\\"bar\"", RemoteUtil::QuoteArgument("foo\"bar"));
-  EXPECT_EQ("\"foo\\\\\\\"bar\"", RemoteUtil::QuoteArgument("foo\\\"bar"));
-  EXPECT_EQ("\"foo\\\\\\\\\\\"bar\"",
-            RemoteUtil::QuoteArgument("foo\\\\\"bar"));
-  EXPECT_EQ("\"\\\"foo\\\"\"", RemoteUtil::QuoteArgument("\"foo\""));
-  EXPECT_EQ("\"\\\" \\file.txt\"", RemoteUtil::QuoteArgument("\" \\file.txt"));
+TEST_F(RemoteUtilTest, QuoteForSsh) {
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("foo"), "\"\\\"foo\\\"\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("foo\\bar"), "\"\\\"foo\\\\bar\\\"\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("foo\\"), "\"\\\"foo\\\\\\\\\\\"\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("foo\\\"bar"),
+            "\"\\\"foo\\\\\\\\\\\\\\\"bar\\\"\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("~"), "\"~\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("~username"), "\"~username\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("~/foo"), "\"~/\\\"foo\\\"\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("~username/foo"),
+            "\"~username/\\\"foo\\\"\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("~user name"), "\"\\\"~user name\\\"\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("~user name/foo"),
+            "\"\\\"~user name/foo\\\"\"");
+  EXPECT_EQ(RemoteUtil::QuoteForSsh("~user-name69/foo"),
+            "\"~user-name69/\\\"foo\\\"\"");  // Nice!
 }
 
 }  // namespace

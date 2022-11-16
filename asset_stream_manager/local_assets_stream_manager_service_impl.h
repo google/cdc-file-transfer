@@ -19,6 +19,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "asset_stream_manager/session.h"
 #include "asset_stream_manager/session_config.h"
 #include "metrics/metrics.h"
 #include "proto/local_assets_stream_manager.grpc.pb.h"
@@ -68,9 +69,26 @@ class LocalAssetsStreamManagerServiceImpl final
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
  private:
+  // Internal implementation of StartSession(). Returns the unique session
+  // identifier |instance_id|, the created or retrieved MultiSession |ms| as
+  // well as the filled metrics event |evt|.
   absl::Status LocalAssetsStreamManagerServiceImpl::StartSessionInternal(
       const StartSessionRequest* request, std::string* instance_id,
       MultiSession** ms, metrics::DeveloperLogEvent* evt);
+
+  // Stadia-specific: Returns a SessionTarget from a gamelet name and fills in
+  // the gamelet's |instance_id|, |project_id| and |organization_id|.
+  // Used if request.gamelet_name() is set.
+  // Fails if the gamelet name fails to parse or if ggp ssh init fails.
+  absl::StatusOr<SessionTarget> GetTargetForStadia(
+      const StartSessionRequest& request, std::string* instance_id,
+      std::string* project_id, std::string* organization_id);
+
+  // Returns a SessionTarget from the corresponding fields in |request|.
+  // |instance_id| is set to [user@]host:mount_dir.
+  // Used if request.gamelet_name() is not set.
+  SessionTarget GetTarget(const StartSessionRequest& request,
+                          std::string* instance_id);
 
   // Convert StartSessionRequest enum to metrics enum.
   metrics::RequestOrigin ConvertOrigin(StartSessionRequestOrigin origin) const;
