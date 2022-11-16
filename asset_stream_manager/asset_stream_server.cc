@@ -26,11 +26,11 @@ AssetStreamServer::AssetStreamServer(std::string src_dir,
 std::unique_ptr<AssetStreamServer> AssetStreamServer::Create(
     AssetStreamServerType type, std::string src_dir,
     DataStoreReader* data_store_reader, FileChunkMap* file_chunks,
-    ContentSentHandler content_sent) {
+    ContentSentHandler content_sent, PrioritizeAssetsHandler prio_assets) {
   switch (type) {
     case AssetStreamServerType::kGrpc:
-      return std::make_unique<GrpcAssetStreamServer>(src_dir, data_store_reader,
-                                                     file_chunks, content_sent);
+      return std::make_unique<GrpcAssetStreamServer>(
+          src_dir, data_store_reader, file_chunks, content_sent, prio_assets);
     case AssetStreamServerType::kTest:
       return std::make_unique<TestingAssetStreamServer>(
           src_dir, data_store_reader, file_chunks);
@@ -38,4 +38,5 @@ std::unique_ptr<AssetStreamServer> AssetStreamServer::Create(
   assert(false);
   return nullptr;
 }
+
 }  // namespace cdc_ft

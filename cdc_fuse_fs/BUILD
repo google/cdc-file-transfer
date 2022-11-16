@@ -50,6 +50,7 @@ cc_test(
     srcs = ["cdc_fuse_fs_test.cc"],
     deps = [
         ":cdc_fuse_fs_lib_mocked",
+        ":mock_config_stream_client",
         "//common:status_test_macros",
         "//data_store",
         "//data_store:mem_data_store",
@@ -128,6 +129,13 @@ cc_library(
         "//proto:asset_stream_service_grpc_proto",
         "@com_google_absl//absl/status",
     ],
+)
+
+cc_library(
+    name = "mock_config_stream_client",
+    srcs = ["mock_config_stream_client.cc"],
+    hdrs = ["mock_config_stream_client.h"],
+    deps = [":config_stream_client"],
 )
 
 filegroup(

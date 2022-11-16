@@ -107,7 +107,7 @@ TEST_F(ManifestUpdaterTest, UpdateAll_AddFileIncremental) {
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
   EXPECT_OK(updater.Update(
       MakeDeleteOps({"subdir/b.txt", "subdir/c.txt", "subdir/d.txt"}),
-      &file_chunks_));
+      &file_chunks_, nullptr));
   ASSERT_NO_FATAL_FAILURE(
       ExpectManifestEquals({"a.txt", "subdir"}, updater.ManifestId()));
 
@@ -173,13 +173,13 @@ TEST_F(ManifestUpdaterTest, UpdateAll_PrunesUnreferencedChunks) {
 
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   ManifestUpdater updater(&data_store_, cfg_);
-  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_));
+  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_, nullptr));
   // 1 for manifest id, 1 for manifest, 1 indirect assets.
   EXPECT_EQ(data_store_.Chunks().size(), 3);
 
   EXPECT_OK(updater.Update(
       MakeUpdateOps({"subdir/b.txt", "subdir/c.txt", "subdir/d.txt"}),
-      &file_chunks_));
+      &file_chunks_, nullptr));
   // 1 for manifest id, 1 for manifest, 5 indirect assets.
   // 2 additional chunks from the first Update() that are now unreferenced.
   // -1, because the indirect asset for "a.txt" is deduplicated
@@ -207,7 +207,7 @@ TEST_F(ManifestUpdaterTest, UpdateAll_RecoversFromMissingChunks) {
 
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   ManifestUpdater updater(&data_store_, cfg_);
-  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_));
+  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_, nullptr));
   // 1 for manifest id, 1 for manifest, 1 indirect assets.
   EXPECT_EQ(data_store_.Chunks().size(), 3)
       << "Manifest: " << ContentId::ToHexString(updater.ManifestId())
@@ -225,7 +225,7 @@ TEST_F(ManifestUpdaterTest, UpdateAll_RecoversFromMissingChunks) {
 
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
   // 1 for manifest id, 1 for manifest, 5 indirect assets.
-  // There would be 7 chunks without the removal above, see UpdateAll_Prune.
+  // There would be 8 chunks without the removal above, see UpdateAll_Prune.
   EXPECT_EQ(data_store_.Chunks().size(), 7)
       << "Manifest: " << ContentId::ToHexString(updater.ManifestId())
       << std::endl
@@ -272,15 +272,17 @@ TEST_F(ManifestUpdaterTest, UpdateAll_FileChunkMapAfterUpdate) {
 // Verifies that the intermediate manifest contains the expected files.
 TEST_F(ManifestUpdaterTest, UpdateAll_PushIntermediateManifest) {
   ContentIdProto intermediate_id;
-  auto push_intermediate_manifest =
-      [&intermediate_id](const ContentIdProto& manifest_id) {
-        intermediate_id = manifest_id;
-      };
+  auto push_manifest = [&intermediate_id](const ContentIdProto& manifest_id) {
+    // Catch the first (= intermediate) manifest.
+    if (intermediate_id == ContentIdProto()) {
+      intermediate_id = manifest_id;
+    }
+  };
 
   // Contains a.txt and subdir/b.txt.
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   ManifestUpdater updater(&data_store_, cfg_);
-  EXPECT_OK(updater.UpdateAll(&file_chunks_, push_intermediate_manifest));
+  EXPECT_OK(updater.UpdateAll(&file_chunks_, push_manifest));
 
   // Double check that the files in the final manifest are no longer in
   // progress.
@@ -301,7 +303,7 @@ TEST_F(ManifestUpdaterTest, UpdateAll_PushIntermediateManifest) {
 TEST_F(ManifestUpdaterTest, Update_AddFile) {
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   ManifestUpdater updater(&data_store_, cfg_);
-  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_));
+  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_, nullptr));
 
   const UpdaterStats& stats = updater.Stats();
   EXPECT_EQ(stats.total_assets_added_or_updated, 1);
@@ -319,7 +321,8 @@ TEST_F(ManifestUpdaterTest, Update_AddFile) {
 TEST_F(ManifestUpdaterTest, Update_AddFileAutoCreateSubdir) {
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   ManifestUpdater updater(&data_store_, cfg_);
-  EXPECT_OK(updater.Update(MakeUpdateOps({"subdir/b.txt"}), &file_chunks_));
+  EXPECT_OK(
+      updater.Update(MakeUpdateOps({"subdir/b.txt"}), &file_chunks_, nullptr));
 
   const UpdaterStats& stats = updater.Stats();
   EXPECT_EQ(stats.total_assets_added_or_updated, 1);
@@ -346,7 +349,7 @@ TEST_F(ManifestUpdaterTest, Update_DeleteFiles) {
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   ManifestUpdater updater(&data_store_, cfg_);
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
-  EXPECT_OK(updater.Update(MakeDeleteOps({"a.txt"}), &file_chunks_));
+  EXPECT_OK(updater.Update(MakeDeleteOps({"a.txt"}), &file_chunks_, nullptr));
 
   const UpdaterStats& stats = updater.Stats();
   EXPECT_EQ(stats.total_assets_added_or_updated, 0);
@@ -360,7 +363,8 @@ TEST_F(ManifestUpdaterTest, Update_DeleteFiles) {
       updater.ManifestId()));
 
   // Delete another one in a subdirectory.
-  EXPECT_OK(updater.Update(MakeDeleteOps({"subdir/b.txt"}), &file_chunks_));
+  EXPECT_OK(
+      updater.Update(MakeDeleteOps({"subdir/b.txt"}), &file_chunks_, nullptr));
   ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals(
       {"subdir", "subdir/c.txt", "subdir/d.txt"}, updater.ManifestId()));
 }
@@ -370,7 +374,7 @@ TEST_F(ManifestUpdaterTest, Update_DeleteDir) {
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   ManifestUpdater updater(&data_store_, cfg_);
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
-  EXPECT_OK(updater.Update(MakeDeleteOps({"subdir"}), &file_chunks_));
+  EXPECT_OK(updater.Update(MakeDeleteOps({"subdir"}), &file_chunks_, nullptr));
 
   const UpdaterStats& stats = updater.Stats();
   EXPECT_EQ(stats.total_assets_added_or_updated, 0);
@@ -390,7 +394,7 @@ TEST_F(ManifestUpdaterTest, Update_DeleteNonExistingAsset) {
   // We need to craft AssetInfos for non-existing assets manually.
   AssetInfo ai{"non_existing", AssetProto::DIRECTORY};
   ManifestUpdater::OperationList ops{{Operator::kDelete, ai}};
-  EXPECT_OK(updater.Update(&ops, &file_chunks_));
+  EXPECT_OK(updater.Update(&ops, &file_chunks_, nullptr));
 
   const UpdaterStats& stats = updater.Stats();
   EXPECT_EQ(stats.total_assets_deleted, 1);
@@ -406,7 +410,7 @@ TEST_F(ManifestUpdaterTest, Update_AddNonExistingFile) {
   ai.path = "non_existing";
   ManifestUpdater::OperationList ops{
       {Operator::kAdd, ai}, {Operator::kAdd, MakeAssetInfo("a.txt").info}};
-  EXPECT_OK(updater.Update(&ops, &file_chunks_));
+  EXPECT_OK(updater.Update(&ops, &file_chunks_, nullptr));
 
   const UpdaterStats& stats = updater.Stats();
   EXPECT_EQ(stats.total_assets_added_or_updated, 2);
@@ -428,17 +432,19 @@ TEST_F(ManifestUpdaterTest, Update_PushIntermediateManifest) {
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
   EXPECT_OK(updater.Update(
       MakeDeleteOps({"subdir/b.txt", "subdir/c.txt", "subdir/d.txt"}),
-      &file_chunks_));
+      &file_chunks_, nullptr));
 
   // Add a.txt back and check intermediate manifest.
   ContentIdProto intermediate_id;
-  auto push_intermediate_manifest =
-      [&intermediate_id](const ContentIdProto& manifest_id) {
-        intermediate_id = manifest_id;
-      };
+  auto push_manifest = [&intermediate_id](const ContentIdProto& manifest_id) {
+    // Catch the first (= intermediate) manifest.
+    if (intermediate_id == ContentIdProto()) {
+      intermediate_id = manifest_id;
+    }
+  };
   EXPECT_OK(updater.Update(
       MakeUpdateOps({"subdir/b.txt", "subdir/c.txt", "subdir/d.txt"}),
-      &file_chunks_, push_intermediate_manifest));
+      &file_chunks_, push_manifest));
   EXPECT_GT(intermediate_id.blake3_sum_160().size(), 0);
 
   // Only file a.txt is done in the intermediate manifest, all others are in
@@ -460,17 +466,18 @@ TEST_F(ManifestUpdaterTest, Update_FileChunkMap) {
   ManifestUpdater updater(&data_store_, cfg_);
 
   // Add a.txt.
-  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_));
+  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_, nullptr));
   ValidateChunkLookup("a.txt", true);
   ValidateChunkLookup("subdir/b.txt", false);
 
   // Add subdir/b.txt.
-  EXPECT_OK(updater.Update(MakeUpdateOps({"subdir/b.txt"}), &file_chunks_));
+  EXPECT_OK(
+      updater.Update(MakeUpdateOps({"subdir/b.txt"}), &file_chunks_, nullptr));
   ValidateChunkLookup("a.txt", true);
   ValidateChunkLookup("subdir/b.txt", true);
 
   // Remove a.txt.
-  EXPECT_OK(updater.Update(MakeDeleteOps({"a.txt"}), &file_chunks_));
+  EXPECT_OK(updater.Update(MakeDeleteOps({"a.txt"}), &file_chunks_, nullptr));
   ValidateChunkLookup("a.txt", false);
   ValidateChunkLookup("subdir/b.txt", true);
 }
@@ -482,18 +489,20 @@ TEST_F(ManifestUpdaterTest, Update_IntermediateFileChunkMap) {
   ManifestUpdater updater(&data_store_, cfg_);
 
   // Add a.txt.
-  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_));
+  EXPECT_OK(updater.Update(MakeUpdateOps({"a.txt"}), &file_chunks_, nullptr));
 
   // Add subdir/b.txt and check intermediate lookups.
-  auto push_intermediate_manifest = [this](const ContentIdProto&) {
+  int count = 0;
+  auto push_manifest = [this, &count](const ContentIdProto&) {
+    ++count;
     ValidateChunkLookup("a.txt", true);
-    ValidateChunkLookup("subdir/b.txt", false);  // Not in yet.
+    // The first (= intermediate) manifest does not have the chunks, the second
+    // (= final) does.
+    ValidateChunkLookup("subdir/b.txt", count > 1);
   };
 
   EXPECT_OK(updater.Update(MakeUpdateOps({"subdir/b.txt"}), &file_chunks_,
-                           push_intermediate_manifest));
-  ValidateChunkLookup("a.txt", true);
-  ValidateChunkLookup("subdir/b.txt", true);  // Now it's in!
+                           push_manifest));
 }
 
 // A call to ManifestId() returns the manifest id!!!
@@ -505,6 +514,70 @@ TEST_F(ManifestUpdaterTest, ManifestId) {
   ContentIdProto manifest_id;
   EXPECT_OK(data_store_.GetProto(manifest_store_id_, &manifest_id));
   EXPECT_EQ(updater.ManifestId(), manifest_id);
+}
+
+TEST_F(ManifestUpdaterTest, VerifyPermissions) {
+  cfg_.src_dir = path::Join(base_dir_, "non_empty");
+  ManifestUpdater updater(&data_store_, cfg_);
+
+  EXPECT_OK(updater.UpdateAll(&file_chunks_));
+  ManifestIterator manifest_iter(&data_store_);
+  EXPECT_OK(manifest_iter.Open(updater.ManifestId()));
+  const AssetProto* entry;
+  while ((entry = manifest_iter.NextEntry()) != nullptr) {
+    switch (entry->type()) {
+      case AssetProto::FILE:
+        EXPECT_EQ(entry->permissions(), ManifestBuilder::kDefaultFilePerms);
+        break;
+      case AssetProto::DIRECTORY:
+        EXPECT_EQ(entry->permissions(), ManifestBuilder::kDefaultDirPerms);
+        break;
+      case AssetProto::SYMLINK:
+        // Symlinks don't have their own permissions.
+        break;
+      default:
+        FAIL() << "Unhandled type: " << AssetProto::Type_Name(entry->type());
+        break;
+    }
+  }
+}
+
+TEST_F(ManifestUpdaterTest, VerifyIntermediateFilesAreExecutable) {
+  cfg_.src_dir = path::Join(base_dir_, "non_empty");
+  ManifestUpdater updater(&data_store_, cfg_);
+
+  int count = 0;
+  auto push_intermediate_manifest = [this, &count](
+                                        const ContentIdProto& manifest_id) {
+    ++count;
+    ManifestIterator manifest_iter(&data_store_);
+    EXPECT_OK(manifest_iter.Open(manifest_id));
+    const AssetProto* entry;
+    while ((entry = manifest_iter.NextEntry()) != nullptr) {
+      switch (entry->type()) {
+        case AssetProto::FILE:
+          if (count == 1) {
+            // While the manifest is in-progress, all files are set to be
+            // executable.
+            EXPECT_EQ(entry->permissions(), ManifestUpdater::kExecutablePerms);
+          } else {
+            EXPECT_EQ(entry->permissions(), ManifestBuilder::kDefaultFilePerms);
+          }
+          break;
+        case AssetProto::DIRECTORY:
+          EXPECT_EQ(entry->permissions(), ManifestBuilder::kDefaultDirPerms);
+          break;
+        default:
+          FAIL() << "Unhandled type: " << AssetProto::Type_Name(entry->type());
+          break;
+      }
+    }
+  };
+
+  // Add subdir/b.txt and verify the file permissions.
+  EXPECT_OK(updater.Update(MakeUpdateOps({"subdir/b.txt"}), &file_chunks_,
+                           push_intermediate_manifest));
+  EXPECT_EQ(updater.Stats().total_files_added_or_updated, 1);
 }
 
 // Makes sure that executables are properly detected.

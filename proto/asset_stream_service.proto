@@ -14,10 +14,6 @@
 
 // This proto defines the service to stream chunks from workstations to
 // gamelet instances.
-//
-// References:
-// * (internal).0
-// * (internal)
 
 syntax = "proto3";
 
@@ -25,6 +21,8 @@ import "proto/manifest.proto";
 
 package cdc_ft.proto;
 
+// Describes the interface to fetch data from the asset streaming server running
+// on the workstation.
 service AssetStreamService {
   // Requests the contents of a chunk by its id.
   rpc GetContent(GetContentRequest) returns (GetContentResponse) {}
@@ -53,12 +51,20 @@ message SendCachedContentIdsRequest {
 
 message SendCachedContentIdsResponse {}
 
+// Describes the interface to receive manifest updates and prioritize processing
+// of specific assets.
 service ConfigStreamService {
+  // Streaming channel to receive continuous manifest updates.
   rpc GetManifestId(GetManifestIdRequest)
       returns (stream GetManifestIdResponse) {}
 
+  // Acknowledges that a specific manifest ID has been received.
   rpc AckManifestIdReceived(AckManifestIdReceivedRequest)
       returns (AckManifestIdReceivedResponse) {}
+
+  // Requests the server to process the given in-progress assets as soon as
+  // possible.
+  rpc ProcessAssets(ProcessAssetsRequest) returns (ProcessAssetsResponse) {}
 }
 
 message GetManifestIdRequest {}
@@ -73,3 +79,9 @@ message AckManifestIdReceivedRequest {
 }
 
 message AckManifestIdReceivedResponse {}
+
+message ProcessAssetsRequest {
+  repeated string relative_paths = 1;
+}
+
+message ProcessAssetsResponse {}

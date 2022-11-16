@@ -96,10 +96,25 @@ MultiSessionRunner::MultiSessionRunner(
 absl::Status MultiSessionRunner::Initialize(int port,
                                             AssetStreamServerType type,
                                             ContentSentHandler content_sent) {
+  // Create the manifest updater.
+  UpdaterConfig cfg;
+  cfg.num_threads = num_updater_threads_;
+  cfg.src_dir = src_dir_;
+
+  assert(!manifest_updater_);
+  manifest_updater_ =
+      std::make_unique<ManifestUpdater>(data_store_, std::move(cfg));
+
+  // Let the manifest updater handle requests to prioritize certain assets.
+  PrioritizeAssetsHandler prio_assets =
+      std::bind(&ManifestUpdater::AddPriorityAssets, manifest_updater_.get(),
+                std::placeholders::_1);
+
   // Start the server.
   assert(!server_);
   server_ = AssetStreamServer::Create(type, src_dir_, data_store_,
-                                      &file_chunks_, content_sent);
+                                      &file_chunks_, std::move(content_sent),
+                                      std::move(prio_assets));
   assert(server_);
   RETURN_IF_ERROR(server_->Start(port),
                   "Failed to start asset stream server for '%s'", src_dir_);
@@ -162,12 +177,6 @@ ContentIdProto MultiSessionRunner::ManifestId() const {
 }
 
 void MultiSessionRunner::Run() {
-  // Create the manifest updater.
-  UpdaterConfig cfg;
-  cfg.num_threads = num_updater_threads_;
-  cfg.src_dir = src_dir_;
-  ManifestUpdater manifest_updater(data_store_, std::move(cfg));
-
   // Set up file watcher.
   // The streamed path should be a directory and exist at the beginning.
   FileWatcherWin watcher(src_dir_);
@@ -179,28 +188,23 @@ void MultiSessionRunner::Run() {
     return;
   }
 
-  // Push an intermediate manifest containing the full directory structure, but
-  // potentially missing chunks. The purpose is that the FUSE can immediately
-  // show the structure and inode stats. FUSE will block on file reads that
-  // cannot be served due to missing chunks until the manifest is ready.
-  auto push_intermediate_manifest = [this](const ContentIdProto& manifest_id) {
+  // Push the intermediate manifest(s) and the final version with this handler.
+  auto push_handler = [this](const ContentIdProto& manifest_id) {
     SetManifest(manifest_id);
   };
 
   // Bring the manifest up to date.
   LOG_INFO("Updating manifest for '%s'...", src_dir_);
   Stopwatch sw;
-  status =
-      manifest_updater.UpdateAll(&file_chunks_, push_intermediate_manifest);
-  RecordManifestUpdate(manifest_updater, sw.Elapsed(),
+  status = manifest_updater_->UpdateAll(&file_chunks_, push_handler);
+  RecordManifestUpdate(*manifest_updater_, sw.Elapsed(),
                        metrics::UpdateTrigger::kInitUpdateAll, status);
   if (!status.ok()) {
     SetStatus(
         WrapStatus(status, "Failed to update manifest for '%s'", src_dir_));
     return;
   }
-  RecordMultiSessionStart(manifest_updater);
-  SetManifest(manifest_updater.ManifestId());
+  RecordMultiSessionStart(*manifest_updater_);
   LOG_INFO("Manifest for '%s' updated in %0.3f seconds", src_dir_,
            sw.ElapsedSeconds());
 
@@ -256,30 +260,26 @@ void MultiSessionRunner::Run() {
           src_dir_);
       modified_files.clear();
       sw.Reset();
-      status = manifest_updater.UpdateAll(&file_chunks_);
-      RecordManifestUpdate(manifest_updater, sw.Elapsed(),
+      status = manifest_updater_->UpdateAll(&file_chunks_, push_handler);
+      RecordManifestUpdate(*manifest_updater_, sw.Elapsed(),
                            metrics::UpdateTrigger::kRunningUpdateAll, status);
       if (!status.ok()) {
         LOG_WARNING(
             "Updating manifest for '%s' after re-creating directory failed: "
             "'%s'",
             src_dir_, status.ToString());
-        SetManifest(manifest_updater.DefaultManifestId());
-      } else {
-        SetManifest(manifest_updater.ManifestId());
+        SetManifest(manifest_updater_->DefaultManifestId());
       }
     } else if (!modified_files.empty()) {
       ManifestUpdater::OperationList ops = GetFileOperations(modified_files);
       sw.Reset();
-      status = manifest_updater.Update(&ops, &file_chunks_);
-      RecordManifestUpdate(manifest_updater, sw.Elapsed(),
+      status = manifest_updater_->Update(&ops, &file_chunks_, push_handler);
+      RecordManifestUpdate(*manifest_updater_, sw.Elapsed(),
                            metrics::UpdateTrigger::kRegularUpdate, status);
       if (!status.ok()) {
         LOG_WARNING("Updating manifest for '%s' failed: %s", src_dir_,
                     status.ToString());
-        SetManifest(manifest_updater.DefaultManifestId());
-      } else {
-        SetManifest(manifest_updater.ManifestId());
+        SetManifest(manifest_updater_->DefaultManifestId());
       }
     }
 
@@ -482,15 +482,16 @@ absl::Status MultiSession::Shutdown() {
     sessions_.erase(instance_id);
   }
 
+  absl::Status status;
   if (runner_) {
-    RETURN_IF_ERROR(runner_->Shutdown());
+    status = runner_->Shutdown();
   }
 
   if (heartbeat_watcher_.joinable()) {
     heartbeat_watcher_.join();
   }
 
-  return absl::OkStatus();
+  return status;
 }
 
 absl::Status MultiSession::Status() {
@@ -528,7 +529,7 @@ absl::Status MultiSession::StartSession(const std::string& instance_id,
   RETURN_IF_ERROR(session->Start(local_asset_stream_port_,
                                  kAssetStreamPortFirst, kAssetStreamPortLast));
 
-  // Wait for the FUSE to receive the intermediate manifest.
+  // Wait for the FUSE to receive the first intermediate manifest.
   RETURN_IF_ERROR(runner_->WaitForManifestAck(instance_id, absl::Seconds(5)));
 
   sessions_[instance_id] = std::move(session);

@@ -40,6 +40,8 @@ using GetManifestIdResponse = proto::GetManifestIdResponse;
 using AckManifestIdReceivedRequest = proto::AckManifestIdReceivedRequest;
 using AckManifestIdReceivedResponse = proto::AckManifestIdReceivedResponse;
 using ConfigStreamService = proto::ConfigStreamService;
+using ProcessAssetsRequest = proto::ProcessAssetsRequest;
+using ProcessAssetsResponse = proto::ProcessAssetsResponse;
 
 }  // namespace
 
@@ -64,6 +66,8 @@ class AssetStreamServiceImpl final : public AssetStreamService::Service {
     std::string rel_path;
     uint64_t offset;
     size_t size;
+    std::string instance_id = instance_ids_->Get(context->peer());
+
     for (const ContentIdProto& id : request->id()) {
       uint32_t uint32_size;
       if (file_chunks_->Lookup(id, &rel_path, &offset, &uint32_size)) {
@@ -77,7 +81,6 @@ class AssetStreamServiceImpl final : public AssetStreamService::Service {
         RETURN_GRPC_IF_ERROR(
             ReadFromDataStore(id, response->add_data(), &size));
       }
-      std::string instance_id = instance_ids_->Get(context->peer());
       if (content_sent_ != nullptr) {
         content_sent_(size, 1, instance_id);
       }
@@ -144,8 +147,9 @@ class AssetStreamServiceImpl final : public AssetStreamService::Service {
 
 class ConfigStreamServiceImpl final : public ConfigStreamService::Service {
  public:
-  explicit ConfigStreamServiceImpl(InstanceIdMap* instance_ids)
-      : instance_ids_(instance_ids) {}
+  ConfigStreamServiceImpl(InstanceIdMap* instance_ids,
+                          PrioritizeAssetsHandler prio_handler)
+      : instance_ids_(instance_ids), prio_handler_(std::move(prio_handler)) {}
   ~ConfigStreamServiceImpl() { Shutdown(); }
 
   grpc::Status GetManifestId(
@@ -180,6 +184,20 @@ class ConfigStreamServiceImpl final : public ConfigStreamService::Service {
     instance_ids_->Set(context->peer(), request->gamelet_id());
     absl::MutexLock lock(&mutex_);
     acked_manifest_ids_[request->gamelet_id()] = request->manifest_id();
+    return grpc::Status::OK;
+  }
+
+  grpc::Status ProcessAssets(grpc::ServerContext* context,
+                             const ProcessAssetsRequest* request,
+                             ProcessAssetsResponse* response) override {
+    if (!prio_handler_) return grpc::Status::OK;
+
+    std::vector<std::string> rel_paths;
+    rel_paths.reserve(request->relative_paths().size());
+    for (const std::string& rel_path : request->relative_paths()) {
+      rel_paths.push_back(rel_path);
+    }
+    prio_handler_(std::move(rel_paths));
     return grpc::Status::OK;
   }
 
@@ -219,6 +237,10 @@ class ConfigStreamServiceImpl final : public ConfigStreamService::Service {
     return id_;
   }
 
+  void SetPrioritizeAssetsHandler(PrioritizeAssetsHandler handler) {
+    prio_handler_ = handler;
+  }
+
  private:
   // Returns false if the update process was cancelled.
   bool WaitForUpdate(ContentIdProto& local_id) ABSL_LOCKS_EXCLUDED(mutex_) {
@@ -234,23 +256,24 @@ class ConfigStreamServiceImpl final : public ConfigStreamService::Service {
   mutable absl::Mutex mutex_;
   ContentIdProto id_ ABSL_GUARDED_BY(mutex_);
   bool running_ ABSL_GUARDED_BY(mutex_) = true;
-  InstanceIdMap* instance_ids_;
+  InstanceIdMap* instance_ids_ = nullptr;
+  PrioritizeAssetsHandler prio_handler_;
 
   // Maps instance ids to the last acknowledged manifest id.
   using AckedManifestIdsMap = std::unordered_map<std::string, ContentIdProto>;
   AckedManifestIdsMap acked_manifest_ids_ ABSL_GUARDED_BY(mutex_);
 };
 
-GrpcAssetStreamServer::GrpcAssetStreamServer(std::string src_dir,
-                                             DataStoreReader* data_store_reader,
-                                             FileChunkMap* file_chunks,
-                                             ContentSentHandler content_sent)
+GrpcAssetStreamServer::GrpcAssetStreamServer(
+    std::string src_dir, DataStoreReader* data_store_reader,
+    FileChunkMap* file_chunks, ContentSentHandler content_sent,
+    PrioritizeAssetsHandler prio_assets)
     : AssetStreamServer(src_dir, data_store_reader, file_chunks),
       asset_stream_service_(std::make_unique<AssetStreamServiceImpl>(
           std::move(src_dir), data_store_reader, file_chunks, &instance_ids_,
           content_sent)),
-      config_stream_service_(
-          std::make_unique<ConfigStreamServiceImpl>(&instance_ids_)) {}
+      config_stream_service_(std::make_unique<ConfigStreamServiceImpl>(
+          &instance_ids_, std::move(prio_assets))) {}
 
 GrpcAssetStreamServer::~GrpcAssetStreamServer() = default;
 

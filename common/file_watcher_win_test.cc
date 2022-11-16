@@ -115,9 +115,8 @@ class FileWatcherParameterizedTest : public ::testing::TestWithParam<bool> {
     bool changed = false;
     do {
       auto cond = [this]() { return files_changed_; };
-      files_changed_mutex_.AwaitWithTimeout(absl::Condition(&cond),
-                                            kWaitTimeout);
-      changed = files_changed_;
+      changed = files_changed_mutex_.AwaitWithTimeout(absl::Condition(&cond),
+                                                      kWaitTimeout);
       files_changed_ = false;
     } while (changed && watcher_.GetEventCountForTesting() < min_event_count);
     return changed;
@@ -128,9 +127,8 @@ class FileWatcherParameterizedTest : public ::testing::TestWithParam<bool> {
     bool changed = false;
     do {
       auto cond = [this]() { return dir_recreated_; };
-      files_changed_mutex_.AwaitWithTimeout(absl::Condition(&cond),
-                                            kWaitTimeout);
-      changed = dir_recreated_;
+      changed = files_changed_mutex_.AwaitWithTimeout(absl::Condition(&cond),
+                                                      kWaitTimeout);
       dir_recreated_ = false;
     } while (changed &&
              watcher_.GetDirRecreateEventCountForTesting() < min_event_count);
@@ -511,7 +509,10 @@ TEST_P(FileWatcherParameterizedTest, ModifiedTime) {
 
 TEST_P(FileWatcherParameterizedTest, DeleteWatchedDir) {
   EXPECT_OK(watcher_.StartWatching([this]() { OnFilesChanged(); },
-                                   [this]() { OnDirRecreated(); }));
+                                   [this]() { OnDirRecreated(); }, kFWTimeout));
+
+  EXPECT_OK(path::WriteFile(first_file_path_, kFirstData, kFirstDataSize));
+  EXPECT_TRUE(WaitForChange(2u));  // 2x modify
 
   EXPECT_OK(path::RemoveDirRec(watcher_dir_path_));
   EXPECT_TRUE(WaitForDirRecreated(1u));
@@ -586,6 +587,8 @@ TEST_P(FileWatcherParameterizedTest, RecreateWatchedDirNoOldChanges) {
   EXPECT_OK(path::WriteFile(first_file_path_, kFirstData, kFirstDataSize));
 
   EXPECT_OK(path::RemoveDirRec(watcher_dir_path_));
+  EXPECT_TRUE(WaitForDirRecreated(1u));
+
   EXPECT_OK(path::CreateDirRec(watcher_dir_path_));
   EXPECT_TRUE(WaitForDirRecreated(2u));
 

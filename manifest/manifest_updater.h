@@ -26,6 +26,7 @@
 #include "manifest/asset_builder.h"
 #include "manifest/file_chunk_map.h"
 #include "manifest/manifest_proto_defs.h"
+#include "manifest/pending_assets_queue.h"
 
 namespace cdc_ft {
 namespace fastcdc {
@@ -140,7 +141,7 @@ class ManifestUpdater {
   // Returns an error if |dir| does not exist or it is not a directory.
   static absl::Status IsValidDir(std::string dir);
 
-  using PushIntermediateManifest =
+  using PushManifestHandler =
       std::function<void(const ContentIdProto& manifest_id)>;
 
   // |data_store| is used to store manifest chunks. File data chunks are not
@@ -156,27 +157,29 @@ class ManifestUpdater {
   // Reads the full source directory and syncs the manifest to it. Prunes old,
   // unreferenced manifest chunks. Updates and flushes |file_chunks|.
   //
-  // If a valid |push_intermediate_manifest| is passed, then a manifest is
-  // flushed after the root directory has been added, but before all files and
+  // If a valid |push_handler| is passed, then a manifest is flushed at least
+  // twice and the handler is called:
+  // - after the root directory has been added, but before all files and
   // directories have been processed. That means, the manifest does not yet
   // contains all assets, all incomplete assets are set to in-progress.
+  // - after an asset that was prioritized with AddPriorityAssets() has been
+  // completed.
+  // - at the end of the update process in case of success
   absl::Status UpdateAll(FileChunkMap* file_chunks,
-                         PushIntermediateManifest push_intermediate_manifest =
-                             PushIntermediateManifest());
+                         PushManifestHandler push_handler = nullptr);
 
   // Updates the manifest by applying the |operations| list. Deletions are
   // handled first to make the outcome independent of the order in the list.
-  // Also updates and flushes |file_chunks| with the changes made. See
-  // UpdateAll() for a description of |push_intermediate_manifest|.
+  // Also updates and flushes |file_chunks| with the changes made. The
+  // |push_handler| is called at least twice during the operation and at the
+  // end, see UpdateAll() for more details.
   //
   // All paths should be Unix paths. If |recursive| is true, then a directory
   // scanner task is enqueued for each directory that is added to the manifest.
   // This is only needed during UpdateAll(). When the manifest is updated in
   // response to file watcher changes, then |recursive| should be set to false.
   absl::Status Update(OperationList* operations, FileChunkMap* file_chunks,
-                      PushIntermediateManifest push_intermediate_manifest =
-                          PushIntermediateManifest(),
-                      bool recursive = false);
+                      PushManifestHandler push_handler, bool recursive = false);
 
   // Content id of the current manifest.
   const ContentIdProto& ManifestId() const { return manifest_id_; }
@@ -190,62 +193,84 @@ class ManifestUpdater {
   // Returns an empty manifest.
   ContentIdProto DefaultManifestId();
 
- private:
-  // Adds enough pending assets from |queue_| as tasks to the |pool| to keep all
-  // worker threads busy. Returns the number of tasks that were added.
-  size_t QueueTasks(Threadpool* pool, const fastcdc::Config* cdc_cfg,
-                    ManifestBuilder* manifest_builder);
+  // Appends the given |rel_paths| to the list of assets to prioritize. All
+  // paths must be given as Unix paths.
+  void AddPriorityAssets(std::vector<std::string> rel_paths)
+      ABSL_LOCKS_EXCLUDED(priority_mutex_);
 
-  // Applies the |operatio ns| list to the manifest owned by the
-  // |manifest_builder|. First, all deletions are handled and the corresponding
-  // files are removed from the |file_chunks| map, then all added or updated
-  // assets are processed. This guarantees that the outcome is independent of
-  // the order in the list.
+ private:
+  // Holds the number of queued tasks returned by QueueTasks().
+  struct QueueTasksResult {
+    size_t dir_scanners = 0, file_chunkers = 0;
+  };
+
+  // Adds enough pending assets from |queue_| as tasks to the |pool| to keep all
+  // worker threads busy. If |drain_dir_scanner_tasks| is true, only
+  // FileChunkerTasks are queued, others are skipped. Returns the number of
+  // tasks that were queued as a QueueTaskResult.
+  QueueTasksResult QueueTasks(bool drain_dir_scanner_tasks, Threadpool* pool,
+                              const fastcdc::Config* cdc_cfg);
+
+  // Modifies the list of queued tasks to prioritize those assets that were
+  // previously selected using the AddPriorityAssets() method.
+  void PrioritizeQueuedAssets() ABSL_LOCKS_EXCLUDED(priority_mutex_);
+
+  // Returns true if all of the following conditions are satisfied:
+  // - |push_manifest_handler| is valid
+  // - the flush deadline that was set by a prioritized asset is due
+  // - the manifest was not flushed recently
+  bool WantManifestFlushed(PushManifestHandler push_manifest_handler) const;
+
+  // Checks if it is safe and desired to flush the manifest, then calls
+  // FlushAndPushManifest() if that is the case.
+  // |dir_scanner_tasks_queued| must be the number of currently queued
+  // DirScannerTasks.
+  // |file_chunks| is updated by the flush operation, if it is executed.
+  // |push_manifest_handler| is invoked if the manifest gets flushed and pushed.
+  absl::Status MaybeFlushAndPushManifest(
+      size_t dir_scanner_tasks_queued, FileChunkMap* file_chunks,
+      std::unordered_set<ContentIdProto>* manifest_content_ids,
+      PushManifestHandler push_manifest_handler);
+
+  // Flushes the in-progress manifest and the updates queued in |file_chunks|.
+  // If |push_manifest_handler| is not nullptr, it is invoked with the resulting
+  // manifest ID.
+  absl::Status FlushAndPushManifest(
+      FileChunkMap* file_chunks,
+      std::unordered_set<ContentIdProto>* manifest_content_ids,
+      PushManifestHandler push_manifest_handler);
+
+  // Applies the |operations| list to the manifest owned by the manifest
+  // builder. First, all deletions are handled and the corresponding files are
+  // removed from the |file_chunks| map, then all added or updated assets are
+  // processed. This guarantees that the outcome is independent of the order in
+  // the list.
   //
   // If |parent| is non-null, then it must be of type DIRECTORY and all added
   // assets are made direct children of |parent|. The function does *not* verify
-  // that all children have |parent| as directory path.
+  // that all children have |parent| as directory path. This is used to
+  // efficently handle the result of a DirScannerTask.
   //
   // Enqueues tasks to chunk the given files for files that were added or
   // updated. If |recursive| is true, then it will also enqueue directory
-  // scanner tasks for all given directories.
+  // scanner tasks for all given directories. All follow-up tasks have the given
+  // |deadline| set, which determines the deadline after which the manifest
+  // should be flushed.
   absl::Status ApplyOperations(std::vector<Operation>* operations,
-                               FileChunkMap* file_chunks,
-                               ManifestBuilder* manifest_builder,
-                               AssetBuilder* parent, bool recursive);
+                               FileChunkMap* file_chunks, AssetBuilder* parent,
+                               absl::Time deadline, bool recursive);
 
   // Handles the results of a completed FileChunkerTask.
   absl::Status HandleFileChunkerResult(FileChunkerTask* task,
-                                       FileChunkMap* file_chunks,
-                                       ManifestBuilder* manifest_builder);
+                                       FileChunkMap* file_chunks);
 
   // Handles the results of a completed DirScannerTask.
   absl::Status HandleDirScannerResult(
       DirScannerTask* task, FileChunkMap* file_chunks,
-      ManifestBuilder* manifest_builder,
       std::unordered_set<ContentIdProto>* manifest_content_ids);
 
-  // Represents an asset that has not been fully processed yet.
-  struct PendingAsset {
-    PendingAsset() {}
-    PendingAsset(AssetProto::Type type, std::string relative_path,
-                 std::string filename)
-        : type(type),
-          relative_path(std::move(relative_path)),
-          filename(std::move(filename)) {}
-
-    // The asset type (either FILE or DIRECTORY).
-    AssetProto::Type type = AssetProto::UNKNOWN;
-
-    // Relative unix path of the directory containing this asset.
-    std::string relative_path;
-
-    // File name of the asset that still needs processing.
-    std::string filename;
-  };
-
   // Queue of pending assets waiting for completion.
-  std::list<PendingAsset> queue_;
+  PendingAssetsQueue queue_;
 
   // Pool of pre-allocated buffers
   std::vector<Buffer> buffers_;
@@ -261,6 +286,29 @@ class ManifestUpdater {
 
   // Stats for the last Update*() operation.
   UpdaterStats stats_;
+
+  // The builder used for updating the manifest.
+  std::unique_ptr<ManifestBuilder> manifest_builder_;
+
+  // Holds the assets that should be prioritized while updating the manifest.
+  std::vector<PriorityAsset> priority_assets_ ABSL_GUARDED_BY(priority_mutex_);
+  absl::Mutex priority_mutex_;
+
+  // Deadline by which the manifest should be flushed again.
+  absl::Time flush_deadline_ = absl::InfiniteFuture();
+
+  // The time when the manifest was flushed last.
+  absl::Time last_manifest_flush_;
+
+  // How much time we allow at least for processing a prioritized asset. The
+  // manifest won't be flushed for that time, to allow more assets to be
+  // finalized before the manifest is sent to the client.
+  static constexpr absl::Duration kMinAssetProcessingTime =
+      absl::Milliseconds(200);
+
+  // How often we allow an intermediate manifest to be flushed and pushed.
+  static constexpr absl::Duration kMinDelayBetweenFlush =
+      absl::Milliseconds(500);
 };
 
 };  // namespace cdc_ft

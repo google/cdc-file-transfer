@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Bazel does not honor copts for test targets, so we need to define
+// USE_MOCK_LIBFUSE in the test code itself *before* including cdc_fuse_fs.h.
+#ifndef USE_MOCK_LIBFUSE
+#define USE_MOCK_LIBFUSE = 1
+#endif
+
 #include "cdc_fuse_fs/cdc_fuse_fs.h"
 
 #include <memory>
 #include <vector>
 
+#include "cdc_fuse_fs/mock_config_stream_client.h"
 #include "cdc_fuse_fs/mock_libfuse.h"
 #include "common/log.h"
 #include "common/path.h"
@@ -91,6 +98,7 @@ class CdcFuseFsTest : public ::testing::Test {
   CdcFuseFsTest() : builder_(&cache_) {
     cdc_fuse_fs::Initialize(0, nullptr).IgnoreError();
     Log::Initialize(std::make_unique<FuseLog>(LogLevel::kInfo));
+    cdc_fuse_fs::SetConfigClient(std::make_unique<MockConfigStreamClient>());
   }
   ~CdcFuseFsTest() {
     Log::Shutdown();
@@ -157,17 +165,26 @@ class CdcFuseFsTest : public ::testing::Test {
     ExpectAccessError(R_OK | W_OK | X_OK, 0 /*error*/);
   }
 
-  // Wipes chunks for |kFile1Name| to simulate an intermediate manifest, i.e.
-  // the manifest that contains all assets, but misses file chunks.
+  // Wipes chunks for |kFile1Name| and assets for |kSubDirName| to simulate an
+  // intermediate manifest, i.e. the manifest for which some files and
+  // directories are not processed yet.
   // Returns the intermediate manifest id.
   ContentIdProto CreateIntermediateManifestId() {
     ManifestProto manifest;
     EXPECT_OK(cache_.GetProto(manifest_id_, &manifest));
     EXPECT_GT(manifest.root_dir().dir_assets_size(), 0);
     if (manifest.root_dir().dir_assets_size() == 0) return ContentIdProto();
+
     AssetProto* file1 = manifest.mutable_root_dir()->mutable_dir_assets(0);
     EXPECT_EQ(file1->name(), kFile1Name);
     file1->clear_file_chunks();
+    file1->set_in_progress(true);
+
+    AssetProto* subdir = manifest.mutable_root_dir()->mutable_dir_assets(1);
+    EXPECT_EQ(subdir->name(), kSubdirName);
+    subdir->clear_dir_assets();
+    subdir->set_in_progress(true);
+
     return cache_.AddProto(manifest);
   }
 
@@ -270,32 +287,51 @@ TEST_F(CdcFuseFsTest, OpenFailsWriteAccess) {
   EXPECT_EQ(fuse_.errors[0], EACCES);
 }
 
-TEST_F(CdcFuseFsTest, OpenQueuedForIntermediateManifest) {
+TEST_F(CdcFuseFsTest, RequestsQueuedForIntermediateManifest) {
   ContentIdProto intermediate_manifest_id = CreateIntermediateManifestId();
   EXPECT_OK(cdc_fuse_fs::SetManifest(intermediate_manifest_id));
+  fuse_file_info fi;
+  auto cfg_client_ptr = std::make_unique<MockConfigStreamClient>();
+  MockConfigStreamClient* cfg_client = cfg_client_ptr.get();
+  cdc_fuse_fs::SetConfigClient(std::move(cfg_client_ptr));
 
-  // Opening file1 should be queued as it contains no chunks.
+  // Opening file1 should be queued as it is marked as in-progress.
   CdcFuseLookup(req_, FUSE_ROOT_ID, kFile1Name);
   ASSERT_EQ(fuse_.entries.size(), 1);
-  fuse_file_info fi;
   CdcFuseOpen(req_, fuse_.entries[0].ino, &fi);
-  ASSERT_EQ(fuse_.open_files.size(), 0);
+  EXPECT_EQ(fuse_.open_files.size(), 0);
+  EXPECT_EQ(cfg_client->ReleasePrioritizedAssets(),
+            std::vector<std::string>({kFile1Name}));
+
+  // Opening subdir should be queued as it is marked as in-progress.
+  CdcFuseLookup(req_, FUSE_ROOT_ID, kSubdirName);
+  ASSERT_EQ(fuse_.entries.size(), 2);
+  CdcFuseOpenDir(req_, fuse_.entries[1].ino, &fi);
+  EXPECT_EQ(fuse_.open_files.size(), 0);
+  EXPECT_EQ(cfg_client->ReleasePrioritizedAssets(),
+            std::vector<std::string>({kSubdirName}));
 
   // Setting the final manifest should fulfill queued open requests.
   EXPECT_OK(cdc_fuse_fs::SetManifest(manifest_id_));
-  ASSERT_EQ(fuse_.open_files.size(), 1);
+  EXPECT_EQ(fuse_.open_files.size(), 2);
 }
 
-TEST_F(CdcFuseFsTest, OpenQueuedRequestsRequeue) {
+TEST_F(CdcFuseFsTest, QueuedRequestsRequeue) {
   ContentIdProto intermediate_manifest_id = CreateIntermediateManifestId();
   EXPECT_OK(cdc_fuse_fs::SetManifest(intermediate_manifest_id));
+  fuse_file_info fi;
 
-  // Opening file1 should be queued as it contains no chunks.
+  // Opening file1 should be queued as it is marked as in-progress
   CdcFuseLookup(req_, FUSE_ROOT_ID, kFile1Name);
   ASSERT_EQ(fuse_.entries.size(), 1);
-  fuse_file_info fi;
   CdcFuseOpen(req_, fuse_.entries[0].ino, &fi);
   ASSERT_EQ(fuse_.open_files.size(), 0);
+
+  // Opening subdir should be queued as it is marked as in-progress.
+  CdcFuseLookup(req_, FUSE_ROOT_ID, kSubdirName);
+  ASSERT_EQ(fuse_.entries.size(), 2);
+  CdcFuseOpenDir(req_, fuse_.entries[1].ino, &fi);
+  EXPECT_EQ(fuse_.open_files.size(), 0);
 
   // Setting the same incomplete manifest again should requeue the request.
   EXPECT_OK(cdc_fuse_fs::SetManifest(intermediate_manifest_id));
@@ -303,7 +339,7 @@ TEST_F(CdcFuseFsTest, OpenQueuedRequestsRequeue) {
 
   // Setting the final manifest should fulfill queued open requests.
   EXPECT_OK(cdc_fuse_fs::SetManifest(manifest_id_));
-  ASSERT_EQ(fuse_.open_files.size(), 1);
+  ASSERT_EQ(fuse_.open_files.size(), 2);
 }
 
 TEST_F(CdcFuseFsTest, ReadSucceeds) {

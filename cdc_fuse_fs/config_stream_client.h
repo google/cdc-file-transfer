@@ -32,26 +32,45 @@ namespace cdc_ft {
 
 class ManifestIdReader;
 
+// Interface class for the config stream client.
 class ConfigStreamClient {
  public:
-  // |instance| is the id of the gamelet.
-  // |channel| is a gRPC channel to use.
-  ConfigStreamClient(std::string instance,
-                     std::shared_ptr<grpc::Channel> channel);
-  ~ConfigStreamClient();
+  ConfigStreamClient() = default;
+  virtual ~ConfigStreamClient() = default;
 
   // Sends a request to get a stream of manifest id updates. |callback| is
   // called from a background thread for every manifest id received.
   // Returns immediately without waiting for the first manifest id.
-  absl::Status StartListeningToManifestUpdates(
-      std::function<absl::Status(const ContentIdProto&)> callback);
+  virtual absl::Status StartListeningToManifestUpdates(
+      std::function<absl::Status(const ContentIdProto&)> callback) = 0;
 
   // Sends a message to indicate that the |manifest_id| was received and FUSE
   // has been updated to use the new manifest.
-  absl::Status SendManifestAck(ContentIdProto manifest_id);
+  virtual absl::Status SendManifestAck(ContentIdProto manifest_id) = 0;
+
+  // Sends a message to prioritize processing of the pending assets in |assets|.
+  // All assets are given as full relative Unix paths to the file or directory.
+  virtual absl::Status ProcessAssets(std::vector<std::string> assets) = 0;
 
   // Stops listening for manifest updates.
-  void Shutdown();
+  virtual void Shutdown() = 0;
+};
+
+class ConfigStreamGrpcClient : public ConfigStreamClient {
+ public:
+  // |instance| is the id of the gamelet.
+  // |channel| is a gRPC channel to use.
+  ConfigStreamGrpcClient(std::string instance,
+                         std::shared_ptr<grpc::Channel> channel);
+  ~ConfigStreamGrpcClient();
+
+  // ConfigStreamClient
+
+  absl::Status StartListeningToManifestUpdates(
+      std::function<absl::Status(const ContentIdProto&)> callback) override;
+  absl::Status SendManifestAck(ContentIdProto manifest_id) override;
+  absl::Status ProcessAssets(std::vector<std::string> assets) override;
+  void Shutdown() override;
 
  private:
   using ConfigStreamService = proto::ConfigStreamService;

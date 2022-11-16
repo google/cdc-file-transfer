@@ -112,6 +112,7 @@ class MultiSessionRunner {
   const uint32_t num_updater_threads_;
   const ManifestUpdatedCb manifest_updated_cb_;
   std::unique_ptr<AssetStreamServer> server_;
+  std::unique_ptr<ManifestUpdater> manifest_updater_;
 
   // Modifications (shutdown, file changes).
   absl::Mutex mutex_;

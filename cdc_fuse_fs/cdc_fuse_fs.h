@@ -62,10 +62,8 @@ namespace cdc_fuse_fs {
 // see fuse_common.h.
 absl::Status Initialize(int argc, char** argv);
 
-// Starts a client to read configuration updates over gRPC |channel|.
-// |instance| is the gamelet instance id.
-absl::Status StartConfigClient(std::string instance,
-                               std::shared_ptr<grpc::Channel> channel);
+// Sets the client to read configuration updates to |config_client|.
+void SetConfigClient(std::unique_ptr<ConfigStreamClient> config_client);
 
 // Sets the |data_store_reader| to load data from, initializes FUSE with a
 // manifest for an empty directory, and starts the filesystem. The call does
