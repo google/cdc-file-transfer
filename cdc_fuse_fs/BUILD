@@ -50,6 +50,7 @@ cc_test(
     srcs = ["cdc_fuse_fs_test.cc"],
     deps = [
         ":cdc_fuse_fs_lib_mocked",
+        ":mock_config_stream_client",
         "//common:status_test_macros",
         "//data_store",
         "//data_store:mem_data_store",

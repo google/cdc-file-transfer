@@ -117,12 +117,12 @@ absl::Status ConfigStreamGrpcClient::SendManifestAck(
 
 absl::Status ConfigStreamGrpcClient::ProcessAssets(
     std::vector<std::string> assets) {
-  ProcessAssetsRequest request;
+  proto::ProcessAssetsRequest request;
   for (std::string& asset : assets)
     request.add_relative_paths(std::move(asset));
 
   grpc::ClientContext context_;
-  ProcessAssetsResponse response;
+  proto::ProcessAssetsResponse response;
   // The caller is waiting for the updated manifest anyway, so we can just wait
   // for the response.
   RETURN_ABSL_IF_ERROR(stub_->ProcessAssets(&context_, request, &response));
