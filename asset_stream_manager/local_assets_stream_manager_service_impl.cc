@@ -36,10 +36,10 @@ namespace cdc_ft {
 namespace {
 
 std::string RequestToString(const google::protobuf::Message& request) {
-  std::string request_str;
-  google::protobuf::TextFormat::PrintToString(request, &request_str);
-  if (request_str.back() == '\n') request_str.pop_back();
-  return absl::StrReplaceAll(request_str, {{"\n", ", "}});
+  std::string str;
+  google::protobuf::TextFormat::PrintToString(request, &str);
+  if (!str.empty() && str.back() == '\n') str.pop_back();
+  return absl::StrReplaceAll(str, {{"\n", ", "}});
 }
 
 // Parses |instance_name| of the form

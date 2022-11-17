@@ -67,9 +67,9 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
   for (const std::string& sourceFilePath : source_filepaths) {
     // Workaround for scp thinking that C is a host in C:\path\to\foo.
     if (absl::StrContains(path::GetDrivePrefix(sourceFilePath), ":")) {
-      source_args += Quote("//./" + sourceFilePath) + " ";
+      source_args += QuoteForWindows("//./" + sourceFilePath) + " ";
     } else {
-      source_args += Quote(sourceFilePath) + " ";
+      source_args += QuoteForWindows(sourceFilePath) + " ";
     }
   }
 
@@ -80,9 +80,9 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
       "%s %s -p -T "
       "-P %i %s "
       "%s:%s",
-      Quote(scp_command_), quiet_ || verbosity_ < 2 ? "-q" : "",
-      compress ? "-C" : "", ssh_port_, source_args, Quote(user_host_),
-      Quote(dest));
+      QuoteForWindows(scp_command_), quiet_ || verbosity_ < 2 ? "-q" : "",
+      compress ? "-C" : "", ssh_port_, source_args, QuoteForWindows(user_host_),
+      QuoteForWindows(dest));
   start_info.name = "scp";
   start_info.forward_output_to_log = forward_output_to_log_;
 
@@ -144,13 +144,13 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
       "-oServerAliveCountMax=6 "  // Number of lost msgs before ssh terminates
       "-oServerAliveInterval=5 "  // Time interval between alive msgs
       "%s %s -p %i %s",
-      Quote(ssh_command_), quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
-      Quote(user_host_), ssh_port_, remote_command_arg);
+      QuoteForWindows(ssh_command_), quiet_ || verbosity_ < 2 ? "-q" : "",
+      forward_arg, QuoteForWindows(user_host_), ssh_port_, remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
   return start_info;
 }
 
-std::string RemoteUtil::Quote(const std::string& argument) {
+std::string RemoteUtil::QuoteForWindows(const std::string& argument) {
   // Escape certain backslashes (see doc of this function).
   std::string escaped =
       std::regex_replace(argument, std::regex(R"(\\*(?="|$))"), "$&$&");
@@ -169,12 +169,12 @@ std::string RemoteUtil::QuoteForSsh(const std::string& argument) {
 
   // Quote, but handle special case for ~.
   if (escaped.empty() || escaped[0] != '~') {
-    return Quote(absl::StrCat("\"", escaped, "\""));
+    return QuoteForWindows(absl::StrCat("\"", escaped, "\""));
   }
 
   // Simple special cases. Quote() isn't required, but called for consistency.
   if (escaped == "~" || escaped == "~/") {
-    return Quote(escaped);
+    return QuoteForWindows(escaped);
   }
 
   // Check whether the username contains only valid characters.
@@ -185,17 +185,17 @@ std::string RemoteUtil::QuoteForSsh(const std::string& argument) {
   if (username_end_pos > 1 &&
       !std::regex_match(escaped.substr(1, username_end_pos - 1),
                         std::regex("^[a-z][-a-z0-9]*"))) {
-    return Quote(absl::StrCat("\"", escaped, "\""));
+    return QuoteForWindows(absl::StrCat("\"", escaped, "\""));
   }
 
   if (slash_pos == std::string::npos) {
     // E.g. ~username -> Quote(~username)
-    return Quote(escaped);
+    return QuoteForWindows(escaped);
   }
 
   // E.g.  or ~username/foo -> Quote(~username/"foo")
-  return Quote(absl::StrCat(escaped.substr(0, slash_pos + 1), "\"",
-                            escaped.substr(slash_pos + 1), "\""));
+  return QuoteForWindows(absl::StrCat(escaped.substr(0, slash_pos + 1), "\"",
+                                      escaped.substr(slash_pos + 1), "\""));
 }
 
 absl::Status RemoteUtil::CheckUserHostPort() {

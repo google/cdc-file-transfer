@@ -424,9 +424,9 @@ absl::Status CdcRsyncClient::DeployServer() {
   // - Make the old cdc_rsync_server writable (if it exists).
   // - Make the new cdc_rsync_server executable.
   // - Replace the old cdc_rsync_server by the new one.
-  std::string old_path =
-      RemoteUtil::Quote(std::string(kRemoteToolsBinDir) + kCdcServerFilename);
-  std::string new_path = RemoteUtil::Quote(remoteServerTmpPath);
+  std::string old_path = RemoteUtil::QuoteForWindows(
+      std::string(kRemoteToolsBinDir) + kCdcServerFilename);
+  std::string new_path = RemoteUtil::QuoteForWindows(remoteServerTmpPath);
   std::string replace_cmd = absl::StrFormat(
       " ([ ! -f %s ] || chmod u+w %s) && chmod a+x %s && mv %s %s", old_path,
       old_path, new_path, new_path, old_path);

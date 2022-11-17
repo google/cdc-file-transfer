@@ -102,7 +102,7 @@ class RemoteUtil {
   // foo\bar   -> "foo\bar"
   // foo\      -> "foo\\"
   // foo\\"bar -> "foo\\\\\"bar".
-  static std::string Quote(const std::string& argument);
+  static std::string QuoteForWindows(const std::string& argument);
 
   // Quotes and escapes a command line arguments for use in SSH command. The
   // argument is first escaped and quoted for Linux using double quotes and then
