@@ -84,6 +84,9 @@ DiskDataStore::DiskDataStore(unsigned int depth, std::string cache_root_dir,
 absl::StatusOr<std::unique_ptr<DiskDataStore>> DiskDataStore::Create(
     unsigned int depth, std::string cache_root_dir, bool create_dirs,
     SystemClock* clock) {
+  // Resolve e.g. ~.
+  RETURN_IF_ERROR(path::ExpandPathVariables(&cache_root_dir),
+                  "Failed to expand cache dir '%s'", cache_root_dir);
   std::unique_ptr<DiskDataStore> store = absl::WrapUnique(
       new DiskDataStore(depth, std::move(cache_root_dir), create_dirs, clock));
   if (create_dirs) {
