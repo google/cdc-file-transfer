@@ -124,6 +124,10 @@ ABSL_FLAG(uint32_t, cleanup_timeout, cdc_ft::DataProvider::kCleanupTimeoutSec,
 ABSL_FLAG(uint32_t, access_idle_timeout, cdc_ft::DataProvider::kAccessIdleSec,
           "Do not run instance cache cleanups for this many seconds after the "
           "last file access");
+ABSL_FLAG(std::string, config_dir, "",
+          "Directory on the host to stream from with the json configuration "
+          "for asset stream manager stored in the file "
+          "`assets_stream_manager.json`.");
 
 // Development args.
 ABSL_FLAG(std::string, dev_src_dir, "",
@@ -151,10 +155,9 @@ int main(int argc, char* argv[]) {
   absl::ParseCommandLine(argc, argv);
 
   // Set up config. Allow overriding this config with
-  // %APPDATA%\GGP\services\assets_stream_manager_v3.json.
-  cdc_ft::SdkUtil sdk_util;
+  // %config_dir%\assets_stream_manager.json.
   const std::string config_path = cdc_ft::path::Join(
-      sdk_util.GetServicesConfigPath(), "assets_stream_manager_v3.json");
+      absl::GetFlag(FLAGS_config_dir), "assets_stream_manager.json");
   cdc_ft::AssetStreamConfig cfg;
   absl::Status cfg_load_status = cfg.LoadFromFile(config_path);
 
