@@ -91,15 +91,19 @@ absl::StatusOr<AssetBuilder> ManifestBuilder::GetOrCreateAsset(
     name = parts.back();
     parts.pop_back();
   }
-  DirCreateMode create_mode =
-      force_create ? DirCreateMode::kForceCreate : DirCreateMode::kCreate;
+  DirCreateMode create_mode = type == AssetProto::UNKNOWN
+                                  ? DirCreateMode::kNoCreate
+                              : force_create ? DirCreateMode::kForceCreate
+                                             : DirCreateMode::kCreate;
   AssetProto* dir;
   ASSIGN_OR_RETURN(dir, FindOrCreateDirPath(parts, create_mode),
                    "Failed to create directory '%s'", JoinUnixPath(parts));
 
   if (name.empty()) {
     // Special case: return the root directory for a DIRECTORY with empty name.
-    if (type == AssetProto::DIRECTORY) return AssetBuilder(dir, std::string());
+    if (type == AssetProto::DIRECTORY || type == AssetProto::UNKNOWN) {
+      return AssetBuilder(dir, std::string());
+    }
     return absl::InvalidArgumentError("Empty path given");
   }
 
@@ -108,6 +112,10 @@ absl::StatusOr<AssetBuilder> ManifestBuilder::GetOrCreateAsset(
   AssetProto* asset = nullptr;
   if (result.ok()) {
     asset = result.value();
+    // If the asset type is unknown, we return any type.
+    if (type == AssetProto::UNKNOWN) {
+      return AssetBuilder(asset, path::DirName(unix_path));
+    }
     // Verify that both assets are of the same type.
     if (asset->type() != type) {
       if (force_create) {
@@ -125,11 +133,15 @@ absl::StatusOr<AssetBuilder> ManifestBuilder::GetOrCreateAsset(
   }
   // Create the asset if it was not found or it was deleted.
   if (!asset) {
+    if (type == AssetProto::UNKNOWN) {
+      return absl::NotFoundError(
+          absl::StrFormat("Asset '%s' does not exist.", path));
+    }
     asset = dir->add_dir_assets();
     InitNewAsset(name, type, asset);
     if (created) *created = true;
   }
-  return AssetBuilder(asset, path::ToUnix(path::DirName(path)));
+  return AssetBuilder(asset, path::DirName(unix_path));
 }
 
 absl::Status ManifestBuilder::DeleteAsset(const std::string& path) {

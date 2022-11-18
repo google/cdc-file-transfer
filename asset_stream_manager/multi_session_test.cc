@@ -65,6 +65,21 @@ class MetricsServiceForTest : public MultiSessionMetricsRecorder {
     metrics_records_.push_back(MetricsRecord(std::move(event), code));
   }
 
+  // Waits until |num_events| events of type |type| have been recorded, or until
+  // the function times out. Returns true if the condition was met and false if
+  // in case of a timeout.
+  bool WaitForEvents(metrics::EventType type, int num_events = 1,
+                     absl::Duration timeout = absl::Seconds(1)) {
+    absl::MutexLock lock(&mutex_);
+    auto cond = [this, type, num_events]() {
+      return std::count_if(metrics_records_.begin(), metrics_records_.end(),
+                           [type](const MetricsRecord& mr) {
+                             return mr.code == type;
+                           }) >= num_events;
+    };
+    return mutex_.AwaitWithTimeout(absl::Condition(&cond), timeout);
+  }
+
   std::vector<MetricsRecord> GetEventsAndClear(metrics::EventType type)
       ABSL_LOCKS_EXCLUDED(mutex_) {
     std::vector<MetricsRecord> events;
@@ -172,8 +187,16 @@ class MultiSessionTest : public ManifestTestBase {
       metrics::ManifestUpdateData* data =
           events[i].evt.as_manager_data->manifest_update_data.get();
       EXPECT_LT(data->local_duration_ms, 60000ull);
-      manifests[i].local_duration_ms = data->local_duration_ms;
-      EXPECT_EQ(*data, manifests[i]);
+      EXPECT_EQ(data->status, manifests[i].status);
+      EXPECT_EQ(data->total_assets_added_or_updated,
+                manifests[i].total_assets_added_or_updated);
+      EXPECT_EQ(data->total_assets_deleted, manifests[i].total_assets_deleted);
+      EXPECT_EQ(data->total_chunks, manifests[i].total_chunks);
+      EXPECT_EQ(data->total_files_added_or_updated,
+                manifests[i].total_files_added_or_updated);
+      EXPECT_EQ(data->total_processed_bytes,
+                manifests[i].total_processed_bytes);
+      EXPECT_EQ(data->trigger, manifests[i].trigger);
     }
   }
 
@@ -268,13 +291,13 @@ TEST_F(MultiSessionTest, GetCachePath_DoesNotSplitUtfCodePoints) {
 TEST_F(MultiSessionTest, MultiSessionRunnerOnEmpty) {
   cfg_.src_dir = test_dir_path_;
   MultiSessionRunner runner(cfg_.src_dir, &data_store_, &process_factory_,
-                            false /*enable_stats*/, kTimeout, kNumThreads,
+                            /*enable_stats=*/false, kTimeout, kNumThreads,
                             metrics_service_,
                             [this]() { OnManifestUpdated(); });
   EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
-  EXPECT_OK(runner.WaitForManifestAck(kInstance, kTimeout));
-  // The first update is always the empty manifest, wait for the second one.
-  ASSERT_TRUE(WaitForManifestUpdated(2));
+  EXPECT_TRUE(WaitForManifestUpdated(2));
+  ASSERT_TRUE(
+      metrics_service_->WaitForEvents(metrics::EventType::kMultiSessionStart));
   ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
   CheckMultiSessionStartRecorded(0, 0, 0);
   CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
@@ -290,13 +313,13 @@ TEST_F(MultiSessionTest, MultiSessionRunnerNonEmptySucceeds) {
   // Contains a.txt, subdir/b.txt, subdir/c.txt, subdir/d.txt.
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   MultiSessionRunner runner(cfg_.src_dir, &data_store_, &process_factory_,
-                            false /*enable_stats*/, kTimeout, kNumThreads,
+                            /*enable_stats=*/false, kTimeout, kNumThreads,
                             metrics_service_,
                             [this]() { OnManifestUpdated(); });
   EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
-  EXPECT_OK(runner.WaitForManifestAck(kInstance, kTimeout));
-  // The first update is always the empty manifest, wait for the second one.
-  ASSERT_TRUE(WaitForManifestUpdated(2));
+  EXPECT_TRUE(WaitForManifestUpdated(2));
+  ASSERT_TRUE(
+      metrics_service_->WaitForEvents(metrics::EventType::kMultiSessionStart));
   CheckMultiSessionStartRecorded(46, 4, 4);
   ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals(
       {"a.txt", "subdir", "subdir/b.txt", "subdir/c.txt", "subdir/d.txt"},
@@ -309,31 +332,50 @@ TEST_F(MultiSessionTest, MultiSessionRunnerNonEmptySucceeds) {
 TEST_F(MultiSessionTest, MultiSessionRunnerAddFileSucceeds) {
   cfg_.src_dir = test_dir_path_;
   MultiSessionRunner runner(cfg_.src_dir, &data_store_, &process_factory_,
-                            false /*enable_stats*/, kTimeout, kNumThreads,
+                            /*enable_stats=*/false, kTimeout, kNumThreads,
                             metrics_service_,
                             [this]() { OnManifestUpdated(); });
-  EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
-  EXPECT_OK(runner.WaitForManifestAck(kInstance, kTimeout));
-  // The first update is always the empty manifest, wait for the second one.
-  ASSERT_TRUE(WaitForManifestUpdated(2));
-  ASSERT_OK(runner.Status());
-  CheckMultiSessionStartRecorded(0, 0, 0);
-  ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
-  CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
-      GetManifestUpdateData(metrics::UpdateTrigger::kInitUpdateAll,
-                            absl::StatusCode::kOk, 0, 0, 0, 0, 0, 0)});
 
-  const std::string file_path = path::Join(test_dir_path_, "file.txt");
-  EXPECT_OK(path::WriteFile(file_path, kData, kDataSize));
-  // 1 file was added = incremented exp_num_manifest_updates.
-  ASSERT_TRUE(WaitForManifestUpdated(3));
-  ASSERT_NO_FATAL_FAILURE(
-      ExpectManifestEquals({"file.txt"}, runner.ManifestId()));
-  CheckMultiSessionStartNotRecorded();
-  CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
-      GetManifestUpdateData(metrics::UpdateTrigger::kRegularUpdate,
-                            absl::StatusCode::kOk, 1, 0, 1, 1, 0, kDataSize)});
+  {
+    SCOPED_TRACE("Initialize.");
 
+    EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
+    // 1 file was added, 1 intermediate + 1 final manifest is pushed.
+    EXPECT_TRUE(WaitForManifestUpdated(2));
+    EXPECT_OK(runner.WaitForManifestAck(kInstance, kTimeout));
+    EXPECT_TRUE(metrics_service_->WaitForEvents(
+        metrics::EventType::kMultiSessionStart));
+    ASSERT_OK(runner.Status());
+  }
+
+  {
+    SCOPED_TRACE("Created base manifest for the test directory.");
+
+    CheckMultiSessionStartRecorded(0, 0, 0);
+    ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
+    CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
+        GetManifestUpdateData(metrics::UpdateTrigger::kInitUpdateAll,
+                              absl::StatusCode::kOk, 0, 0, 0, 0, 0, 0)});
+  }
+
+  {
+    SCOPED_TRACE("Added file.txt.");
+
+    uint32_t prev_updates = num_manifest_updates_;
+    const std::string file_path = path::Join(test_dir_path_, "file.txt");
+    EXPECT_OK(path::WriteFile(file_path, kData, kDataSize));
+    // 1 file was added, 1 intermediate + 1 final manifest is pushed.
+    EXPECT_TRUE(WaitForManifestUpdated(prev_updates + 2));
+    EXPECT_TRUE(
+        metrics_service_->WaitForEvents(metrics::EventType::kManifestUpdated));
+    ASSERT_NO_FATAL_FAILURE(
+        ExpectManifestEquals({"file.txt"}, runner.ManifestId()));
+    CheckMultiSessionStartNotRecorded();
+    CheckManifestUpdateRecorded(
+        std::vector<metrics::ManifestUpdateData>{GetManifestUpdateData(
+            metrics::UpdateTrigger::kRegularUpdate, absl::StatusCode::kOk, 1, 0,
+            1, 1, 0, kDataSize)});
+  }
   EXPECT_OK(runner.Status());
   EXPECT_OK(runner.Shutdown());
 }
@@ -343,7 +385,7 @@ TEST_F(MultiSessionTest, MultiSessionRunnerAddFileSucceeds) {
 TEST_F(MultiSessionTest, MultiSessionRunnerNoDirFails) {
   cfg_.src_dir = path::Join(base_dir_, "non_existing");
   MultiSessionRunner runner(cfg_.src_dir, &data_store_, &process_factory_,
-                            false /*enable_stats*/, kTimeout, kNumThreads,
+                            /*enable_stats=*/false, kTimeout, kNumThreads,
                             metrics_service_,
                             [this]() { OnManifestUpdated(); });
   EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
@@ -365,16 +407,16 @@ TEST_F(MultiSessionTest, MultiSessionRunnerDirRecreatedSucceeds) {
                             kDataSize));
 
   MultiSessionRunner runner(cfg_.src_dir, &data_store_, &process_factory_,
-                            false /*enable_stats*/, kTimeout, kNumThreads,
+                            /*enable_stats=*/false, kTimeout, kNumThreads,
                             metrics_service_,
                             [this]() { OnManifestUpdated(); });
   EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
 
   {
     SCOPED_TRACE("Originally, only the streamed directory contains file.txt.");
-    EXPECT_OK(runner.WaitForManifestAck(kInstance, kTimeout));
-    // The first update is always the empty manifest, wait for the second one.
-    ASSERT_TRUE(WaitForManifestUpdated(2));
+    EXPECT_TRUE(WaitForManifestUpdated(2));
+    ASSERT_TRUE(metrics_service_->WaitForEvents(
+        metrics::EventType::kMultiSessionStart));
     CheckMultiSessionStartRecorded((uint64_t)kDataSize, 1, 1);
     ASSERT_NO_FATAL_FAILURE(
         ExpectManifestEquals({"file.txt"}, runner.ManifestId()));
@@ -387,8 +429,9 @@ TEST_F(MultiSessionTest, MultiSessionRunnerDirRecreatedSucceeds) {
   {
     SCOPED_TRACE(
         "Remove the streamed directory, the manifest should become empty.");
+    uint32_t prev_updates = num_manifest_updates_;
     EXPECT_OK(path::RemoveDirRec(test_dir_path_));
-    ASSERT_TRUE(WaitForManifestUpdated(3));
+    ASSERT_TRUE(WaitForManifestUpdated(prev_updates + 1));
     ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
     CheckManifestUpdateRecorded(
         std::vector<metrics::ManifestUpdateData>{GetManifestUpdateData(
@@ -400,9 +443,13 @@ TEST_F(MultiSessionTest, MultiSessionRunnerDirRecreatedSucceeds) {
     SCOPED_TRACE(
         "Create the watched directory -> an empty manifest should be "
         "streamed.");
+    uint32_t prev_updates = num_manifest_updates_;
     EXPECT_OK(path::CreateDirRec(test_dir_path_));
-    EXPECT_TRUE(WaitForManifestUpdated(4));
+    // The first update is always the empty manifest, wait for the second one.
+    EXPECT_TRUE(WaitForManifestUpdated(prev_updates + 2));
     ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
+    EXPECT_TRUE(
+        metrics_service_->WaitForEvents(metrics::EventType::kManifestUpdated));
     CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
         GetManifestUpdateData(metrics::UpdateTrigger::kRunningUpdateAll,
                               absl::StatusCode::kOk, 0, 0, 0, 0, 0, 0)});
@@ -410,11 +457,16 @@ TEST_F(MultiSessionTest, MultiSessionRunnerDirRecreatedSucceeds) {
 
   {
     SCOPED_TRACE("Create 'new_file.txt' -> new manifest should be created.");
+    uint32_t prev_updates = num_manifest_updates_;
     EXPECT_OK(path::WriteFile(path::Join(test_dir_path_, "new_file.txt"), kData,
                               kDataSize));
-    ASSERT_TRUE(WaitForManifestUpdated(5));
+    // The first update doesn't have the chunks for new_file.txt, wait for the
+    // second one.
+    ASSERT_TRUE(WaitForManifestUpdated(prev_updates + 2));
     ASSERT_NO_FATAL_FAILURE(
         ExpectManifestEquals({"new_file.txt"}, runner.ManifestId()));
+    EXPECT_TRUE(
+        metrics_service_->WaitForEvents(metrics::EventType::kManifestUpdated));
     CheckManifestUpdateRecorded(
         std::vector<metrics::ManifestUpdateData>{GetManifestUpdateData(
             metrics::UpdateTrigger::kRegularUpdate, absl::StatusCode::kOk, 1, 0,
@@ -432,11 +484,11 @@ TEST_F(MultiSessionTest, MultiSessionRunnerFileAsStreamedDirFails) {
   EXPECT_OK(path::WriteFile(cfg_.src_dir, kData, kDataSize));
 
   MultiSessionRunner runner(cfg_.src_dir, &data_store_, &process_factory_,
-                            false /*enable_stats*/, kTimeout, kNumThreads,
+                            /*enable_stats=*/false, kTimeout, kNumThreads,
                             metrics_service_,
                             [this]() { OnManifestUpdated(); });
   EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
-  ASSERT_FALSE(WaitForManifestUpdated(1, absl::Milliseconds(10)));
+  ASSERT_FALSE(WaitForManifestUpdated(1, absl::Milliseconds(100)));
   CheckMultiSessionStartNotRecorded();
   CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{});
   EXPECT_NOT_OK(runner.Shutdown());
@@ -452,33 +504,49 @@ TEST_F(MultiSessionTest,
   EXPECT_OK(path::CreateDirRec(cfg_.src_dir));
 
   MultiSessionRunner runner(cfg_.src_dir, &data_store_, &process_factory_,
-                            false /*enable_stats*/, kTimeout, kNumThreads,
+                            /*enable_stats=*/false, kTimeout, kNumThreads,
                             metrics_service_,
                             [this]() { OnManifestUpdated(); });
-  EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
-  ASSERT_TRUE(WaitForManifestUpdated(2));
-  CheckMultiSessionStartRecorded(0, 0, 0);
-  CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
-      GetManifestUpdateData(metrics::UpdateTrigger::kInitUpdateAll,
-                            absl::StatusCode::kOk, 0, 0, 0, 0, 0, 0)});
-  ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
+  {
+    SCOPED_TRACE("Initialize manifest in test directory.");
 
-  // Remove the streamed directory, the manifest should become empty.
-  EXPECT_OK(path::RemoveDirRec(cfg_.src_dir));
-  ASSERT_TRUE(WaitForManifestUpdated(3));
-  ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
-  CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
-      GetManifestUpdateData(metrics::UpdateTrigger::kRunningUpdateAll,
-                            absl::StatusCode::kNotFound, 0, 0, 0, 0, 0, 0)});
+    EXPECT_OK(runner.Initialize(kPort, AssetStreamServerType::kTest));
+    ASSERT_TRUE(WaitForManifestUpdated(2));
+    ASSERT_TRUE(metrics_service_->WaitForEvents(
+        metrics::EventType::kMultiSessionStart));
+    CheckMultiSessionStartRecorded(0, 0, 0);
+    CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
+        GetManifestUpdateData(metrics::UpdateTrigger::kInitUpdateAll,
+                              absl::StatusCode::kOk, 0, 0, 0, 0, 0, 0)});
+    ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
+  }
 
-  EXPECT_OK(path::WriteFile(cfg_.src_dir, kData, kDataSize));
-  EXPECT_TRUE(WaitForManifestUpdated(4));
-  ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
-  CheckManifestUpdateRecorded(
-      std::vector<metrics::ManifestUpdateData>{GetManifestUpdateData(
-          metrics::UpdateTrigger::kRunningUpdateAll,
-          absl::StatusCode::kFailedPrecondition, 0, 0, 0, 0, 0, 0)});
-  CheckMultiSessionStartNotRecorded();
+  {
+    SCOPED_TRACE("Remove the streamed directory, the manifest becomes empty.");
+
+    uint32_t prev_updates = num_manifest_updates_;
+    EXPECT_OK(path::RemoveDirRec(cfg_.src_dir));
+    ASSERT_TRUE(WaitForManifestUpdated(prev_updates + 1));
+    ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
+    CheckManifestUpdateRecorded(std::vector<metrics::ManifestUpdateData>{
+        GetManifestUpdateData(metrics::UpdateTrigger::kRunningUpdateAll,
+                              absl::StatusCode::kNotFound, 0, 0, 0, 0, 0, 0)});
+  }
+
+  {
+    SCOPED_TRACE("Create a file in place of the directory");
+
+    uint32_t prev_updates = num_manifest_updates_;
+    EXPECT_OK(path::WriteFile(cfg_.src_dir, kData, kDataSize));
+    ASSERT_TRUE(WaitForManifestUpdated(prev_updates + 2));
+    ASSERT_NO_FATAL_FAILURE(ExpectManifestEquals({}, runner.ManifestId()));
+    metrics::ManifestUpdateData update_data = GetManifestUpdateData(
+        metrics::UpdateTrigger::kRunningUpdateAll,
+        absl::StatusCode::kFailedPrecondition, 0, 0, 0, 0, 0, 0);
+    CheckManifestUpdateRecorded(
+        std::vector<metrics::ManifestUpdateData>{update_data, update_data});
+    CheckMultiSessionStartNotRecorded();
+  }
 
   EXPECT_OK(runner.Status());
   EXPECT_OK(runner.Shutdown());

@@ -344,6 +344,52 @@ TEST_F(ManifestBuilderTest, FilesDirsCreatedOnlyOnce) {
   VerifyAssets(assets, builder.ManifestId());
 }
 
+TEST_F(ManifestBuilderTest, GetAssetsOfUnkonwnType) {
+  ManifestBuilder builder(cdc_params_, &cache_);
+  AssetMap assets;
+  assets["file1.txt"] = {"a"};
+  assets["dir1"] = {};
+
+  ASSERT_OK(AddAssets(assets, &builder));
+  bool created = false;
+
+  // Get existing assets, force_create == false
+  EXPECT_OK(builder.GetOrCreateAsset("file1.txt", AssetProto::UNKNOWN, false,
+                                     &created));
+  EXPECT_FALSE(created);
+  EXPECT_OK(
+      builder.GetOrCreateAsset("dir1", AssetProto::UNKNOWN, false, &created));
+  EXPECT_FALSE(created);
+
+  // Get existing assets, force_create == true
+  EXPECT_OK(builder.GetOrCreateAsset("file1.txt", AssetProto::UNKNOWN, true,
+                                     &created));
+  EXPECT_FALSE(created);
+  EXPECT_OK(
+      builder.GetOrCreateAsset("dir1", AssetProto::UNKNOWN, true, &created));
+  EXPECT_FALSE(created);
+
+  // Get the root directory.
+  EXPECT_OK(builder.GetOrCreateAsset("", AssetProto::UNKNOWN));
+
+  // Get non-existing file fails, force_create = false
+  EXPECT_NOT_OK(
+      builder.GetOrCreateAsset("does_not_exist", AssetProto::UNKNOWN, false));
+
+  // Get non-existing file fails, force_create = true
+  EXPECT_NOT_OK(
+      builder.GetOrCreateAsset("does_not_exist", AssetProto::UNKNOWN, true));
+
+  // Get non-existing file fails, no sub-directories are created.
+  EXPECT_NOT_OK(builder.GetOrCreateAsset("new_dir1/does_not_exist",
+                                         AssetProto::UNKNOWN, false));
+  EXPECT_NOT_OK(builder.GetOrCreateAsset("new_dir2/does_not_exist",
+                                         AssetProto::UNKNOWN, true));
+
+  ASSERT_OK(builder.Flush());
+  VerifyAssets(assets, builder.ManifestId());
+}
+
 TEST_F(ManifestBuilderTest, Deduplication) {
   ManifestBuilder builder(cdc_params_, &cache_);
   AssetMap assets;

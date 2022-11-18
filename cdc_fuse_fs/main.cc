@@ -19,6 +19,7 @@
 #include "absl/flags/parse.h"
 #include "absl_helper/jedec_size_flag.h"
 #include "cdc_fuse_fs/cdc_fuse_fs.h"
+#include "cdc_fuse_fs/config_stream_client.h"
 #include "cdc_fuse_fs/constants.h"
 #include "common/gamelet_component.h"
 #include "common/log.h"
@@ -72,6 +73,31 @@ bool IsUpToDate(const std::string& components_arg) {
   return true;
 }
 
+absl::Status CreateMountDir(const std::vector<char*>& args) {
+  // Assume the mount dir is the last argument.
+  size_t argc = args.size();
+  if (argc < 2 || !args[argc - 1]) {
+    return absl::InvalidArgumentError(
+        "The last argument must be the mount directory");
+  }
+  std::string mount_dir = args[argc - 1];
+  if (mount_dir[0] == '-') {
+    return absl::InvalidArgumentError(absl::StrFormat(
+        "The last argument must be the mount directory, but is '%s'",
+        mount_dir));
+  }
+
+  // Expand ~ etc.
+  RETURN_IF_ERROR(cdc_ft::path::ExpandPathVariables(&mount_dir),
+                  "Failed to expand mount directory '%s'", mount_dir);
+
+  // Create expanded directory.
+  RETURN_IF_ERROR(cdc_ft::path::CreateDirRec(mount_dir),
+                  "Failed to create directory '%s'", mount_dir);
+
+  return absl::OkStatus();
+}
+
 }  // namespace
 }  // namespace cdc_ft
 
@@ -104,7 +130,7 @@ ABSL_FLAG(uint32_t, access_idle_timeout, cdc_ft::DataProvider::kAccessIdleSec,
 
 static_assert(static_cast<int>(absl::StatusCode::kOk) == 0, "kOk != 0");
 
-// Usage: cdc_fuse_fs <ABSL_FLAGs> -- mount_dir [-d|-s|..]
+// Usage: cdc_fuse_fs <ABSL_FLAGs> -- [-d|-s|.. mount_dir]
 // Any args after --  are FUSE args, search third_party/fuse for FUSE_OPT_KEY or
 // FUSE_LIB_OPT (there doesn't seem to be a place where they're all described).
 int main(int argc, char* argv[]) {
@@ -136,9 +162,16 @@ int main(int argc, char* argv[]) {
   printf("%s\n", cdc_ft::kFuseUpToDate);
   fflush(stdout);
 
+  // Create mount dir if it doesn't exist yet.
+  absl::Status status = cdc_ft::CreateMountDir(mount_args);
+  if (!status.ok()) {
+    LOG_ERROR("Failed to create mount directory: %s", status.ToString());
+    return 1;
+  }
+
   // Create fs. The rest of the flags are mount flags, so pass them along.
-  absl::Status status = cdc_ft::cdc_fuse_fs::Initialize(
-      static_cast<int>(mount_args.size()), mount_args.data());
+  status = cdc_ft::cdc_fuse_fs::Initialize(static_cast<int>(mount_args.size()),
+                                           mount_args.data());
   if (!status.ok()) {
     LOG_ERROR("Failed to initialize file system: %s", status.ToString());
     return static_cast<int>(status.code());
@@ -191,10 +224,9 @@ int main(int argc, char* argv[]) {
                                      prefetch_size, dp_cleanup_timeout,
                                      dp_access_idle_timeout);
 
-  if (!cdc_ft::cdc_fuse_fs::StartConfigClient(instance, grpc_channel).ok()) {
-    LOG_ERROR("Could not start reading configuration updates'");
-    return 1;
-  }
+  cdc_ft::cdc_fuse_fs::SetConfigClient(
+      std::make_unique<cdc_ft::ConfigStreamGrpcClient>(
+          std::move(instance), std::move(grpc_channel)));
 
   // Run FUSE.
   LOG_INFO("Running filesystem");

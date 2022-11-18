@@ -111,8 +111,14 @@ cc_library(
 
 cc_library(
     name = "manifest_updater",
-    srcs = ["manifest_updater.cc"],
-    hdrs = ["manifest_updater.h"],
+    srcs = [
+        "manifest_updater.cc",
+        "pending_assets_queue.cc",
+    ],
+    hdrs = [
+        "manifest_updater.h",
+        "pending_assets_queue.h",
+    ],
     deps = [
         ":file_chunk_map",
         ":manifest_builder",

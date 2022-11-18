@@ -90,7 +90,7 @@ class ManifestTestBase : public ::testing::Test {
   // Compares the contents of the manifest to the real files at |rel_paths|.
   // The paths are relative to |cfg_.src_dir|.
   void ExpectManifestEquals(std::initializer_list<std::string> rel_paths,
-                            const ContentIdProto& actual_manifest_id);
+                            const ContentIdProto& got_manifest_id);
 
   // Returns true if the file at Unix |path| contains file chunks in the
   // manifest referenced by |manifest_id|.

@@ -76,6 +76,10 @@ class ManifestBuilder {
   // asset is removed (recursively for directories) and a new asset with the
   // same name is created instead.
   //
+  // When |type| is UNKNOWN, an existing assets of any type is returned, no new
+  // asset is created when it does not exist, nor are any of the directories
+  // that lead up to that asset.
+  //
   // When |created| is given, then it will be set to true if that asset was
   // actually added, otherwise it will be set to false.
   absl::StatusOr<AssetBuilder> GetOrCreateAsset(const std::string& path,

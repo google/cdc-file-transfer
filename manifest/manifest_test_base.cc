@@ -82,12 +82,14 @@ ManifestTestBase::ManifestTestBase(std::string base_dir)
 
 std::vector<ManifestTestBase::AssetInfoForTest>
 ManifestTestBase::GetAllManifestAssets(ContentIdProto actual_manifest_id) {
-  ContentIdProto manifest_id;
-  EXPECT_OK(data_store_.GetProto(manifest_store_id_, &manifest_id));
-  EXPECT_EQ(manifest_id, actual_manifest_id);
+  ContentIdProto expected_manifest_id;
+  EXPECT_OK(data_store_.GetProto(manifest_store_id_, &expected_manifest_id));
+  EXPECT_EQ(ContentId::ToHexString(expected_manifest_id),
+            ContentId::ToHexString(actual_manifest_id))
+      << DumpDataStoreProtos();
 
   ManifestIterator manifest_iter(&data_store_);
-  EXPECT_OK(manifest_iter.Open(manifest_id));
+  EXPECT_OK(manifest_iter.Open(expected_manifest_id));
 
   std::vector<AssetInfoForTest> assets;
   const AssetProto* entry;
@@ -168,10 +170,10 @@ void ManifestTestBase::ExpectAssetInfosEqual(std::vector<AssetInfoForTest> a,
 void ManifestTestBase::ExpectManifestEquals(
     std::initializer_list<std::string> rel_paths,
     const ContentIdProto& actual_manifest_id) {
-  std::vector<AssetInfoForTest> manifest_ais =
+  std::vector<AssetInfoForTest> actual_ais =
       GetAllManifestAssets(actual_manifest_id);
   std::vector<AssetInfoForTest> expected_ais = MakeAssetInfos(rel_paths);
-  ExpectAssetInfosEqual(manifest_ais, expected_ais);
+  ExpectAssetInfosEqual(actual_ais, expected_ais);
 }
 
 bool ManifestTestBase::InProgress(const ContentIdProto& manifest_id,

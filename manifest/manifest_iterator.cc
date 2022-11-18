@@ -79,7 +79,7 @@ absl::Status ManifestIterator::Open(const std::string& manifest_file) {
     std::string msg =
         absl::StrFormat("failed to open file '%s' for reading", manifest_file);
     if (errno) {
-      status_ = ErrnoToCanonicalStatus(errno, '%s', msg);
+      status_ = ErrnoToCanonicalStatus(errno, "%s", msg);
     } else {
       status_ = absl::UnknownError(msg);
     }
