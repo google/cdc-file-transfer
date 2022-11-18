@@ -326,6 +326,10 @@ std::string GetDrivePrefix(const std::string& path) {
 
 std::string GetCwd() { return std::filesystem::current_path().u8string(); }
 
+void SetCwd(const std::string& path) {
+  std::filesystem::current_path(std::filesystem::u8path(path));
+}
+
 std::string GetFullPath(const std::string& path) {
   if (path.empty()) {
     return std::string();

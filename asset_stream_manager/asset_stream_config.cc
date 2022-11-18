@@ -26,9 +26,6 @@
 #include "common/status_macros.h"
 #include "json/json.h"
 
-ABSL_DECLARE_FLAG(std::string, src_dir);
-ABSL_DECLARE_FLAG(std::string, instance_ip);
-ABSL_DECLARE_FLAG(uint16_t, instance_port);
 ABSL_DECLARE_FLAG(int, verbosity);
 ABSL_DECLARE_FLAG(bool, debug);
 ABSL_DECLARE_FLAG(bool, singlethreaded);
@@ -41,6 +38,14 @@ ABSL_DECLARE_FLAG(uint32_t, cleanup_timeout);
 ABSL_DECLARE_FLAG(uint32_t, access_idle_timeout);
 ABSL_DECLARE_FLAG(int, manifest_updater_threads);
 ABSL_DECLARE_FLAG(int, file_change_wait_duration_ms);
+
+// Development flags.
+ABSL_DECLARE_FLAG(std::string, dev_src_dir);
+ABSL_DECLARE_FLAG(std::string, dev_user_host);
+ABSL_DECLARE_FLAG(uint16_t, dev_ssh_port);
+ABSL_DECLARE_FLAG(std::string, dev_ssh_command);
+ABSL_DECLARE_FLAG(std::string, dev_scp_command);
+ABSL_DECLARE_FLAG(std::string, dev_mount_dir);
 
 // Declare AS20 flags, so that AS30 can be used on older SDKs simply by
 // replacing the binary. Note that the RETIRED_FLAGS macro can't be used
@@ -62,9 +67,6 @@ const auto RETIRED_FLAGS_REG_allow_edge =
 namespace cdc_ft {
 
 AssetStreamConfig::AssetStreamConfig() {
-  src_dir_ = absl::GetFlag(FLAGS_src_dir);
-  instance_ip_ = absl::GetFlag(FLAGS_instance_ip);
-  instance_port_ = absl::GetFlag(FLAGS_instance_port);
   session_cfg_.verbosity = absl::GetFlag(FLAGS_verbosity);
   session_cfg_.fuse_debug = absl::GetFlag(FLAGS_debug);
   session_cfg_.fuse_singlethreaded = absl::GetFlag(FLAGS_singlethreaded);
@@ -80,6 +82,13 @@ AssetStreamConfig::AssetStreamConfig() {
       absl::GetFlag(FLAGS_manifest_updater_threads);
   session_cfg_.file_change_wait_duration_ms =
       absl::GetFlag(FLAGS_file_change_wait_duration_ms);
+
+  dev_src_dir_ = absl::GetFlag(FLAGS_dev_src_dir);
+  dev_target_.user_host = absl::GetFlag(FLAGS_dev_user_host);
+  dev_target_.ssh_port = absl::GetFlag(FLAGS_dev_ssh_port);
+  dev_target_.ssh_command = absl::GetFlag(FLAGS_dev_ssh_command);
+  dev_target_.scp_command = absl::GetFlag(FLAGS_dev_scp_command);
+  dev_target_.mount_dir = absl::GetFlag(FLAGS_dev_mount_dir);
 }
 
 AssetStreamConfig::~AssetStreamConfig() = default;
@@ -105,7 +114,6 @@ absl::Status AssetStreamConfig::LoadFromFile(const std::string& path) {
     }                                      \
   } while (0)
 
-  ASSIGN_VAR(src_dir_, src_dir, String);
   ASSIGN_VAR(session_cfg_.verbosity, verbosity, Int);
   ASSIGN_VAR(session_cfg_.fuse_debug, debug, Bool);
   ASSIGN_VAR(session_cfg_.fuse_singlethreaded, singlethreaded, Bool);
@@ -144,7 +152,6 @@ absl::Status AssetStreamConfig::LoadFromFile(const std::string& path) {
 
 std::string AssetStreamConfig::ToString() {
   std::ostringstream ss;
-  ss << "src_dir                      = " << src_dir_ << std::endl;
   ss << "verbosity                    = " << session_cfg_.verbosity
      << std::endl;
   ss << "debug                        = " << session_cfg_.fuse_debug
@@ -166,6 +173,14 @@ std::string AssetStreamConfig::ToString() {
      << session_cfg_.manifest_updater_threads << std::endl;
   ss << "file_change_wait_duration_ms = "
      << session_cfg_.file_change_wait_duration_ms << std::endl;
+  ss << "dev_src_dir                  = " << dev_src_dir_ << std::endl;
+  ss << "dev_user_host                = " << dev_target_.user_host << std::endl;
+  ss << "dev_ssh_port                 = " << dev_target_.ssh_port << std::endl;
+  ss << "dev_ssh_command              = " << dev_target_.ssh_command
+     << std::endl;
+  ss << "dev_scp_command              = " << dev_target_.scp_command
+     << std::endl;
+  ss << "dev_mount_dir                = " << dev_target_.mount_dir << std::endl;
   return ss.str();
 }
 

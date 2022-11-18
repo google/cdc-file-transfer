@@ -28,6 +28,7 @@ cc_binary(
         "//asset_stream_manager:multi_session",
         "//cdc_fuse_fs:asset",
         "//cdc_fuse_fs:cdc_fuse_fs_lib_mocked",
+        "//cdc_fuse_fs:mock_config_stream_client",
         "//common:test_main",
         "//common:testing_clock",
         "//data_store:data_provider",

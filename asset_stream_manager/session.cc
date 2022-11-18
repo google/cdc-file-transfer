@@ -26,7 +26,7 @@ namespace cdc_ft {
 namespace {
 
 // Timeout for initial gamelet connection.
-constexpr double kInstanceConnectionTimeoutSec = 10.0f;
+constexpr double kInstanceConnectionTimeoutSec = 60.0f;
 
 metrics::DeveloperLogEvent GetEventWithHeartBeatData(size_t bytes,
                                                      size_t chunks) {
@@ -40,18 +40,24 @@ metrics::DeveloperLogEvent GetEventWithHeartBeatData(size_t bytes,
 
 }  // namespace
 
-Session::Session(std::string instance_id, std::string instance_ip,
-                 uint16_t instance_port, SessionConfig cfg,
-                 ProcessFactory* process_factory,
+Session::Session(std::string instance_id, const SessionTarget& target,
+                 SessionConfig cfg, ProcessFactory* process_factory,
                  std::unique_ptr<SessionMetricsRecorder> metrics_recorder)
     : instance_id_(std::move(instance_id)),
+      mount_dir_(target.mount_dir),
       cfg_(std::move(cfg)),
       process_factory_(process_factory),
       remote_util_(cfg_.verbosity, cfg_.quiet, process_factory,
                    /*forward_output_to_logging=*/true),
       metrics_recorder_(std::move(metrics_recorder)) {
   assert(metrics_recorder_);
-  remote_util_.SetUserHostAndPort(instance_ip, instance_port);
+  remote_util_.SetUserHostAndPort(target.user_host, target.ssh_port);
+  if (!target.ssh_command.empty()) {
+    remote_util_.SetSshCommand(target.ssh_command);
+  }
+  if (!target.scp_command.empty()) {
+    remote_util_.SetScpCommand(target.scp_command);
+  }
 }
 
 Session::~Session() {
@@ -80,9 +86,10 @@ absl::Status Session::Start(int local_port, int first_remote_port,
   fuse_ = std::make_unique<CdcFuseManager>(instance_id_, process_factory_,
                                            &remote_util_);
   RETURN_IF_ERROR(
-      fuse_->Start(local_port, remote_port, cfg_.verbosity, cfg_.fuse_debug,
-                   cfg_.fuse_singlethreaded, cfg_.stats, cfg_.fuse_check,
-                   cfg_.fuse_cache_capacity, cfg_.fuse_cleanup_timeout_sec,
+      fuse_->Start(mount_dir_, local_port, remote_port, cfg_.verbosity,
+                   cfg_.fuse_debug, cfg_.fuse_singlethreaded, cfg_.stats,
+                   cfg_.fuse_check, cfg_.fuse_cache_capacity,
+                   cfg_.fuse_cleanup_timeout_sec,
                    cfg_.fuse_access_idle_timeout_sec),
       "Failed to start instance component");
   return absl::OkStatus();

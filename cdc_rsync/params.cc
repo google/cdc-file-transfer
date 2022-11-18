@@ -73,10 +73,10 @@ Options:
 -R, --relative            Use relative path names
     --existing            Skip creating new files on instance
     --copy-dest dir       Use files from dir as sync base if files are missing
-    --ssh-command         Path and arguments of SSH command to use, e.g.
+    --ssh-command         Path and arguments of ssh command to use, e.g.
                           C:\path\to\ssh.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
                           Can also be specified by the CDC_SSH_COMMAND environment variable.
-    --scp-command         Path and arguments of SSH command to use, e.g.
+    --scp-command         Path and arguments of scp command to use, e.g.
                           C:\path\to\scp.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
                           Can also be specified by the CDC_SCP_COMMAND environment variable.
 -h  --help                Help for cdc_rsync

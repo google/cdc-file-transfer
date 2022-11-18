@@ -20,6 +20,7 @@
 #include "asset_stream_manager/local_assets_stream_manager_service_impl.h"
 #include "asset_stream_manager/session_management_server.h"
 #include "asset_stream_manager/session_manager.h"
+#include "common/grpc_status.h"
 #include "common/log.h"
 #include "common/path.h"
 #include "common/process.h"
@@ -49,15 +50,19 @@ absl::Status Run(const AssetStreamConfig& cfg) {
   background_service.SetExitCallback(
       [&sm_server]() { return sm_server.Shutdown(); });
 
-  RETURN_IF_ERROR(sm_server.Start(kSessionManagementPort));
-  if (!cfg.src_dir().empty()) {
-    MultiSession* ms_unused;
-    metrics::SessionStartStatus status_unused;
-    RETURN_IF_ERROR(session_manager.StartSession(
-        /*instance_id=*/cfg.instance_ip(), /*project_id=*/std::string(),
-        /*organization_id=*/std::string(), cfg.instance_ip(),
-        cfg.instance_port(), cfg.src_dir(), &ms_unused, &status_unused));
+  if (!cfg.dev_src_dir().empty()) {
+    localassetsstreammanager::StartSessionRequest request;
+    request.set_workstation_directory(cfg.dev_src_dir());
+    request.set_user_host(cfg.dev_target().user_host);
+    request.set_mount_dir(cfg.dev_target().mount_dir);
+    request.set_port(cfg.dev_target().ssh_port);
+    request.set_ssh_command(cfg.dev_target().ssh_command);
+    request.set_scp_command(cfg.dev_target().scp_command);
+    localassetsstreammanager::StartSessionResponse response;
+    RETURN_ABSL_IF_ERROR(
+        session_service.StartSession(nullptr, &request, &response));
   }
+  RETURN_IF_ERROR(sm_server.Start(kSessionManagementPort));
   sm_server.RunUntilShutdown();
   return absl::OkStatus();
 }
@@ -96,18 +101,6 @@ const auto RETIRED_FLAGS_REG_allow_edge =
 }  // namespace
 }  // namespace cdc_ft
 
-ABSL_FLAG(std::string, src_dir, "",
-          "Start a streaming session immediately from the given Windows path. "
-          "Used during development. Must have exactly one gamelet reserved or "
-          "specify the target gamelet with --instance.");
-ABSL_FLAG(std::string, instance_ip, "",
-          "Connect to the instance with the given IP address for this session. "
-          "This flag is ignored unless --src_dir is set as well. Used "
-          "during development. ");
-ABSL_FLAG(uint16_t, instance_port, 0,
-          "Connect to the instance through the given SSH port. "
-          "This flag is ignored unless --src_dir is set as well. Used "
-          "during development. ");
 ABSL_FLAG(int, verbosity, 2, "Verbosity of the log output");
 ABSL_FLAG(bool, debug, false, "Run FUSE filesystem in debug mode");
 ABSL_FLAG(bool, singlethreaded, false,
@@ -131,6 +124,28 @@ ABSL_FLAG(uint32_t, cleanup_timeout, cdc_ft::DataProvider::kCleanupTimeoutSec,
 ABSL_FLAG(uint32_t, access_idle_timeout, cdc_ft::DataProvider::kAccessIdleSec,
           "Do not run instance cache cleanups for this many seconds after the "
           "last file access");
+
+// Development args.
+ABSL_FLAG(std::string, dev_src_dir, "",
+          "Start a streaming session immediately from the given Windows path. "
+          "Used during development. Must also specify --dev_user_host and "
+          "--dev_mount_dir and possibly other --dev flags, depending on the "
+          "SSH setup");
+ABSL_FLAG(std::string, dev_user_host, "",
+          "Username and host to stream to, of the form [user@]host. Used "
+          "during development. See --dev_src_dir for more info.");
+ABSL_FLAG(uint16_t, dev_ssh_port, cdc_ft::RemoteUtil::kDefaultSshPort,
+          "SSH port to use for the connection to the host. Used during "
+          "development. See --dev_src_dir for more info.");
+ABSL_FLAG(std::string, dev_ssh_command, "",
+          "Ssh command and extra flags to use for the connection to the host. "
+          "Used during development. See --dev_src_dir for more info.");
+ABSL_FLAG(std::string, dev_scp_command, "",
+          "Scp command and extra flags to use for the connection to the host. "
+          "Used during development. See --dev_src_dir for more info.");
+ABSL_FLAG(std::string, dev_mount_dir, "",
+          "Directory on the host to stream to. Used during development. See "
+          "--dev_src_dir for more info.");
 
 int main(int argc, char* argv[]) {
   absl::ParseCommandLine(argc, argv);

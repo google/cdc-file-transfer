@@ -50,7 +50,6 @@
     <BazelTargets>//cdc_rsync_server:cdc_rsync_server</BazelTargets>
     <BazelOutputFile>cdc_rsync_server</BazelOutputFile>
     <BazelIncludePaths>..\;..\third_party\absl;..\third_party\blake3\c;..\bazel-stadia-file-transfer\external\com_github_zstd\lib;..\third_party\googletest\googletest\include;..\third_party\protobuf\src</BazelIncludePaths>
-    <BazelSourcePathPrefix>..\/</BazelSourcePathPrefix>
   </PropertyGroup>
   <Import Project="..\NMakeBazelProject.targets" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

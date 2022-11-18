@@ -130,6 +130,9 @@ std::string GetDrivePrefix(const std::string& path);
 // Gets the current working directory.
 std::string GetCwd();
 
+// Sets the current working directory.
+void SetCwd(const std::string& path);
+
 // Expands a relative path to an absolute path (relative to the current working
 // directory). Also canonicalizes the path, removing any . and .. elements.
 // Note that if the path does not exist or contains invalid characters, it may

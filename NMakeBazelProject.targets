@@ -6,8 +6,6 @@
        Usage: Define 4 properties in your project file:
                 BazelTargets:          Labels of Bazel targets to build, e.g. //common:status.
                 BazelOutputFile:       Output filename, e.g. cdc_rsync.exe
-                BazelSourcePathPrefix: Prefix for source paths, to translate paths relative to (/foo) to project-relative paths (../foo).
-                                       Must be escaped for sed (e.g. / -> \/), e.g. ..\/..\/..\/
               Optionally, define:
                 BazelIncludePaths:     Include paths, used for Intellisense.
               Import NMakeCMakeProject.targets. -->
@@ -16,7 +14,6 @@
   <Target Name="CheckProperties" BeforeTargets="PrepareForNMakeBuild">
     <Error Condition="'$(BazelTargets)' == ''" Text="Please define property BazelTargets" />
     <Error Condition="'$(BazelOutputFile)' == ''" Text="Please define property BazelOutputFile" />
-    <Error Condition="'$(BazelSourcePathPrefix)' == ''" Text="Please define property BazelSourcePathPrefix" />
   </Target>
 
   <!-- Define Bazel properties. -->
@@ -27,15 +24,10 @@
     <BazelPlatformDir Condition="'$(Platform)'=='GGP'">k8</BazelPlatformDir>
     <BazelCompilationMode Condition="'$(Configuration)'=='Debug'">dbg</BazelCompilationMode>
     <BazelCompilationMode Condition="'$(Configuration)'=='Release'">opt</BazelCompilationMode>
-    <!-- The sed command converts repo-relative paths (/path/to/foo) to project-relative paths (../path/to/foo), so that errors etc. can be clicked in VS.
-         Matches foo:31:8: bar, foo(31): bar, foo(31,32): bar -->
-    <BazelSedCommand>| sed -r &quot;s/^([^:\(]+[:\(][[:digit:]]+(,[[:digit:]]+)?[:\)])/$(BazelSourcePathPrefix)\\1/&quot;</BazelSedCommand>
-    <!-- Clang prints errors to stderr, so pipe it into stdout. -->
-    <BazelSedCommand Condition="'$(Platform)'=='GGP'">2&gt;&amp;1 $(BazelSedCommand)</BazelSedCommand>
     <BazelArgs>--config=$(BazelPlatform)</BazelArgs>
     <BazelArgs Condition="'$(Configuration)|$(Platform)'=='Release|GGP'">$(BazelArgs) --linkopt=-Wl,--strip-all</BazelArgs>
     <!-- Prevent protobuf recompilation (protobuf is written to "host" by default for both x84 and ggp, causing recompiles). -->
-    <BazelArgs Condition="'$(Platform)'=='x64'">$(BazelArgs) --distinct_host_configuration=false</BazelArgs>
+    <!-- <BazelArgs Condition="'$(Platform)'=='x64'">$(BazelArgs) - -distinct_host_configuration=false</BazelArgs> -->
     <!-- Windows uses /LTCG (link-time code generation), but no /GL (global optimization), which is a requirement for that. -->
     <BazelArgs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(BazelArgs) --copt=/GL</BazelArgs>
     <!-- Strip unused symbols on GGP. -->
@@ -51,9 +43,9 @@
   <!-- Define NMake properties. -->
   <PropertyGroup>
     <NMakeIncludeSearchPath>$(SolutionDir)..\..\bazel-out\$(BazelPlatformDir)-$(BazelCompilationMode)\bin;$(BazelIncludePaths)</NMakeIncludeSearchPath>
-    <NMakeBuildCommandLine>$(RmBazelOutDir) bazel build --compilation_mode=$(BazelCompilationMode) $(BazelArgs) $(BazelTargets) $(BazelSedCommand) $(MakeRW)</NMakeBuildCommandLine>
+    <NMakeBuildCommandLine>$(RmBazelOutDir) bazel build --compilation_mode=$(BazelCompilationMode) $(BazelArgs) $(BazelTargets) $(MakeRW)</NMakeBuildCommandLine>
     <NMakeCleanCommandLine>$(RmBazelOutDir) bazel clean</NMakeCleanCommandLine>
-    <NMakeReBuildCommandLine>$(RmBazelOutDir) bazel clean &amp;&amp; bazel build --compilation_mode=$(BazelCompilationMode) $(BazelArgs) $(BazelTargets) $(BazelSedCommand) $(MakeRW)</NMakeReBuildCommandLine>
+    <NMakeReBuildCommandLine>$(RmBazelOutDir) bazel clean &amp;&amp; bazel build --compilation_mode=$(BazelCompilationMode) $(BazelArgs) $(BazelTargets) $(MakeRW)</NMakeReBuildCommandLine>
     <NMakeOutput>$(OutDir)$(BazelOutputFile)</NMakeOutput>
   </PropertyGroup>
 </Project>

@@ -29,13 +29,10 @@ namespace {
 constexpr char kFuseFilename[] = "cdc_fuse_fs";
 constexpr char kLibFuseFilename[] = "libfuse.so";
 constexpr char kFuseStdoutPrefix[] = "cdc_fuse_fs_stdout";
-constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc_file_transfer/";
-
-// Mount point for FUSE on the gamelet.
-constexpr char kMountDir[] = "/mnt/workstation";
+constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/bin/";
 
 // Cache directory on the gamelet to store data chunks.
-constexpr char kCacheDir[] = "/var/cache/asset_streaming";
+constexpr char kCacheDir[] = "~/.cache/cdc-file-transfer/chunks";
 
 }  // namespace
 
@@ -56,23 +53,14 @@ absl::Status CdcFuseManager::Deploy() {
   std::string exe_dir;
   RETURN_IF_ERROR(path::GetExeDir(&exe_dir), "Failed to get exe directory");
 
-  std::string local_exe_path = path::Join(exe_dir, kFuseFilename);
-  std::string local_lib_path = path::Join(exe_dir, kLibFuseFilename);
+  // Set the cwd to the exe dir and pass the filenames to scp. Otherwise, some
+  // scp implementations can get confused and create the wrong remote filenames.
+  path::SetCwd(exe_dir);
 
-#ifdef _DEBUG
-  // Sync FUSE to the gamelet in debug. Debug builds are rather large, so
-  // there's a gain from using sync.
-  LOG_DEBUG("Syncing FUSE");
-  RETURN_IF_ERROR(
-      remote_util_->Sync({local_exe_path, local_lib_path}, kRemoteToolsBinDir),
-      "Failed to sync FUSE to gamelet");
-  LOG_DEBUG("Syncing FUSE succeeded");
-#else
-  // Copy FUSE to the gamelet. This is usually faster in production since it
-  // doesn't have to deploy ggp__server first.
+  // Copy FUSE to the gamelet.
   LOG_DEBUG("Copying FUSE");
-  RETURN_IF_ERROR(remote_util_->Scp({local_exe_path, local_lib_path},
-                                    kRemoteToolsBinDir, true),
+  RETURN_IF_ERROR(remote_util_->Scp({kFuseFilename, kLibFuseFilename},
+                                    kRemoteToolsBinDir, /*compress=*/false),
                   "Failed to copy FUSE to gamelet");
   LOG_DEBUG("Copying FUSE succeeded");
 
@@ -82,12 +70,12 @@ absl::Status CdcFuseManager::Deploy() {
   RETURN_IF_ERROR(remote_util_->Chmod("a+x", remotePath),
                   "Failed to set executable flag on FUSE");
   LOG_DEBUG("Making FUSE succeeded");
-#endif
 
   return absl::OkStatus();
 }
 
-absl::Status CdcFuseManager::Start(uint16_t local_port, uint16_t remote_port,
+absl::Status CdcFuseManager::Start(const std::string& mount_dir,
+                                   uint16_t local_port, uint16_t remote_port,
                                    int verbosity, bool debug,
                                    bool singlethreaded, bool enable_stats,
                                    bool check, uint64_t cache_capacity,
@@ -115,15 +103,18 @@ absl::Status CdcFuseManager::Start(uint16_t local_port, uint16_t remote_port,
   // Build the remote command.
   std::string remotePath = path::JoinUnix(kRemoteToolsBinDir, kFuseFilename);
   std::string remote_command = absl::StrFormat(
-      "LD_LIBRARY_PATH=%s %s --instance='%s' "
-      "--components='%s' --port=%i --cache_dir=%s "
+      "mkdir -p %s; LD_LIBRARY_PATH=%s %s "
+      "--instance=%s "
+      "--components=%s --port=%i --cache_dir=%s "
       "--verbosity=%i --cleanup_timeout=%i --access_idle_timeout=%i --stats=%i "
       "--check=%i --cache_capacity=%u -- -o allow_root -o ro -o nonempty -o "
       "auto_unmount %s%s%s",
-      kRemoteToolsBinDir, remotePath, instance_, component_args, remote_port,
-      kCacheDir, verbosity, cleanup_timeout_sec, access_idle_timeout_sec,
-      enable_stats, check, cache_capacity, kMountDir, debug ? " -d" : "",
-      singlethreaded ? " -s" : "");
+      kRemoteToolsBinDir, kRemoteToolsBinDir, remotePath,
+      RemoteUtil::QuoteForSsh(instance_),
+      RemoteUtil::QuoteForSsh(component_args), remote_port, kCacheDir,
+      verbosity, cleanup_timeout_sec, access_idle_timeout_sec, enable_stats,
+      check, cache_capacity, RemoteUtil::QuoteForSsh(mount_dir),
+      debug ? " -d" : "", singlethreaded ? " -s" : "");
 
   bool needs_deploy = false;
   RETURN_IF_ERROR(

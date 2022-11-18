@@ -478,7 +478,7 @@ absl::Status MultiSession::Shutdown() {
   while (!sessions_.empty()) {
     std::string instance_id = sessions_.begin()->first;
     RETURN_IF_ERROR(StopSession(instance_id),
-                    "Failed to stop session for instance id %s", instance_id);
+                    "Failed to stop session for instance id '%s'", instance_id);
     sessions_.erase(instance_id);
   }
 
@@ -499,10 +499,9 @@ absl::Status MultiSession::Status() {
 }
 
 absl::Status MultiSession::StartSession(const std::string& instance_id,
+                                        const SessionTarget& target,
                                         const std::string& project_id,
-                                        const std::string& organization_id,
-                                        const std::string& instance_ip,
-                                        uint16_t instance_port) {
+                                        const std::string& organization_id) {
   absl::MutexLock lock(&sessions_mutex_);
 
   if (sessions_.find(instance_id) != sessions_.end()) {
@@ -523,9 +522,8 @@ absl::Status MultiSession::StartSession(const std::string& instance_id,
       metrics_recorder_->GetMetricsService(),
       metrics_recorder_->MultiSessionId(), project_id, organization_id);
 
-  auto session =
-      std::make_unique<Session>(instance_id, instance_ip, instance_port, cfg_,
-                                process_factory_, std::move(metrics_recorder));
+  auto session = std::make_unique<Session>(
+      instance_id, target, cfg_, process_factory_, std::move(metrics_recorder));
   RETURN_IF_ERROR(session->Start(local_asset_stream_port_,
                                  kAssetStreamPortFirst, kAssetStreamPortLast));
 
@@ -552,7 +550,7 @@ absl::Status MultiSession::StopSession(const std::string& instance_id) {
   return absl::OkStatus();
 }
 
-bool MultiSession::HasSessionForInstance(const std::string& instance_id) {
+bool MultiSession::HasSession(const std::string& instance_id) {
   absl::ReaderMutexLock lock(&sessions_mutex_);
   return sessions_.find(instance_id) != sessions_.end();
 }
@@ -663,19 +661,19 @@ void MultiSession::OnContentSent(size_t byte_count, size_t chunck_count,
                                  std::string instance_id) {
   if (instance_id.empty()) {
     // |instance_id| is empty only in case when manifest wasn't acknowledged by
-    // the gamelet yet (ConfigStreamServiceImpl::AckManifestIdReceived was not
+    // the instance yet (ConfigStreamServiceImpl::AckManifestIdReceived was not
     // invoked). This means MultiSession::StartSession is still waiting for
     // manifest acknowledge and |sessions_mutex_| is currently locked. In this
     // case invoking MultiSession::FindSession and waiting for |sessions_mutex_|
     // to get unlocked will block the current thread, which is also responsible
     // for receiving a call at ConfigStreamServiceImpl::AckManifestIdReceived.
     // This causes a deadlock and leads to a DeadlineExceeded error.
-    LOG_WARNING("Can not record session content for an empty instance_id.");
+    LOG_WARNING("Cannot record session content for an empty instance_id.");
     return;
   }
   Session* session = FindSession(instance_id);
   if (session == nullptr) {
-    LOG_WARNING("Failed to find active session by instrance id: %s",
+    LOG_WARNING("Failed to find active session by instance id '%s'",
                 instance_id);
     return;
   }

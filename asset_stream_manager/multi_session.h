@@ -36,6 +36,7 @@ namespace cdc_ft {
 
 class ProcessFactory;
 class Session;
+struct SessionTarget;
 using ManifestUpdatedCb = std::function<void()>;
 
 // Updates the manifest and runs a file watcher in a background thread.
@@ -65,7 +66,7 @@ class MultiSessionRunner {
   // Stops updating the manifest and |server_|.
   absl::Status Shutdown() ABSL_LOCKS_EXCLUDED(mutex_);
 
-  // Waits until a manifest is ready and the gamelet |instance_id| has
+  // Waits until a manifest is ready and the session for |instance_id| has
   // acknowledged the reception of the currently set manifest id. |fuse_timeout|
   // is the timeout for waiting for the FUSE manifest ack. The time required to
   // generate the manifest is not part of this timeout as this could take a
@@ -172,30 +173,29 @@ class MultiSession {
   // Not thread-safe.
   absl::Status Status();
 
-  // Starts a new streaming session to the instance with given |instance_id| and
+  // Starts a new streaming session to the instance described by |target| and
   // waits until the FUSE has received the initial manifest id.
   // Returns an error if a session for that instance already exists.
-  // |instance_id| is the instance id of the target remote instance.
-  // |project_id| is id of the project that contains the instance.
-  // |organization_id| is id of the organization that contains the instance.
-  // |instance_ip| is the IP address of the instance.
-  // |instance_port| is the SSH port for connecting to the remote instance.
+  // |instance_id| is a unique id for the remote instance and mount directory,
+  // e.g. user@host:mount_dir.
+  // |target| identifies the remote target and how to connect to it.
+  // |project_id| is the project that owns the instance. Stadia only.
+  // |organization_id| is organization that contains the instance. Stadia only.
   // Thread-safe.
   absl::Status StartSession(const std::string& instance_id,
+                            const SessionTarget& target,
                             const std::string& project_id,
-                            const std::string& organization_id,
-                            const std::string& instance_ip,
-                            uint16_t instance_port)
+                            const std::string& organization_id)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
-  // Starts a new streaming session to the gamelet with given |instance_id|.
+  // Stops the session for the given |instance_id|.
   // Returns a NotFound error if a session for that instance does not exists.
   // Thread-safe.
   absl::Status StopSession(const std::string& instance_id)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
   // Returns true if there is an existing session for |instance_id|.
-  bool HasSessionForInstance(const std::string& instance_id)
+  bool HasSession(const std::string& instance_id)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
   // Returns true if the FUSE process is up and running for an existing session
@@ -226,7 +226,7 @@ class MultiSession {
   void RecordMultiSessionEvent(metrics::DeveloperLogEvent event,
                                metrics::EventType code);
 
-  // Record an event for a session associated with the |instance|.
+  // Record an event for a session associated with the |instance_id|.
   void RecordSessionEvent(metrics::DeveloperLogEvent event,
                           metrics::EventType code,
                           const std::string& instance_id);
