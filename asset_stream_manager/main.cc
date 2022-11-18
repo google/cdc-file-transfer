@@ -67,14 +67,14 @@ absl::Status Run(const AssetStreamConfig& cfg) {
   return absl::OkStatus();
 }
 
-void InitLogging(bool log_to_stdout, int verbosity) {
+void InitLogging(const char* log_dir, bool log_to_stdout, int verbosity) {
   LogLevel level = cdc_ft::Log::VerbosityToLogLevel(verbosity);
   if (log_to_stdout) {
     cdc_ft::Log::Initialize(std::make_unique<cdc_ft::ConsoleLog>(level));
   } else {
     SdkUtil util;
     cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
-        level, util.GetLogPath("assets_stream_manager_v3").c_str()));
+        level, util.GetLogPath(log_dir, "assets_stream_manager").c_str()));
   }
 }
 
@@ -113,12 +113,12 @@ ABSL_FLAG(int, manifest_updater_threads, 4,
           "Number of threads used to compute file hashes on the workstation.");
 ABSL_FLAG(int, file_change_wait_duration_ms, 500,
           "Time in milliseconds to wait until pushing a file change to the "
-          "instance after detecting it.");
+          "instance after detecting it");
 ABSL_FLAG(bool, check, false, "Check FUSE consistency and log check results");
 ABSL_FLAG(bool, log_to_stdout, false, "Log to stdout instead of to a file");
 ABSL_FLAG(cdc_ft::JedecSize, cache_capacity,
           cdc_ft::JedecSize(cdc_ft::DiskDataStore::kDefaultCapacity),
-          "Cache capacity. Supports common unit suffixes K, M, G.");
+          "Cache capacity. Supports common unit suffixes K, M, G");
 ABSL_FLAG(uint32_t, cleanup_timeout, cdc_ft::DataProvider::kCleanupTimeoutSec,
           "Period in seconds at which instance cache cleanups are run");
 ABSL_FLAG(uint32_t, access_idle_timeout, cdc_ft::DataProvider::kAccessIdleSec,
@@ -127,7 +127,9 @@ ABSL_FLAG(uint32_t, access_idle_timeout, cdc_ft::DataProvider::kAccessIdleSec,
 ABSL_FLAG(std::string, config_dir, "",
           "Directory on the host to stream from with the json configuration "
           "for asset stream manager stored in the file "
-          "`assets_stream_manager.json`.");
+          "`assets_stream_manager.json`");
+ABSL_FLAG(std::string, log_dir, "",
+          "Directory on the host to stream from to store log files");
 
 // Development args.
 ABSL_FLAG(std::string, dev_src_dir, "",
@@ -161,7 +163,8 @@ int main(int argc, char* argv[]) {
   cdc_ft::AssetStreamConfig cfg;
   absl::Status cfg_load_status = cfg.LoadFromFile(config_path);
 
-  cdc_ft::InitLogging(cfg.log_to_stdout(), cfg.session_cfg().verbosity);
+  cdc_ft::InitLogging(absl::GetFlag(FLAGS_log_dir).c_str(), cfg.log_to_stdout(),
+                      cfg.session_cfg().verbosity);
 
   // Log status of loaded configuration. Errors are not critical.
   if (cfg_load_status.ok()) {

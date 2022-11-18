@@ -44,10 +44,11 @@ std::string SdkUtil::GetServicesConfigPath() const {
   return path::Join(GetUserConfigPath(), "services");
 }
 
-std::string SdkUtil::GetLogPath(const char* log_base_name) const {
+std::string SdkUtil::GetLogPath(const char* log_dir,
+                                const char* log_base_name) const {
   DefaultSystemClock clock;
   std::string timestamp_ext = clock.FormatNow(".%Y%m%d-%H%M%S.log", false);
-  return path::Join(GetUserConfigPath(), "logs", log_base_name + timestamp_ext);
+  return path::Join(log_dir, log_base_name + timestamp_ext);
 }
 
 std::string SdkUtil::GetDevBinPath() const {

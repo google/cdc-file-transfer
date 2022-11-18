@@ -47,9 +47,9 @@ class SdkUtil {
   // %APPDATA%\GGP\services.
   std::string GetServicesConfigPath() const;
 
-  // Returns the path of a log file with given |log_base_name|, e.g.
-  // %APPDATA%\GGP\logs\log_base_name.20210729-125930.log.
-  std::string GetLogPath(const char* log_base_name) const;
+  // Returns the path of a log file with given |log_base_name| in the folder
+  // |log_dir|, e.g. C:\Temp\log_base_name.20210729-125930.log.
+  std::string GetLogPath(const char* log_dir, const char* log_base_name) const;
 
   // Returns the path of the dev tools that ship with the SDK, e.g.
   // C:\Program Files\GGP SDK\dev\bin.
