@@ -12,7 +12,6 @@ cc_binary(
         "//cdc_stream",
         "//common:log",
         "//common:path",
-        "//common:sdk_util",
         "//data_store:data_provider",
     ],
 )

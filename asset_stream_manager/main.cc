@@ -24,7 +24,6 @@
 #include "common/log.h"
 #include "common/path.h"
 #include "common/process.h"
-#include "common/sdk_util.h"
 #include "common/status_macros.h"
 #include "data_store/data_provider.h"
 #include "data_store/disk_data_store.h"
@@ -67,14 +66,19 @@ absl::Status Run(const AssetStreamConfig& cfg) {
   return absl::OkStatus();
 }
 
+std::string GetLogPath(const char* log_dir, const char* log_base_name) {
+  DefaultSystemClock clock;
+  std::string timestamp_ext = clock.FormatNow(".%Y%m%d-%H%M%S.log", false);
+  return path::Join(log_dir, log_base_name + timestamp_ext);
+}
+
 void InitLogging(const char* log_dir, bool log_to_stdout, int verbosity) {
   LogLevel level = cdc_ft::Log::VerbosityToLogLevel(verbosity);
   if (log_to_stdout) {
     cdc_ft::Log::Initialize(std::make_unique<cdc_ft::ConsoleLog>(level));
   } else {
-    SdkUtil util;
     cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
-        level, util.GetLogPath(log_dir, "assets_stream_manager").c_str()));
+        level, GetLogPath(log_dir, "assets_stream_manager").c_str()));
   }
 }
 
