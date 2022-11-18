@@ -17,6 +17,8 @@
 #ifndef FASTCDC_FASTCDC_H_
 #define FASTCDC_FASTCDC_H_
 
+#include <string.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cstdio>

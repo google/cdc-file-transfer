@@ -79,9 +79,9 @@ TEST_F(SemaphoreTest, DoesNotBlockIfInitialCountIsOne) {
 
 TEST_F(SemaphoreTest, SignalManyThreads) {
   Semaphore semaphore(0);
-  std::atomic_int a(0);
-  std::atomic_int b(0);
-  std::atomic_int c(0);
+  std::atomic_int a{0};
+  std::atomic_int b{0};
+  std::atomic_int c{0};
 
   const int N = 16;
   std::vector<std::thread> threads;

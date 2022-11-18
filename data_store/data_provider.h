@@ -105,6 +105,9 @@ class DataProvider : public DataStoreReader {
   // Periodically cleans up data in |writer_|.
   void CleanupThreadMain() ABSL_LOCKS_EXCLUDED(shutdown_mutex_, cleaned_mutex_);
 
+  // Returns the current time of |steady_clock_| in seconds.
+  int64_t GetSteadyNowSec();
+
   static constexpr unsigned int kNumberOfMutexes = 256;
 
   // How much additional data to prefetch when a max. FUSE read is encountered.
@@ -124,15 +127,18 @@ class DataProvider : public DataStoreReader {
   // Indicates whether the shutdown was triggered.
   bool shutdown_ ABSL_GUARDED_BY(shutdown_mutex_) = false;
 
-  // The last access time.
-  std::atomic<std::chrono::time_point<std::chrono::steady_clock>>
-      last_access_ts_;
+  // The last access time in seconds since construction. Note that for some
+  // compilers we can't use std::chrono::time_point with atomics, so keep the
+  // time in seconds.
+  std::atomic<int64_t> last_access_sec_;
 
   // Identifies if new data was added to the cache since the last cleanup.
   std::atomic<bool> chunks_updated_;
 
   // Clock to track the last access time.
   SteadyClock* steady_clock_ = DefaultSteadyClock::GetInstance();
+  const std::chrono::time_point<std::chrono::steady_clock> first_now_ =
+      steady_clock_->Now();
 
   // Cleanup interval.
   uint32_t cleanup_timeout_sec_ = kCleanupTimeoutSec;

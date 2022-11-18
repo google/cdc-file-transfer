@@ -49,7 +49,7 @@ void SetThreadName(const std::string& name) {
   }
 }
 
-std::atomic_int g_pipe_serial_number(0);
+std::atomic_int g_pipe_serial_number{0};
 
 // Creates a pipe suitable for overlapped IO. Regular anonymous pipes in Windows
 // don't support overlapped IO. This method creates a named pipe with a unique

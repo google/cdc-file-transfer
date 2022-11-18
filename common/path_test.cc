@@ -753,6 +753,12 @@ std::vector<PathTest::File> PathTest::SearchFiles(const std::string& pattern,
   };
 
   EXPECT_OK(path::SearchFiles(pattern, recursive, handler));
+
+  // Linux and Windows yield a slightly different order, so sort first.
+  std::sort(files.begin(), files.end(), [](const File& a, const File& b) {
+    return a.filename_ < b.filename_;
+  });
+
   return files;
 }
 
@@ -771,9 +777,11 @@ TEST_F(PathTest, SearchFiles_NonRecursiveTrailingSeparator) {
 
   EXPECT_EQ(files[1].dir_, search_dir_);
   EXPECT_EQ(files[1].Path(), test_filepath_);
+  EXPECT_FALSE(files[1].is_directory_);
 
   EXPECT_EQ(files[2].dir_, search_dir_);
   EXPECT_EQ(files[2].Path(), unicode_test_filepath_);
+  EXPECT_FALSE(files[2].is_directory_);
 #endif
 }
 
@@ -793,9 +801,11 @@ TEST_F(PathTest, SearchFiles_NonRecursiveNoTrailingSeparator) {
 
   EXPECT_EQ(files[1].dir_, search_dir_);
   EXPECT_EQ(files[1].Path(), test_filepath_);
+  EXPECT_FALSE(files[1].is_directory_);
 
   EXPECT_EQ(files[2].dir_, search_dir_);
   EXPECT_EQ(files[2].Path(), unicode_test_filepath_);
+  EXPECT_FALSE(files[2].is_directory_);
 #endif
 }
 
@@ -814,9 +824,11 @@ TEST_F(PathTest, SearchFiles_RecursiveTrailingSeparator) {
 
   EXPECT_EQ(files[2].dir_, search_dir_);
   EXPECT_EQ(files[2].Path(), test_filepath_);
+  EXPECT_FALSE(files[2].is_directory_);
 
   EXPECT_EQ(files[3].dir_, search_dir_);
   EXPECT_EQ(files[3].Path(), unicode_test_filepath_);
+  EXPECT_FALSE(files[3].is_directory_);
 }
 
 #if PLATFORM_WINDOWS
