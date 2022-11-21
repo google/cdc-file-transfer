@@ -16,7 +16,7 @@
 
 namespace cdc_ft {
 
-Threadpool::Threadpool(size_t num_threads) : shutdown_(false) {
+Threadpool::Threadpool(size_t num_threads) : shutdown_{false} {
   workers_.reserve(num_threads);
   for (size_t n = 0; n < num_threads; ++n) {
     workers_.emplace_back([this]() { ThreadWorkerMain(); });

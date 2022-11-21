@@ -49,7 +49,7 @@ TEST_F(ThreadpoolTest, WaitShutdownWorkWithoutTasks) {
 }
 
 TEST_F(ThreadpoolTest, SingleThreadedRunsToCompletion) {
-  std::atomic_bool task_finished(false);
+  std::atomic_bool task_finished{false};
   auto task_func = [&task_finished](Task::IsCancelledPredicate) {
     task_finished = true;
   };
@@ -69,7 +69,7 @@ TEST_F(ThreadpoolTest, SingleThreadedRunsToCompletion) {
 TEST_F(ThreadpoolTest, MultiThreadedRunsToCompletion) {
   const int num_tasks = 19;
   const int num_threads = 7;
-  std::atomic_int num_completed(0);
+  std::atomic_int num_completed{0};
 
   Threadpool pool(num_threads);
   std::unordered_set<Task*> tasks;
@@ -95,7 +95,7 @@ TEST_F(ThreadpoolTest, MultiThreadedRunsToCompletion) {
 
 TEST_F(ThreadpoolTest, TaskIsCancelledOnShutdown) {
   Semaphore task_started(0);
-  std::atomic_bool task_finished(false);
+  std::atomic_bool task_finished{false};
   auto task_func = [&task_started,
                     &task_finished](Task::IsCancelledPredicate is_cancelled) {
     task_started.Signal();

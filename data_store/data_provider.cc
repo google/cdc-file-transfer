@@ -40,7 +40,7 @@ DataProvider::DataProvider(
     : prefetch_size_(prefetch_size),
       writer_(std::move(writer)),
       readers_(std::move(readers)),
-      chunks_updated_(true),
+      chunks_updated_{true},
       cleanup_timeout_sec_(cleanup_timeout_sec),
       access_idle_timeout_sec_(access_idle_timeout_sec) {
   if (writer_) {
@@ -74,7 +74,7 @@ size_t DataProvider::PrefetchSize(size_t read_size) const {
 absl::StatusOr<size_t> DataProvider::Get(const ContentIdProto& content_id,
                                          void* data, size_t offset,
                                          size_t size) {
-  last_access_ts_ = steady_clock_->Now();
+  last_access_sec_ = GetSteadyNowSec();
   absl::Mutex* content_mutex = GetContentMutex(content_id);
   absl::StatusOr<size_t> read_bytes;
   if (writer_) {
@@ -127,7 +127,7 @@ absl::StatusOr<size_t> DataProvider::Get(const ContentIdProto& content_id,
 }
 
 absl::Status DataProvider::Get(ChunkTransferList* chunks) {
-  last_access_ts_ = steady_clock_->Now();
+  last_access_sec_ = GetSteadyNowSec();
   // Try to fetch chunks from the cache first.
   RETURN_IF_ERROR(GetFromWriter(chunks, /*lock_required=*/true));
   if (chunks->ReadDone()) return absl::OkStatus();
@@ -175,7 +175,7 @@ absl::Status DataProvider::Get(ChunkTransferList* chunks) {
 }
 
 absl::Status DataProvider::Get(const ContentIdProto& content_id, Buffer* data) {
-  last_access_ts_ = steady_clock_->Now();
+  last_access_sec_ = GetSteadyNowSec();
   absl::Mutex* content_mutex = GetContentMutex(content_id);
   absl::Status status = absl::OkStatus();
   if (writer_) {
@@ -324,9 +324,7 @@ void DataProvider::CleanupThreadMain() {
                                    next_cleanup_time - steady_clock_->Now())
                                    .count())));
     int64_t time_sec_since_last_access =
-        std::chrono::duration_cast<std::chrono::seconds>(steady_clock_->Now() -
-                                                         last_access_ts_.load())
-            .count();
+        GetSteadyNowSec() - last_access_sec_.load();
     if (chunks_updated_ &&
         time_sec_since_last_access > access_idle_timeout_sec_) {
       WriterMutexLockList locks;
@@ -361,4 +359,11 @@ bool DataProvider::WaitForCleanupAndResetForTesting(absl::Duration timeout) {
   is_cleaned_ = false;
   return is_cleaned;
 }
+
+int64_t DataProvider::GetSteadyNowSec() {
+  return std::chrono::duration_cast<std::chrono::seconds>(steady_clock_->Now() -
+                                                          first_now_)
+      .count();
+}
+
 }  // namespace cdc_ft

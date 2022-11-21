@@ -230,7 +230,7 @@ TEST_F(ProcessTest, RunUntil) {
   ProcessStartInfo start_info;
   start_info.command = "findstr stop";
   start_info.redirect_stdin = true;
-  std::atomic_bool stop(false);
+  std::atomic_bool stop{false};
   start_info.stdout_handler = [&std_out, &stop](const char* data, size_t) {
     // Check whether someone sent the "stop" command.
     // Note: This runs in a background thread.

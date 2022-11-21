@@ -1648,7 +1648,7 @@ absl::Status Run(DataStoreReader* data_store_reader, bool consistency_check) {
   ctx->data_store_reader = data_store_reader;
   InitializeRootManifest();
 #ifndef USE_MOCK_LIBFUSE
-  RETURN_IF_ERROR(ctx->config_stream_client_->StartListeningToManifestUpdates(
+  RETURN_IF_ERROR(ctx->config_stream_client->StartListeningToManifestUpdates(
                       [](const ContentIdProto& id) { return SetManifest(id); }),
                   "Failed to listen to manifest updates");
 

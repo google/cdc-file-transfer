@@ -1,0 +1,65 @@
+name: Build & Test
+
+# Run when something is pushed to main or when there's action on a pull request.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+# Cancel running workflow if a pull request is modified. Note that head_ref is
+# undefined for pushes to main. Use run_id as fallback. This is unique for each
+# run, so runs for pushes to main are never cancelled.
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  Build-And-Test-Linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Initialize submodules
+        run: git submodule update --init --recursive
+
+      - name: Build (fastbuild)
+        run: |
+          bazel build --config=linux -- //... -//third_party/...
+
+      # Skip file_finder_test: The test works when file_finder_test is run
+      # directly, but not through bazel test. The reason is, bazel test
+      # creates symlinks of test files, but the finder ignores symlinks.
+      # Also run tests sequentially since some tests write to a common tmp dir.
+      - name: Test (fastbuild)
+        run: |
+          bazel test --config=linux --test_output=errors --local_test_jobs=1 -- //... -//third_party/... -//cdc_rsync_server:file_finder_test
+
+  Build-And-Test-Windows:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Initialize submodules
+        run: git submodule update --init --recursive
+
+      - name: Build
+        run: |
+          bazel build --config=windows //cdc_rsync //cdc_stream //asset_stream_manager //tests_common //tests_asset_streaming_30 //tests_cdc_rsync
+
+      - name: Test
+        run: |
+          bazel-bin\tests_common\tests_common.exe
+          bazel-bin\tests_asset_streaming_30\tests_asset_streaming_30.exe
+          bazel-bin\tests_cdc_rsync\tests_cdc_rsync.exe
+          bazel test --config=windows --test_output=errors --local_test_jobs=1 `
+            //asset_stream_manager/... `
+            //cdc_fuse_fs/... `
+            //cdc_rsync/... `
+            //cdc_rsync/base/... `
+            //cdc_rsync_server/... `
+            //common/... `
+            //data_store/... `
+            //fastcdc/... `
+            //manifest/... `
+            //metrics/...
