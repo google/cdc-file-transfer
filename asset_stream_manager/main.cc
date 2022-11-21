@@ -67,18 +67,26 @@ absl::Status Run(const AssetStreamConfig& cfg) {
 }
 
 std::string GetLogPath(const char* log_dir, const char* log_base_name) {
-  DefaultSystemClock clock;
-  std::string timestamp_ext = clock.FormatNow(".%Y%m%d-%H%M%S.log", false);
+  DefaultSystemClock* clock = DefaultSystemClock::GetInstance();
+  std::string timestamp_ext = clock->FormatNow(".%Y%m%d-%H%M%S.log", false);
   return path::Join(log_dir, log_base_name + timestamp_ext);
 }
 
-void InitLogging(const char* log_dir, bool log_to_stdout, int verbosity) {
+void InitLogging(std::string& log_dir, bool log_to_stdout, int verbosity) {
   LogLevel level = cdc_ft::Log::VerbosityToLogLevel(verbosity);
   if (log_to_stdout) {
     cdc_ft::Log::Initialize(std::make_unique<cdc_ft::ConsoleLog>(level));
   } else {
-    cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
-        level, GetLogPath(log_dir, "assets_stream_manager").c_str()));
+    if (path::ExpandPathVariables(&log_dir).ok() &&
+        path::CreateDirRec(log_dir).ok()) {
+      cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
+          level, GetLogPath(log_dir.c_str(), "assets_stream_manager").c_str()));
+    } else {
+      LOG_WARNING("Failed to create log directory or expand directory path %s",
+                  log_dir);
+      cdc_ft::Log::Initialize(std::make_unique<cdc_ft::ConsoleLog>(level));
+      LOG_WARNING("Started to write console log");
+    }
   }
 }
 
@@ -128,12 +136,11 @@ ABSL_FLAG(uint32_t, cleanup_timeout, cdc_ft::DataProvider::kCleanupTimeoutSec,
 ABSL_FLAG(uint32_t, access_idle_timeout, cdc_ft::DataProvider::kAccessIdleSec,
           "Do not run instance cache cleanups for this many seconds after the "
           "last file access");
-ABSL_FLAG(std::string, config_dir, "",
-          "Directory on the host to stream from with the json configuration "
-          "for asset stream manager stored in the file "
-          "`assets_stream_manager.json`");
-ABSL_FLAG(std::string, log_dir, "",
-          "Directory on the host to stream from to store log files");
+ABSL_FLAG(std::string, config_file,
+          "%APPDATA%\\cdc-file-transfer\\assets_stream_manager.json",
+          "Json configuration file for asset stream manager");
+ABSL_FLAG(std::string, log_dir, "%APPDATA%\\cdc-file-transfer\\logs",
+          "Directory to store log files for asset stream manager");
 
 // Development args.
 ABSL_FLAG(std::string, dev_src_dir, "",
@@ -160,21 +167,24 @@ ABSL_FLAG(std::string, dev_mount_dir, "",
 int main(int argc, char* argv[]) {
   absl::ParseCommandLine(argc, argv);
 
-  // Set up config. Allow overriding this config with
-  // %config_dir%\assets_stream_manager.json.
-  const std::string config_path = cdc_ft::path::Join(
-      absl::GetFlag(FLAGS_config_dir), "assets_stream_manager.json");
+  // Set up config. Allow overriding this config |config_file|.
   cdc_ft::AssetStreamConfig cfg;
-  absl::Status cfg_load_status = cfg.LoadFromFile(config_path);
+  std::string config_file = absl::GetFlag(FLAGS_config_file);
+  absl::Status cfg_load_status =
+      cdc_ft::path::ExpandPathVariables(&config_file);
+  if (cfg_load_status.ok()) {
+    cfg_load_status = cfg.LoadFromFile(config_file);
+  }
 
-  cdc_ft::InitLogging(absl::GetFlag(FLAGS_log_dir).c_str(), cfg.log_to_stdout(),
+  std::string log_dir = absl::GetFlag(FLAGS_log_dir);
+  cdc_ft::InitLogging(log_dir, cfg.log_to_stdout(),
                       cfg.session_cfg().verbosity);
 
   // Log status of loaded configuration. Errors are not critical.
   if (cfg_load_status.ok()) {
-    LOG_INFO("Successfully loaded configuration file at '%s'", config_path);
+    LOG_INFO("Successfully loaded configuration file at '%s'", config_file);
   } else if (absl::IsNotFound(cfg_load_status)) {
-    LOG_INFO("No configuration file found at '%s'", config_path);
+    LOG_INFO("No configuration file found at '%s'", config_file);
   } else {
     LOG_ERROR("%s", cfg_load_status.message());
   }
