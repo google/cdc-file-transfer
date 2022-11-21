@@ -29,6 +29,14 @@
 #include "common/util.h"
 #include "gtest/gtest.h"
 
+#if PLATFORM_WINDOWS
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 1
+#endif
+#include <windows.h>  // GetLongPathName
+#undef ReplaceFile
+#endif
+
 namespace cdc_ft {
 namespace {
 
@@ -52,6 +60,22 @@ constexpr char kLinesFileName[] = "lines_test.txt";
 constexpr char kTestFileName[] = "test.txt";
 constexpr char kUnicodeTestFileName[] = u8"unicode test \U0001F964.txt";
 constexpr char kSubDirFileName[] = "subdir_file.txt";
+
+// Converts e.g. C:\Progra~1 to C:\Program Files on Windows.
+std::string GetLongPath(std::string path) {
+#if PLATFORM_WINDOWS
+  std::wstring wpath = Util::Utf8ToWideStr(path);
+  std::wstring long_wpath(4096, 0);
+  size_t buf_len =
+      GetLongPathName(wpath.c_str(), const_cast<wchar_t*>(long_wpath.c_str()),
+                      long_wpath.size() * sizeof(wchar_t));
+  EXPECT_GT(buf_len, 0);
+  long_wpath.resize(buf_len);
+  return Util::WideToUtf8Str(long_wpath);
+#else
+  return path;
+#endif
+}
 
 class PathTest : public ::testing::Test {
  public:
@@ -159,7 +183,10 @@ class PathTest : public ::testing::Test {
 
   std::vector<File> SearchFiles(const std::string& pattern, bool recursive);
 
-  std::string base_dir_ = path::Join(path::GetTempDir(), kBaseDirName);
+  // Some tests get confused if the temp dir is a short filename
+  // (e.g. RUNNER~1 instead of runneradmin - I'm looking at you, Github!).
+  const std::string tmp_dir_ = GetLongPath(path::GetTempDir());
+  std::string base_dir_ = path::Join(tmp_dir_, kBaseDirName);
   std::string search_dir_ = path::Join(base_dir_, kSearchDirName);
   std::string subdir_ = path::Join(search_dir_, kSubDirName);
   const std::string subdir_fulldirpath_ = subdir_;
@@ -303,9 +330,11 @@ TEST_F(PathTest, GetFullPath) {
             path::Join(cwd, u8"\U0001F964", "foo"));
 
 #if PLATFORM_WINDOWS
-  // These test cases assume that C: is the current drive.
-  EXPECT_EQ(path::GetFullPath("C:"), cwd);
-  EXPECT_EQ(path::GetFullPath("C:foo"), path::Join(cwd, "foo"));
+  std::string current_drive = path::GetDrivePrefix(cwd);
+  ASSERT_NE(current_drive, std::string());
+  ASSERT_EQ(current_drive.size(), 2) << current_drive;
+  EXPECT_EQ(path::GetFullPath(current_drive), cwd);
+  EXPECT_EQ(path::GetFullPath(current_drive + "foo"), path::Join(cwd, "foo"));
   EXPECT_EQ(path::GetFullPath("V:foo"), "V:\\foo");
   EXPECT_EQ(path::GetFullPath("C:\\"), "C:\\");
   EXPECT_EQ(path::GetFullPath("C:\\foo"), "C:\\foo");
@@ -322,9 +351,10 @@ TEST_F(PathTest, GetFullPath) {
   // other Windows APIs are trimming such spaces, most notably GetFullPathNameW.
   EXPECT_EQ(path::GetFullPath("trailing space "),
             path::Join(cwd, "trailing space "));
-  EXPECT_EQ(path::GetFullPath("C:trailing space "),
+  EXPECT_EQ(path::GetFullPath(current_drive + "trailing space "),
             path::Join(cwd, "trailing space "));
-  EXPECT_EQ(path::GetFullPath("C:\\trailing space "), "C:\\trailing space ");
+  EXPECT_EQ(path::GetFullPath(current_drive + "\\trailing space "),
+            current_drive + "\\trailing space ");
   EXPECT_EQ(path::GetFullPath("V:trailing space "), "V:\\trailing space ");
 #else
   EXPECT_EQ(path::GetFullPath("/"), "/");
@@ -1227,7 +1257,7 @@ TEST_F(PathTest, Exists) {
 }
 
 TEST_F(PathTest, CreateDir) {
-  std::string dir = path::Join(path::GetTempDir(), "createdir_test");
+  std::string dir = path::Join(tmp_dir_, "createdir_test");
   std::string unicode_dir = path::Join(dir, u8"\U0001F964\U0001F964\U0001F964");
   path::RemoveDirRec(dir).IgnoreError();
   EXPECT_NOT_OK(path::CreateDir(path::Join(dir, "subdir")));
@@ -1244,7 +1274,7 @@ TEST_F(PathTest, CreateDir) {
 }
 
 TEST_F(PathTest, CreateDirRec) {
-  std::string dir = path::Join(path::GetTempDir(), "createdir_test", "subdir");
+  std::string dir = path::Join(tmp_dir_, "createdir_test", "subdir");
   std::string unicode_dir = path::Join(dir, u8"\U0001F964\U0001F964\U0001F964");
   path::RemoveDirRec(dir).IgnoreError();
   EXPECT_OK(path::CreateDirRec(dir));

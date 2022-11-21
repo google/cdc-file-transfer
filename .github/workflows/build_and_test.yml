@@ -30,10 +30,10 @@ jobs:
       # Skip file_finder_test: The test works when file_finder_test is run
       # directly, but not through bazel test. The reason is, bazel test
       # creates symlinks of test files, but the finder ignores symlinks.
-      # Also run with --jobs 1 since some tests write to a common tmp dir.
+      # Also run tests sequentially since some tests write to a common tmp dir.
       - name: Test (fastbuild)
         run: |
-          bazel test --config=linux --test_output=errors --jobs 1 -- //... -//third_party/... -//cdc_rsync_server:file_finder_test
+          bazel test --config=linux --test_output=errors --local_test_jobs=1 -- //... -//third_party/... -//cdc_rsync_server:file_finder_test
 
   Build-And-Test-Windows:
     runs-on: windows-2019
@@ -52,7 +52,7 @@ jobs:
           bazel-bin\tests_common\tests_common.exe
           bazel-bin\tests_asset_streaming_30\tests_asset_streaming_30.exe
           bazel-bin\tests_cdc_rsync\tests_cdc_rsync.exe
-          bazel test --config=windows `
+          bazel test --config=windows --test_output=errors --local_test_jobs=1 `
             //asset_stream_manager/... `
             //cdc_fuse_fs/... `
             //cdc_rsync/... `
