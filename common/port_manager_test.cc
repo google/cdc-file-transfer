@@ -219,7 +219,7 @@ TEST_F(PortManagerTest, FindAvailableLocalPortsSuccess) {
 
   absl::StatusOr<std::unordered_set<int>> ports =
       PortManager::FindAvailableLocalPorts(kFirstPort, kLastPort, "127.0.0.1",
-                                           &process_factory_, true);
+                                           &process_factory_);
   ASSERT_OK(ports);
   EXPECT_EQ(ports->size(), kNumPorts - 1);
   for (int port = kFirstPort + 1; port <= kLastPort; ++port) {
@@ -237,7 +237,7 @@ TEST_F(PortManagerTest, FindAvailableLocalPortsFailsNoPorts) {
 
   absl::StatusOr<std::unordered_set<int>> ports =
       PortManager::FindAvailableLocalPorts(kFirstPort, kLastPort, "127.0.0.1",
-                                           &process_factory_, true);
+                                           &process_factory_);
   EXPECT_TRUE(absl::IsResourceExhausted(ports.status()));
   EXPECT_TRUE(absl::StrContains(ports.status().message(),
                                 "No port available in range"));
@@ -252,7 +252,7 @@ TEST_F(PortManagerTest, FindAvailableRemotePortsSuccess) {
   absl::StatusOr<std::unordered_set<int>> ports =
       PortManager::FindAvailableRemotePorts(kFirstPort, kLastPort, "0.0.0.0",
                                             &process_factory_, &remote_util_,
-                                            kTimeoutSec, true);
+                                            kTimeoutSec);
   ASSERT_OK(ports);
   EXPECT_EQ(ports->size(), kNumPorts - 1);
   for (int port = kFirstPort + 1; port <= kLastPort; ++port) {
@@ -271,7 +271,7 @@ TEST_F(PortManagerTest, FindAvailableRemotePortsFailsNoPorts) {
   absl::StatusOr<std::unordered_set<int>> ports =
       PortManager::FindAvailableRemotePorts(kFirstPort, kLastPort, "0.0.0.0",
                                             &process_factory_, &remote_util_,
-                                            kTimeoutSec, true);
+                                            kTimeoutSec);
   EXPECT_TRUE(absl::IsResourceExhausted(ports.status()));
   EXPECT_TRUE(absl::StrContains(ports.status().message(),
                                 "No port available in range"));
