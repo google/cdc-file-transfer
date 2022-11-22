@@ -82,7 +82,7 @@ void InitLogging(std::string& log_dir, bool log_to_stdout, int verbosity) {
       cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
           level, GetLogPath(log_dir.c_str(), "assets_stream_manager").c_str()));
     } else {
-      LOG_ERROR("Failed to create log directory");
+      LOG_ERROR("Failed to create log directory '%s'", log_dir);
       exit(1);
     }
   }
