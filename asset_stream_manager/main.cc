@@ -82,10 +82,8 @@ void InitLogging(std::string& log_dir, bool log_to_stdout, int verbosity) {
       cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
           level, GetLogPath(log_dir.c_str(), "assets_stream_manager").c_str()));
     } else {
-      LOG_WARNING("Failed to create log directory or expand directory path %s",
-                  log_dir);
-      cdc_ft::Log::Initialize(std::make_unique<cdc_ft::ConsoleLog>(level));
-      LOG_WARNING("Started to write console log");
+      LOG_ERROR("Failed to create log directory");
+      exit(1);
     }
   }
 }
@@ -172,9 +170,7 @@ int main(int argc, char* argv[]) {
   std::string config_file = absl::GetFlag(FLAGS_config_file);
   absl::Status cfg_load_status =
       cdc_ft::path::ExpandPathVariables(&config_file);
-  if (cfg_load_status.ok()) {
-    cfg_load_status = cfg.LoadFromFile(config_file);
-  }
+  cfg_load_status.Update(cfg.LoadFromFile(config_file));
 
   std::string log_dir = absl::GetFlag(FLAGS_log_dir);
   cdc_ft::InitLogging(log_dir, cfg.log_to_stdout(),
