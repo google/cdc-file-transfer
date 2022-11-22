@@ -100,14 +100,14 @@ FileFinderAndSender::FileFinderAndSender(PathFilter* path_filter,
       recursive_(recursive),
       relative_(relative),
       request_size_threshold_(request_byte_threshold) {
-  // (internal): Support / instead of \ in the source folder.
+  // Support / instead of \ in the source folder.
   path::FixPathSeparators(&sources_dir_);
 }
 
 FileFinderAndSender::~FileFinderAndSender() = default;
 
 absl::Status FileFinderAndSender::FindAndSendFiles(std::string source) {
-  // (internal): Support / instead of \ in sources.
+  // Support / instead of \ in sources.
   path::FixPathSeparators(&source);
   // Special case, "." and ".." should not specify the directory, but the files
   // inside this directory!

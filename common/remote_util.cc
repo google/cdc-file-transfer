@@ -119,7 +119,7 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSsh(
 
 ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshPortForward(
     int local_port, int remote_port, bool reverse) {
-  // (internal): Usually, one would pass in -N here, but this makes the
+  // Usually, one would pass in -N here, but this makes the
   // connection terribly slow! As a workaround, don't use -N (will open a
   // shell), but simply eat the output.
   ProcessStartInfo si = BuildProcessStartInfoForSshInternal(
