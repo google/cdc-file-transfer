@@ -35,21 +35,6 @@ SdkUtil::SdkUtil() {
 
 SdkUtil::~SdkUtil() = default;
 
-std::string SdkUtil::GetUserConfigPath() const {
-  assert(init_status_.ok());
-  return path::Join(roaming_appdata_path_, "GGP");
-}
-
-std::string SdkUtil::GetServicesConfigPath() const {
-  return path::Join(GetUserConfigPath(), "services");
-}
-
-std::string SdkUtil::GetLogPath(const char* log_base_name) const {
-  DefaultSystemClock clock;
-  std::string timestamp_ext = clock.FormatNow(".%Y%m%d-%H%M%S.log", false);
-  return path::Join(GetUserConfigPath(), "logs", log_base_name + timestamp_ext);
-}
-
 std::string SdkUtil::GetDevBinPath() const {
   return path::Join(ggp_sdk_path_env_, "dev", "bin");
 }

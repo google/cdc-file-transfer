@@ -91,7 +91,6 @@ cc_library(
         "//common:port_manager",
         "//common:process",
         "//common:remote_util",
-        "//common:sdk_util",
         "//common:status",
         "//common:status_macros",
         "//common:threadpool",

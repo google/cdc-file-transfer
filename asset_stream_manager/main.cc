@@ -24,7 +24,6 @@
 #include "common/log.h"
 #include "common/path.h"
 #include "common/process.h"
-#include "common/sdk_util.h"
 #include "common/status_macros.h"
 #include "data_store/data_provider.h"
 #include "data_store/disk_data_store.h"
@@ -67,14 +66,25 @@ absl::Status Run(const AssetStreamConfig& cfg) {
   return absl::OkStatus();
 }
 
-void InitLogging(bool log_to_stdout, int verbosity) {
+std::string GetLogPath(const char* log_dir, const char* log_base_name) {
+  DefaultSystemClock* clock = DefaultSystemClock::GetInstance();
+  std::string timestamp_ext = clock->FormatNow(".%Y%m%d-%H%M%S.log", false);
+  return path::Join(log_dir, log_base_name + timestamp_ext);
+}
+
+void InitLogging(std::string& log_dir, bool log_to_stdout, int verbosity) {
   LogLevel level = cdc_ft::Log::VerbosityToLogLevel(verbosity);
   if (log_to_stdout) {
     cdc_ft::Log::Initialize(std::make_unique<cdc_ft::ConsoleLog>(level));
   } else {
-    SdkUtil util;
-    cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
-        level, util.GetLogPath("assets_stream_manager_v3").c_str()));
+    if (path::ExpandPathVariables(&log_dir).ok() &&
+        path::CreateDirRec(log_dir).ok()) {
+      cdc_ft::Log::Initialize(std::make_unique<cdc_ft::FileLog>(
+          level, GetLogPath(log_dir.c_str(), "assets_stream_manager").c_str()));
+    } else {
+      LOG_ERROR("Failed to create log directory '%s'", log_dir);
+      exit(1);
+    }
   }
 }
 
@@ -113,17 +123,22 @@ ABSL_FLAG(int, manifest_updater_threads, 4,
           "Number of threads used to compute file hashes on the workstation.");
 ABSL_FLAG(int, file_change_wait_duration_ms, 500,
           "Time in milliseconds to wait until pushing a file change to the "
-          "instance after detecting it.");
+          "instance after detecting it");
 ABSL_FLAG(bool, check, false, "Check FUSE consistency and log check results");
 ABSL_FLAG(bool, log_to_stdout, false, "Log to stdout instead of to a file");
 ABSL_FLAG(cdc_ft::JedecSize, cache_capacity,
           cdc_ft::JedecSize(cdc_ft::DiskDataStore::kDefaultCapacity),
-          "Cache capacity. Supports common unit suffixes K, M, G.");
+          "Cache capacity. Supports common unit suffixes K, M, G");
 ABSL_FLAG(uint32_t, cleanup_timeout, cdc_ft::DataProvider::kCleanupTimeoutSec,
           "Period in seconds at which instance cache cleanups are run");
 ABSL_FLAG(uint32_t, access_idle_timeout, cdc_ft::DataProvider::kAccessIdleSec,
           "Do not run instance cache cleanups for this many seconds after the "
           "last file access");
+ABSL_FLAG(std::string, config_file,
+          "%APPDATA%\\cdc-file-transfer\\assets_stream_manager.json",
+          "Json configuration file for asset stream manager");
+ABSL_FLAG(std::string, log_dir, "%APPDATA%\\cdc-file-transfer\\logs",
+          "Directory to store log files for asset stream manager");
 
 // Development args.
 ABSL_FLAG(std::string, dev_src_dir, "",
@@ -150,21 +165,22 @@ ABSL_FLAG(std::string, dev_mount_dir, "",
 int main(int argc, char* argv[]) {
   absl::ParseCommandLine(argc, argv);
 
-  // Set up config. Allow overriding this config with
-  // %APPDATA%\GGP\services\assets_stream_manager_v3.json.
-  cdc_ft::SdkUtil sdk_util;
-  const std::string config_path = cdc_ft::path::Join(
-      sdk_util.GetServicesConfigPath(), "assets_stream_manager_v3.json");
+  // Set up config. Allow overriding this config |config_file|.
   cdc_ft::AssetStreamConfig cfg;
-  absl::Status cfg_load_status = cfg.LoadFromFile(config_path);
+  std::string config_file = absl::GetFlag(FLAGS_config_file);
+  absl::Status cfg_load_status =
+      cdc_ft::path::ExpandPathVariables(&config_file);
+  cfg_load_status.Update(cfg.LoadFromFile(config_file));
 
-  cdc_ft::InitLogging(cfg.log_to_stdout(), cfg.session_cfg().verbosity);
+  std::string log_dir = absl::GetFlag(FLAGS_log_dir);
+  cdc_ft::InitLogging(log_dir, cfg.log_to_stdout(),
+                      cfg.session_cfg().verbosity);
 
   // Log status of loaded configuration. Errors are not critical.
   if (cfg_load_status.ok()) {
-    LOG_INFO("Successfully loaded configuration file at '%s'", config_path);
+    LOG_INFO("Successfully loaded configuration file at '%s'", config_file);
   } else if (absl::IsNotFound(cfg_load_status)) {
-    LOG_INFO("No configuration file found at '%s'", config_path);
+    LOG_INFO("No configuration file found at '%s'", config_file);
   } else {
     LOG_ERROR("%s", cfg_load_status.message());
   }

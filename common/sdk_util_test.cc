@@ -63,19 +63,6 @@ class SdkUtilTest : public ::testing::Test {
   std::vector<std::string> test_created_directories_;
 };
 
-TEST_F(SdkUtilTest, CheckRoamingAppDataPaths) {
-  SdkUtil sdk_util;
-  EXPECT_OK(sdk_util.GetInitStatus());
-
-  std::string appdata_dir;
-  EXPECT_OK(
-      path::GetKnownFolderPath(path::FolderId::kRoamingAppData, &appdata_dir));
-
-  const std::string ggp_path = path::Join(appdata_dir, "GGP");
-  EXPECT_EQ(sdk_util.GetUserConfigPath(), ggp_path);
-  EXPECT_EQ(sdk_util.GetServicesConfigPath(), path::Join(ggp_path, "services"));
-}
-
 TEST_F(SdkUtilTest, CheckSdkPathsWithoutGgpSdkPathEnv) {
   // Clear environment variable and figure out default SDK dir.
   EXPECT_OK(path::SetEnv("GGP_SDK_PATH", ""));
@@ -85,17 +72,6 @@ TEST_F(SdkUtilTest, CheckSdkPathsWithoutGgpSdkPathEnv) {
   const std::string sdk_dir = path::Join(program_files_dir, "GGP SDK");
 
   SdkUtil sdk_util;
-  EXPECT_OK(sdk_util.GetInitStatus());
-  CheckSdkPaths(sdk_util, sdk_dir);
-}
-
-TEST_F(SdkUtilTest, CheckSdkPathsWithGgpSdkPathEnv) {
-  // Set a path with unicode character.
-  std::string sdk_dir = u8"C:\\I\\♥\\GGP SDK\\";
-  EXPECT_OK(path::SetEnv("GGP_SDK_PATH", sdk_dir));
-
-  SdkUtil sdk_util;
-  EXPECT_OK(sdk_util.GetInitStatus());
   CheckSdkPaths(sdk_util, sdk_dir);
 }
 

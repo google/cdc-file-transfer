@@ -35,22 +35,6 @@ class SdkUtil {
   SdkUtil();
   ~SdkUtil();
 
-  // Returns the initialization status. Should be OK unless in case of some rare
-  // internal error. Should be checked before accessing any members.
-  const absl::Status& GetInitStatus() const { return init_status_; }
-
-  // Returns the path of the SDK user configuration, e.g.
-  // %APPDATA%\GGP.
-  std::string GetUserConfigPath() const;
-
-  // Returns the path of the SDK services configuration, e.g.
-  // %APPDATA%\GGP\services.
-  std::string GetServicesConfigPath() const;
-
-  // Returns the path of a log file with given |log_base_name|, e.g.
-  // %APPDATA%\GGP\logs\log_base_name.20210729-125930.log.
-  std::string GetLogPath(const char* log_base_name) const;
-
   // Returns the path of the dev tools that ship with the SDK, e.g.
   // C:\Program Files\GGP SDK\dev\bin.
   std::string GetDevBinPath() const;
