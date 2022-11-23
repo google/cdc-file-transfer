@@ -129,7 +129,7 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    std::string src_dir = args[2];
+    std::string src_dir = cdc_ft::path::GetFullPath(args[2]);
     std::string user_host, mount_dir;
     if (!ParseUserHostDir(args[3], &user_host, &mount_dir)) return 1;
 
