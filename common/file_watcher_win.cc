@@ -80,9 +80,9 @@ class AsyncFileWatcher {
         files_changed_cb_(std::move(files_changed_cb)),
         dir_recreated_cb_(std::move(dir_recreated_cb)),
         timeout_ms_(timeout_ms) {
-    // (internal): Check whether ReadDirectoryChangesExW is available.
-    // It requires Windows 10, version 1709, released October 17, 2017, or
-    // corresponding Windows Server versions.
+    // Check whether ReadDirectoryChangesExW is available. It requires Windows
+    // 10, version 1709, released October 17, 2017, or Corresponding Windows
+    // Server versions.
     if (!enforceLegacyReadDirectoryChangesForTesting) {
       read_directory_changes_ex_ =
           reinterpret_cast<decltype(ReadDirectoryChangesExW)*>(::GetProcAddress(

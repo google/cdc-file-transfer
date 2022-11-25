@@ -303,12 +303,19 @@ absl::Status CdcRsyncServer::HandleSetOptions() {
   existing_ = request.existing();
   copy_dest_ = request.copy_dest();
 
-  // (internal): Support \ instead of / in destination folders.
+  // Support \ instead of / in destination folders.
   path::FixPathSeparators(&destination_);
   path::EnsureEndsWithPathSeparator(&destination_);
   if (!copy_dest_.empty()) {
     path::FixPathSeparators(&copy_dest_);
     path::EnsureEndsWithPathSeparator(&copy_dest_);
+  }
+
+  // Expand e.g. ~.
+  status = path::ExpandPathVariables(&destination_);
+  if (!status.ok()) {
+    return WrapStatus(status, "Failed to expand destination '%s'",
+                      destination_);
   }
 
   assert(path_filter_.IsEmpty());

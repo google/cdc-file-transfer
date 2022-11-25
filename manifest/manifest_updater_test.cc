@@ -613,10 +613,9 @@ TEST_F(ManifestUpdaterTest, UpdateAll_LargeIntermediateIndirectDirAssets) {
   cfg_.src_dir = path::Join(base_dir_, "non_empty");
   ManifestUpdater updater(&data_store_, cfg_);
 
-  // (internal): Run UpdateAll() with intermediate manifest push. The push
-  // causes a Flush() call to the manifest builder, which pushes some assets to
-  // indirect lists. This used to invalidate pointers and cause asserts to
-  // trigger.
+  // Run UpdateAll() with intermediate manifest push. The push causes a Flush()
+  // call to the manifest builder, which pushes some assets to indirect lists.
+  // This used to invalidate pointers and cause asserts to trigger.
   EXPECT_OK(updater.UpdateAll(&file_chunks_, [](const ContentIdProto&) {}));
 }
 
