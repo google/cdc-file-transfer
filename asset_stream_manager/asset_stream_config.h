@@ -25,6 +25,10 @@
 #include "asset_stream_manager/session_config.h"
 #include "session.h"
 
+namespace lyra {
+class command;
+}
+
 namespace cdc_ft {
 
 // Class containing all configuration settings for asset streaming.
@@ -35,6 +39,9 @@ class AssetStreamConfig {
   // Constructs the configuration by applying command line flags.
   AssetStreamConfig();
   ~AssetStreamConfig();
+
+  // Registers arguments with Lyra.
+  void RegisterCommandLineFlags(lyra::command& cmd);
 
   // Loads a configuration from the JSON file at |path| and overrides any config
   // values that are set in this file. Sample json file:
@@ -81,7 +88,16 @@ class AssetStreamConfig {
   // Whether to log to a file or to stdout.
   bool log_to_stdout() const { return log_to_stdout_; }
 
+  // Workaround for Lyra not accepting errors from parsers.
+  const std::string& jedec_parse_error() const { return jedec_parse_error_; }
+
  private:
+  // Jedec parser for Lyra options. Usage:
+  //   lyra::opt(JedecParser("size-flag", &size_bytes), "bytes"))
+  // Sets jedec_parse_error_ on error, Lyra doesn't support errors from lambdas.
+  std::function<void(const std::string&)> JedecParser(const char* flag_name,
+                                                      uint64_t* bytes);
+
   SessionConfig session_cfg_;
   bool log_to_stdout_ = false;
 
@@ -95,6 +111,9 @@ class AssetStreamConfig {
 
   // Maps flags to errors occurred while reading this flag.
   std::map<std::string, std::string> flag_read_errors_;
+
+  // Errors from parsing JEDEC sizes.
+  std::string jedec_parse_error_;
 };
 
 };  // namespace cdc_ft

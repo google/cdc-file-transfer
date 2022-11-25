@@ -1,0 +1,35 @@
+# Description:
+# This project provides Linux compatible Dirent interface for Microsoft Windows.
+#
+
+licenses(["notice"])  # BSL-1.0 license
+
+exports_files(["LICENSE"])
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "lyra",
+    hdrs = [
+        "include/lyra/arg.hpp",
+        "include/lyra/args.hpp",
+        "include/lyra/arguments.hpp",
+        "include/lyra/cli.hpp",
+        "include/lyra/cli_parser.hpp",
+        "include/lyra/command.hpp",
+        "include/lyra/detail",
+        "include/lyra/exe_name.hpp",
+        "include/lyra/group.hpp",
+        "include/lyra/help.hpp",
+        "include/lyra/literal.hpp",
+        "include/lyra/lyra.hpp",
+        "include/lyra/main.hpp",
+        "include/lyra/opt.hpp",
+        "include/lyra/option_style.hpp",
+        "include/lyra/parser.hpp",
+        "include/lyra/parser_result.hpp",
+        "include/lyra/val.hpp",
+        "include/lyra/version.hpp",
+    ],
+    includes = ["include"],
+)

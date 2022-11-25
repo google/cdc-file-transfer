@@ -18,6 +18,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\asset_stream_config.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\asset_stream_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\background_service_impl.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\base_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\cdc_fuse_manager.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\grpc_asset_stream_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\local_assets_stream_manager_service_impl.cc" />
@@ -29,6 +30,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\session.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_management_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_manager.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\start_service_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\testing_asset_stream_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset_stream_client.cc" />
@@ -145,6 +147,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\asset_stream_config.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\asset_stream_server.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\background_service_impl.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\base_command.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\cdc_fuse_manager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\grpc_asset_stream_server.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\local_assets_stream_manager_service_impl.h" />
@@ -154,6 +157,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_config.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_management_server.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_manager.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\start_service_command.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\testing_asset_stream_server.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset_stream_client.h" />

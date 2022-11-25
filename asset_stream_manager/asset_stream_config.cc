@@ -16,82 +16,137 @@
 
 #include <sstream>
 
-#include "absl/flags/flag.h"
-#include "absl/flags/parse.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl_helper/jedec_size_flag.h"
 #include "common/buffer.h"
 #include "common/path.h"
 #include "common/status_macros.h"
+#include "data_store/data_provider.h"
+#include "data_store/disk_data_store.h"
 #include "json/json.h"
-
-ABSL_DECLARE_FLAG(int, verbosity);
-ABSL_DECLARE_FLAG(bool, debug);
-ABSL_DECLARE_FLAG(bool, singlethreaded);
-ABSL_DECLARE_FLAG(bool, stats);
-ABSL_DECLARE_FLAG(bool, quiet);
-ABSL_DECLARE_FLAG(bool, check);
-ABSL_DECLARE_FLAG(bool, log_to_stdout);
-ABSL_DECLARE_FLAG(cdc_ft::JedecSize, cache_capacity);
-ABSL_DECLARE_FLAG(uint32_t, cleanup_timeout);
-ABSL_DECLARE_FLAG(uint32_t, access_idle_timeout);
-ABSL_DECLARE_FLAG(int, manifest_updater_threads);
-ABSL_DECLARE_FLAG(int, file_change_wait_duration_ms);
-
-// Development flags.
-ABSL_DECLARE_FLAG(std::string, dev_src_dir);
-ABSL_DECLARE_FLAG(std::string, dev_user_host);
-ABSL_DECLARE_FLAG(uint16_t, dev_ssh_port);
-ABSL_DECLARE_FLAG(std::string, dev_ssh_command);
-ABSL_DECLARE_FLAG(std::string, dev_scp_command);
-ABSL_DECLARE_FLAG(std::string, dev_mount_dir);
-
-// Declare AS20 flags, so that AS30 can be used on older SDKs simply by
-// replacing the binary. Note that the RETIRED_FLAGS macro can't be used
-// because the flags contain dashes. This code mimics the macro.
-absl::flags_internal::RetiredFlag<std::string> RETIRED_FLAGS_session_ports;
-absl::flags_internal::RetiredFlag<std::string> RETIRED_FLAGS_gm_mount_point;
-absl::flags_internal::RetiredFlag<bool> RETIRED_FLAGS_allow_edge;
-
-const auto RETIRED_FLAGS_REG_session_ports =
-    (RETIRED_FLAGS_session_ports.Retire("session-ports"),
-     ::absl::flags_internal::FlagRegistrarEmpty{});
-const auto RETIRED_FLAGS_REG_gm_mount_point =
-    (RETIRED_FLAGS_gm_mount_point.Retire("gamelet-mount-point"),
-     ::absl::flags_internal::FlagRegistrarEmpty{});
-const auto RETIRED_FLAGS_REG_allow_edge =
-    (RETIRED_FLAGS_allow_edge.Retire("allow-edge"),
-     ::absl::flags_internal::FlagRegistrarEmpty{});
+#include "lyra/lyra.hpp"
 
 namespace cdc_ft {
 
-AssetStreamConfig::AssetStreamConfig() {
-  session_cfg_.verbosity = absl::GetFlag(FLAGS_verbosity);
-  session_cfg_.fuse_debug = absl::GetFlag(FLAGS_debug);
-  session_cfg_.fuse_singlethreaded = absl::GetFlag(FLAGS_singlethreaded);
-  session_cfg_.stats = absl::GetFlag(FLAGS_stats);
-  session_cfg_.quiet = absl::GetFlag(FLAGS_quiet);
-  session_cfg_.fuse_check = absl::GetFlag(FLAGS_check);
-  log_to_stdout_ = absl::GetFlag(FLAGS_log_to_stdout);
-  session_cfg_.fuse_cache_capacity = absl::GetFlag(FLAGS_cache_capacity).Size();
-  session_cfg_.fuse_cleanup_timeout_sec = absl::GetFlag(FLAGS_cleanup_timeout);
-  session_cfg_.fuse_access_idle_timeout_sec =
-      absl::GetFlag(FLAGS_access_idle_timeout);
-  session_cfg_.manifest_updater_threads =
-      absl::GetFlag(FLAGS_manifest_updater_threads);
-  session_cfg_.file_change_wait_duration_ms =
-      absl::GetFlag(FLAGS_file_change_wait_duration_ms);
-
-  dev_src_dir_ = absl::GetFlag(FLAGS_dev_src_dir);
-  dev_target_.user_host = absl::GetFlag(FLAGS_dev_user_host);
-  dev_target_.ssh_port = absl::GetFlag(FLAGS_dev_ssh_port);
-  dev_target_.ssh_command = absl::GetFlag(FLAGS_dev_ssh_command);
-  dev_target_.scp_command = absl::GetFlag(FLAGS_dev_scp_command);
-  dev_target_.mount_dir = absl::GetFlag(FLAGS_dev_mount_dir);
-}
+AssetStreamConfig::AssetStreamConfig() = default;
 
 AssetStreamConfig::~AssetStreamConfig() = default;
+
+void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd) {
+  session_cfg_.verbosity = 2;
+  cmd.add_argument(lyra::opt(session_cfg_.verbosity, "num")
+                       .name("--verbosity")
+                       .help("Verbosity of the log output, default: " +
+                             std::to_string(session_cfg_.verbosity)));
+
+  cmd.add_argument(
+      lyra::opt(session_cfg_.stats)
+          .name("--stats")
+          .help("Collect and print detailed streaming statistics"));
+
+  cmd.add_argument(
+      lyra::opt(session_cfg_.quiet)
+          .name("--quiet")
+          .help("Do not print any output except errors and stats"));
+
+  session_cfg_.manifest_updater_threads = 4;
+  cmd.add_argument(
+      lyra::opt(session_cfg_.manifest_updater_threads, "count")
+          .name("--manifest-updater-threads")
+          .help("Number of threads used to compute file hashes on "
+                "the workstation, default: " +
+                std::to_string(session_cfg_.manifest_updater_threads)));
+
+  session_cfg_.file_change_wait_duration_ms = 500;
+  cmd.add_argument(
+      lyra::opt(session_cfg_.file_change_wait_duration_ms, "ms")
+          .name("--file-change-wait-duration-ms")
+          .help("Time in milliseconds to wait until pushing a file change "
+                "to the instance after detecting it, default: " +
+                std::to_string(session_cfg_.file_change_wait_duration_ms)));
+
+  cmd.add_argument(lyra::opt(session_cfg_.fuse_debug)
+                       .name("--debug")
+                       .help("Run FUSE filesystem in debug mode"));
+
+  cmd.add_argument(lyra::opt(session_cfg_.fuse_singlethreaded)
+                       .name("--singlethreaded")
+                       .optional()
+                       .help("Run FUSE filesystem in singlethreaded mode"));
+
+  cmd.add_argument(lyra::opt(session_cfg_.fuse_check)
+                       .name("--check")
+                       .help("Check FUSE consistency and log check results"));
+
+  // TODO: Use jedec_size_flag.
+  session_cfg_.fuse_cache_capacity = cdc_ft::DiskDataStore::kDefaultCapacity;
+  cmd.add_argument(lyra::opt(JedecParser("--cache-capacity",
+                                         &session_cfg_.fuse_cache_capacity),
+                             "bytes")
+                       .name("--cache-capacity")
+                       .help("FUSE cache capacity, default: " +
+                             std::to_string(session_cfg_.fuse_cache_capacity) +
+                             ". Supports common unit suffixes K, M, G."));
+
+  session_cfg_.fuse_cleanup_timeout_sec =
+      cdc_ft::DataProvider::kCleanupTimeoutSec;
+  cmd.add_argument(
+      lyra::opt(session_cfg_.fuse_cleanup_timeout_sec, "sec")
+          .name("--cleanup-timeout")
+          .help("Period in seconds at which instance cache cleanups are run, "
+                "default: " +
+                std::to_string(session_cfg_.fuse_cleanup_timeout_sec)));
+
+  session_cfg_.fuse_access_idle_timeout_sec =
+      cdc_ft::DataProvider::kAccessIdleSec;
+  cmd.add_argument(
+      lyra::opt(session_cfg_.fuse_access_idle_timeout_sec, "sec")
+          .name("--access-idle-timeout")
+          .help("Do not run instance cache cleanups for this long after the "
+                "last file access, default: " +
+                std::to_string(session_cfg_.fuse_access_idle_timeout_sec)));
+
+  cmd.add_argument(lyra::opt(log_to_stdout_)
+                       .name("--log-to-stdout")
+                       .help("Log to stdout instead of to a file"));
+  cmd.add_argument(
+      lyra::opt(dev_src_dir_, "dir")
+          .name("--dev-src-dir")
+          .help("Start a streaming session immediately from the given Windows "
+                "path. Used during development. Must also specify other --dev "
+                "flags."));
+
+  cmd.add_argument(
+      lyra::opt(dev_target_.user_host, "[user@]host")
+          .name("--dev-user-host")
+          .help("Username and host to stream to. See also --dev-src-dir."));
+
+  dev_target_.ssh_port = cdc_ft::RemoteUtil::kDefaultSshPort;
+  cmd.add_argument(
+      lyra::opt(dev_target_.ssh_port, "port")
+          .name("--dev-ssh-port")
+          .help("SSH port to use for the connection to the host, default: " +
+                std::to_string(dev_target_.ssh_port) +
+                ". See also --dev-src-dir."));
+
+  cmd.add_argument(
+      lyra::opt(dev_target_.ssh_command, "cmd")
+          .name("--dev-ssh-command")
+          .help("Ssh command and extra flags to use for the "
+                "connection to the host. See also --dev-src-dir."));
+
+  cmd.add_argument(
+      lyra::opt(dev_target_.scp_command, "cmd")
+          .name("--dev-scp-command")
+          .help("Scp command and extra flags to use for the "
+                "connection to the host. See also --dev-src-dir."));
+
+  cmd.add_argument(
+      lyra::opt(dev_target_.mount_dir, "dir")
+          .name("--dev-mount-dir")
+          .help("Directory on the host to stream to. See also --dev-src-dir."));
+}
 
 absl::Status AssetStreamConfig::LoadFromFile(const std::string& path) {
   Buffer buffer;
@@ -106,31 +161,31 @@ absl::Status AssetStreamConfig::LoadFromFile(const std::string& path) {
                         reader.getFormattedErrorMessages()));
   }
 
-#define ASSIGN_VAR(var, flag, type)        \
-  do {                                     \
-    if (config.isMember(#flag)) {          \
-      var = config[#flag].as##type();      \
-      flags_read_from_file_.insert(#flag); \
-    }                                      \
+#define ASSIGN_VAR(var, flag, type)       \
+  do {                                    \
+    if (config.isMember(flag)) {          \
+      var = config[flag].as##type();      \
+      flags_read_from_file_.insert(flag); \
+    }                                     \
   } while (0)
 
-  ASSIGN_VAR(session_cfg_.verbosity, verbosity, Int);
-  ASSIGN_VAR(session_cfg_.fuse_debug, debug, Bool);
-  ASSIGN_VAR(session_cfg_.fuse_singlethreaded, singlethreaded, Bool);
-  ASSIGN_VAR(session_cfg_.stats, stats, Bool);
-  ASSIGN_VAR(session_cfg_.quiet, quiet, Bool);
-  ASSIGN_VAR(session_cfg_.fuse_check, check, Bool);
-  ASSIGN_VAR(log_to_stdout_, log_to_stdout, Bool);
-  ASSIGN_VAR(session_cfg_.fuse_cleanup_timeout_sec, cleanup_timeout, Int);
-  ASSIGN_VAR(session_cfg_.fuse_access_idle_timeout_sec, access_idle_timeout,
+  ASSIGN_VAR(session_cfg_.verbosity, "verbosity", Int);
+  ASSIGN_VAR(session_cfg_.fuse_debug, "debug", Bool);
+  ASSIGN_VAR(session_cfg_.fuse_singlethreaded, "singlethreaded", Bool);
+  ASSIGN_VAR(session_cfg_.stats, "stats", Bool);
+  ASSIGN_VAR(session_cfg_.quiet, "quiet", Bool);
+  ASSIGN_VAR(session_cfg_.fuse_check, "check", Bool);
+  ASSIGN_VAR(log_to_stdout_, "log-to-stdout", Bool);
+  ASSIGN_VAR(session_cfg_.fuse_cleanup_timeout_sec, "cleanup-timeout", Int);
+  ASSIGN_VAR(session_cfg_.fuse_access_idle_timeout_sec, "access-idle-timeout",
              Int);
-  ASSIGN_VAR(session_cfg_.manifest_updater_threads, manifest_updater_threads,
+  ASSIGN_VAR(session_cfg_.manifest_updater_threads, "manifest-updater-threads",
              Int);
   ASSIGN_VAR(session_cfg_.file_change_wait_duration_ms,
-             file_change_wait_duration_ms, Int);
+             "file-change-wait-duration-ms", Int);
 
   // cache_capacity requires Jedec size conversion.
-  constexpr char kCacheCapacity[] = "cache_capacity";
+  constexpr char kCacheCapacity[] = "cache-capacity";
   if (config.isMember(kCacheCapacity)) {
     JedecSize cache_capacity;
     std::string error;
@@ -162,25 +217,25 @@ std::string AssetStreamConfig::ToString() {
   ss << "quiet                        = " << session_cfg_.quiet << std::endl;
   ss << "check                        = " << session_cfg_.fuse_check
      << std::endl;
-  ss << "log_to_stdout                = " << log_to_stdout_ << std::endl;
-  ss << "cache_capacity               = " << session_cfg_.fuse_cache_capacity
+  ss << "log-to-stdout                = " << log_to_stdout_ << std::endl;
+  ss << "cache-capacity               = " << session_cfg_.fuse_cache_capacity
      << std::endl;
-  ss << "cleanup_timeout              = "
+  ss << "cleanup-timeout              = "
      << session_cfg_.fuse_cleanup_timeout_sec << std::endl;
-  ss << "access_idle_timeout          = "
+  ss << "access-idle-timeout          = "
      << session_cfg_.fuse_access_idle_timeout_sec << std::endl;
-  ss << "manifest_updater_threads     = "
+  ss << "manifest-updater-threads     = "
      << session_cfg_.manifest_updater_threads << std::endl;
-  ss << "file_change_wait_duration_ms = "
+  ss << "file-change-wait-duration-ms = "
      << session_cfg_.file_change_wait_duration_ms << std::endl;
-  ss << "dev_src_dir                  = " << dev_src_dir_ << std::endl;
-  ss << "dev_user_host                = " << dev_target_.user_host << std::endl;
-  ss << "dev_ssh_port                 = " << dev_target_.ssh_port << std::endl;
-  ss << "dev_ssh_command              = " << dev_target_.ssh_command
+  ss << "dev-src-dir                  = " << dev_src_dir_ << std::endl;
+  ss << "dev-user-host                = " << dev_target_.user_host << std::endl;
+  ss << "dev-ssh-port                 = " << dev_target_.ssh_port << std::endl;
+  ss << "dev-ssh-command              = " << dev_target_.ssh_command
      << std::endl;
-  ss << "dev_scp_command              = " << dev_target_.scp_command
+  ss << "dev-scp-command              = " << dev_target_.scp_command
      << std::endl;
-  ss << "dev_mount_dir                = " << dev_target_.mount_dir << std::endl;
+  ss << "dev-mount-dir                = " << dev_target_.mount_dir << std::endl;
   return ss.str();
 }
 
@@ -194,6 +249,19 @@ std::string AssetStreamConfig::GetFlagReadErrors() {
     error_str += absl::StrFormat("%sFailed to read '%s': %s",
                                  error_str.empty() ? "" : "\n", flag, error);
   return error_str;
+}
+std::function<void(const std::string&)> AssetStreamConfig::JedecParser(
+    const char* flag_name, uint64_t* bytes) {
+  return [flag_name, bytes,
+          error = &jedec_parse_error_](const std::string& value) {
+    JedecSize size;
+    if (AbslParseFlag(value, &size, error)) {
+      *bytes = size.Size();
+    } else {
+      *error = absl::StrFormat("Failed to parse --%s=%s: %s", flag_name, value,
+                               *error);
+    }
+  };
 }
 
 }  // namespace cdc_ft

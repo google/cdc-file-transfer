@@ -7,12 +7,28 @@ cc_binary(
     srcs = ["main.cc"],
     data = [":roots_pem"],
     deps = [
-        ":asset_stream_config",
-        ":session_management_server",
+        ":commands",
         "//cdc_stream",
         "//common:log",
         "//common:path",
-        "//data_store:data_provider",
+    ],
+)
+
+cc_library(
+    name = "commands",
+    srcs = [
+        "base_command.cc",
+        "start_service_command.cc",
+    ],
+    hdrs = [
+        "base_command.h",
+        "start_service_command.h",
+    ],
+    deps = [
+        ":asset_stream_config",
+        ":session_management_server",
+        "@com_github_lyra//:lyra",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -53,8 +69,10 @@ cc_library(
         "//common:log",
         "//common:path",
         "//common:status_macros",
+        "//data_store:data_provider",
+        "//data_store:disk_data_store",
         "@com_github_jsoncpp//:jsoncpp",
-        "@com_google_absl//absl/flags:parse",
+        "@com_github_lyra//:lyra",
     ],
 )
 

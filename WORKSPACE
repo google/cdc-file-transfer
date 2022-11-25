@@ -47,10 +47,10 @@ http_archive(
 http_archive(
     name = "com_github_fuse",
     build_file = "@//third_party/fuse:BUILD",
-    sha256 = "832432d1ad4f833c20e13b57cf40ce5277a9d33e483205fc63c78111b3358874",
-    strip_prefix = "fuse-2.9.7",
     patch_args = ["-p1"],
     patches = ["@//third_party/fuse:disable_symbol_versioning.patch"],
+    sha256 = "832432d1ad4f833c20e13b57cf40ce5277a9d33e483205fc63c78111b3358874",
+    strip_prefix = "fuse-2.9.7",
     url = "https://github.com/libfuse/libfuse/releases/download/fuse-2.9.7/fuse-2.9.7.tar.gz",
 )
 
@@ -68,6 +68,14 @@ http_archive(
     sha256 = "f72d39e3c39610b6901e391b140aa69b51e0eb99216939ed5e547b5dad03afb1",
     strip_prefix = "dirent-1.23.2",
     url = "https://github.com/tronkko/dirent/archive/refs/tags/1.23.2.tar.gz",
+)
+
+http_archive(
+    name = "com_github_lyra",
+    build_file = "@//third_party/lyra:BUILD.bazel",
+    sha256 = "a93f247ed89eba11ca36eb24c4f8ba7be636bf24e74aaaa8e1066e0954bec7e3",
+    strip_prefix = "Lyra-1.6.1",
+    url = "https://github.com/bfgroup/Lyra/archive/refs/tags/1.6.1.tar.gz",
 )
 
 local_repository(
