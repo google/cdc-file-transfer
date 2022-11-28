@@ -53,7 +53,7 @@ jobs:
       - name: Build
         run: |
           bazel build --config=windows --compilation_mode=opt --copt=/GL `
-                       //cdc_rsync //cdc_stream //asset_stream_manager //tests_common //tests_asset_streaming_30 //tests_cdc_rsync
+                       //cdc_rsync //asset_stream_manager //tests_common //tests_asset_streaming_30 //tests_cdc_rsync
 
       - name: Test
         run: |
@@ -77,7 +77,6 @@ jobs:
         run: |
           mkdir artifacts
           cp bazel-bin/cdc_rsync/cdc_rsync.exe artifacts
-          cp bazel-bin/cdc_stream/cdc_stream.exe artifacts
           cp bazel-bin/asset_stream_manager/asset_stream_manager.exe artifacts
           cp LICENSE artifacts
           cp README.md artifacts

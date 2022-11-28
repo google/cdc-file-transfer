@@ -19,6 +19,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "absl_helper/jedec_size_flag.h"
+#include "asset_stream_manager/base_command.h"
 #include "common/buffer.h"
 #include "common/path.h"
 #include "common/status_macros.h"
@@ -38,12 +39,14 @@ AssetStreamConfig::AssetStreamConfig() = default;
 
 AssetStreamConfig::~AssetStreamConfig() = default;
 
-void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd) {
+void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd,
+                                                 BaseCommand& base_command) {
   session_cfg_.verbosity = kDefaultVerbosity;
   cmd.add_argument(lyra::opt(session_cfg_.verbosity, "num")
                        .name("--verbosity")
                        .help("Verbosity of the log output, default: " +
-                             std::to_string(kDefaultVerbosity)));
+                             std::to_string(kDefaultVerbosity) +
+                             ". Increase to make logs more verbose."));
 
   cmd.add_argument(
       lyra::opt(session_cfg_.stats)
@@ -84,13 +87,14 @@ void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd) {
                        .help("Check FUSE consistency and log check results"));
 
   session_cfg_.fuse_cache_capacity = DiskDataStore::kDefaultCapacity;
-  cmd.add_argument(lyra::opt(JedecParser("--cache-capacity",
+  cmd.add_argument(
+      lyra::opt(base_command.JedecParser("--cache-capacity",
                                          &session_cfg_.fuse_cache_capacity),
-                             "bytes")
-                       .name("--cache-capacity")
-                       .help("FUSE cache capacity, default: " +
-                             std::to_string(DiskDataStore::kDefaultCapacity) +
-                             ". Supports common unit suffixes K, M, G."));
+                "bytes")
+          .name("--cache-capacity")
+          .help("FUSE cache capacity, default: " +
+                std::to_string(DiskDataStore::kDefaultCapacity) +
+                ". Supports common unit suffixes K, M, G."));
 
   session_cfg_.fuse_cleanup_timeout_sec = DataProvider::kCleanupTimeoutSec;
   cmd.add_argument(
@@ -250,19 +254,6 @@ std::string AssetStreamConfig::GetFlagReadErrors() {
     error_str += absl::StrFormat("%sFailed to read '%s': %s",
                                  error_str.empty() ? "" : "\n", flag, error);
   return error_str;
-}
-std::function<void(const std::string&)> AssetStreamConfig::JedecParser(
-    const char* flag_name, uint64_t* bytes) {
-  return [flag_name, bytes,
-          error = &jedec_parse_error_](const std::string& value) {
-    JedecSize size;
-    if (AbslParseFlag(value, &size, error)) {
-      *bytes = size.Size();
-    } else {
-      *error = absl::StrFormat("Failed to parse --%s=%s: %s", flag_name, value,
-                               *error);
-    }
-  };
 }
 
 }  // namespace cdc_ft

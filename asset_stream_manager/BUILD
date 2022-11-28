@@ -9,27 +9,71 @@ cc_binary(
     srcs = ["main.cc"],
     data = [":roots_pem"],
     deps = [
-        ":commands",
-        "//cdc_stream",
+        ":start_command",
+        ":start_service_command",
+        ":stop_command",
         "//common:log",
         "//common:path",
     ],
 )
 
 cc_library(
-    name = "commands",
-    srcs = [
-        "base_command.cc",
-        "start_service_command.cc",
+    name = "base_command",
+    srcs = ["base_command.cc"],
+    hdrs = ["base_command.h"],
+    deps = [
+        "//absl_helper:jedec_size_flag",
+        "@com_github_lyra//:lyra",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings:str_format",
     ],
-    hdrs = [
-        "base_command.h",
-        "start_service_command.h",
-    ],
+)
+
+cc_library(
+    name = "start_service_command",
+    srcs = ["start_service_command.cc"],
+    hdrs = ["start_service_command.h"],
     deps = [
         ":asset_stream_config",
+        ":base_command",
         ":session_management_server",
-        "@com_github_lyra//:lyra",
+    ],
+)
+
+cc_library(
+    name = "start_command",
+    srcs = ["start_command.cc"],
+    hdrs = ["start_command.h"],
+    deps = [
+        ":base_command",
+        ":local_assets_stream_manager_client",
+        ":session_management_server",
+        "//common:path",
+        "//common:status_macros",
+    ],
+)
+
+cc_library(
+    name = "stop_command",
+    srcs = ["stop_command.cc"],
+    hdrs = ["stop_command.h"],
+    deps = [
+        ":base_command",
+        ":local_assets_stream_manager_client",
+        ":session_management_server",
+        "//common:path",
+        "//common:remote_util",
+        "//common:status_macros",
+    ],
+)
+
+cc_library(
+    name = "local_assets_stream_manager_client",
+    srcs = ["local_assets_stream_manager_client.cc"],
+    hdrs = ["local_assets_stream_manager_client.h"],
+    deps = [
+        "//common:grpc_status",
+        "//proto:local_assets_stream_manager_grpc_proto",
         "@com_google_absl//absl/status",
     ],
 )
@@ -66,8 +110,8 @@ cc_library(
     srcs = ["asset_stream_config.cc"],
     hdrs = ["asset_stream_config.h"],
     deps = [
+        ":base_command",
         ":multi_session",
-        "//absl_helper:jedec_size_flag",
         "//common:log",
         "//common:path",
         "//common:status_macros",

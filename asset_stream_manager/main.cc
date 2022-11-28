@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "asset_stream_manager/start_command.h"
 #include "asset_stream_manager/start_service_command.h"
+#include "asset_stream_manager/stop_command.h"
 #include "lyra/lyra.hpp"
 
 int main(int argc, char* argv[]) {
@@ -22,8 +24,14 @@ int main(int argc, char* argv[]) {
   int exit_code = -1;
   cli.add_argument(lyra::help(show_help));
 
-  cdc_ft::StartServiceCommand start_service(&exit_code);
-  start_service.Register(cli);
+  cdc_ft::StartCommand start_cmd(&exit_code);
+  start_cmd.Register(cli);
+
+  cdc_ft::StopCommand stop_cmd(&exit_code);
+  stop_cmd.Register(cli);
+
+  cdc_ft::StartServiceCommand start_service_cmd(&exit_code);
+  start_service_cmd.Register(cli);
 
   // Parse args and run. Note that parse actually runs the commands.
   // exit_code is -1 if no command was run.

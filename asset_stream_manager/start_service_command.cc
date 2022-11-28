@@ -30,8 +30,6 @@
 namespace cdc_ft {
 namespace {
 
-constexpr int kSessionManagementPort = 44432;
-
 std::string GetLogPath(const char* log_dir, const char* log_base_name) {
   DefaultSystemClock* clock = DefaultSystemClock::GetInstance();
   std::string timestamp_ext = clock->FormatNow(".%Y%m%d-%H%M%S.log", false);
@@ -57,19 +55,17 @@ void StartServiceCommand::RegisterCommandLineFlags(lyra::command& cmd) {
           .name("--log-dir")
           .help("Directory to store log files, default: " + log_dir_));
 
-  cfg_.RegisterCommandLineFlags(cmd);
+  cfg_.RegisterCommandLineFlags(cmd, *this);
 }
 
 absl::Status StartServiceCommand::Run() {
-  if (!cfg_.jedec_parse_error().empty()) {
-    return absl::InvalidArgumentError(cfg_.jedec_parse_error());
-  }
-
   // Set up config. Allow overriding this config with |config_file|.
   absl::Status cfg_load_status = path::ExpandPathVariables(&config_file_);
   cfg_load_status.Update(cfg_.LoadFromFile(config_file_));
 
-  RETURN_IF_ERROR(InitLogging());
+  std::unique_ptr<Log> logger;
+  ASSIGN_OR_RETURN(logger, GetLogger());
+  cdc_ft::ScopedLog scoped_log(std::move(logger));
 
   // Log status of loaded configuration. Errors are not critical.
   if (cfg_load_status.ok()) {
@@ -102,16 +98,14 @@ absl::Status StartServiceCommand::Run() {
     LOG_INFO("Asset stream manager shut down successfully.");
   }
 
-  Log::Shutdown();
   return status;
 }
 
-absl::Status StartServiceCommand::InitLogging() {
+absl::StatusOr<std::unique_ptr<Log>> StartServiceCommand::GetLogger() {
   LogLevel level = Log::VerbosityToLogLevel(cfg_.session_cfg().verbosity);
   if (cfg_.log_to_stdout()) {
     // Log to stdout.
-    Log::Initialize(std::make_unique<ConsoleLog>(level));
-    return absl::OkStatus();
+    return std::make_unique<ConsoleLog>(level);
   }
 
   // Log to file.
@@ -121,9 +115,8 @@ absl::Status StartServiceCommand::InitLogging() {
         absl::StrFormat("Failed to create log directory '%s'", log_dir_));
   }
 
-  Log::Initialize(std::make_unique<FileLog>(
-      level, GetLogPath(log_dir_.c_str(), "assets_stream_manager").c_str()));
-  return absl::OkStatus();
+  return std::make_unique<FileLog>(
+      level, GetLogPath(log_dir_.c_str(), "assets_stream_manager").c_str());
 }
 
 // Runs the session management service and returns when it finishes.
@@ -154,7 +147,8 @@ absl::Status StartServiceCommand::RunService() {
     RETURN_ABSL_IF_ERROR(
         session_service.StartSession(nullptr, &request, &response));
   }
-  RETURN_IF_ERROR(sm_server.Start(kSessionManagementPort));
+  RETURN_IF_ERROR(
+      sm_server.Start(SessionManagementServer::kDefaultServicePort));
   sm_server.RunUntilShutdown();
   return absl::OkStatus();
 }

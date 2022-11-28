@@ -123,6 +123,13 @@ class ConsoleLog : public Log {
   absl::Mutex mutex_;
 };
 
+// Initializes the log in the constructor and shuts it down on destruction.
+class ScopedLog {
+ public:
+  ScopedLog(std::unique_ptr<Log> log) { Log::Initialize(std::move(log)); }
+  ~ScopedLog() { Log::Shutdown(); }
+};
+
 class FileLog : public Log {
  public:
   FileLog(LogLevel log_level, const char* path);

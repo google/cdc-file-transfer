@@ -21,6 +21,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\base_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\cdc_fuse_manager.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\grpc_asset_stream_server.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\local_assets_stream_manager_client.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\local_assets_stream_manager_service_impl.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\main.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\metrics_recorder.cc" />
@@ -30,7 +31,9 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\session.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_management_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_manager.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\start_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\start_service_command.cc" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\stop_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)asset_stream_manager\testing_asset_stream_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset_stream_client.cc" />
@@ -42,8 +45,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\mock_libfuse.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_indexer\indexer.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_indexer\main.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\local_assets_stream_manager_client.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\main.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\buffer.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\buffer_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\clock.cc" />
@@ -150,6 +151,7 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\base_command.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\cdc_fuse_manager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\grpc_asset_stream_server.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\local_assets_stream_manager_client.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\local_assets_stream_manager_service_impl.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\metrics_recorder.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\multi_session.h" />
@@ -157,7 +159,9 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_config.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_management_server.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\session_manager.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\start_command.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\start_service_command.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\stop_command.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)asset_stream_manager\testing_asset_stream_server.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset_stream_client.h" />
@@ -166,7 +170,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\constants.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\mock_libfuse.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_indexer\indexer.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)cdc_stream\local_assets_stream_manager_client.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\buffer.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\clock.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\dir_iter.h" />
@@ -246,7 +249,6 @@
     <None Include="$(MSBuildThisFileDirectory)cdc_indexer\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)cdc_indexer\README.md" />
     <None Include="$(MSBuildThisFileDirectory)cdc_rsync\protos\BUILD" />
-    <None Include="$(MSBuildThisFileDirectory)cdc_stream\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)common\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)data_store\BUILD" />
     <None Include="$(MSBuildThisFileDirectory)cdc_rsync\base\BUILD" />
