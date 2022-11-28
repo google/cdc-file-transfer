@@ -140,7 +140,11 @@ class FileWatcherParameterizedTest : public ::testing::TestWithParam<bool> {
 
     // Wait for events, until they are processed.
     while (modified_files.size() < number_of_files) {
-      EXPECT_TRUE(WaitForChange());
+      if (!WaitForChange()) {
+        LOG_ERROR("No change detected after %s",
+                  absl::FormatDuration(kWaitTimeout));
+        return modified_files;
+      }
       for (const auto& [path, info] : watcher_.GetModifiedFiles())
         modified_files.insert_or_assign(path, info);
     }
