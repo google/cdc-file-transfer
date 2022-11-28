@@ -12,12 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This proto defines the manifest format used for Asset Streaming 3.0 and
-// package diffing.
-//
-// References:
-// * (internal).0
-// * (internal)
+// This proto defines the manifest format used for CDC Stream.
 
 syntax = "proto3";
 

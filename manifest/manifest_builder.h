@@ -34,8 +34,6 @@ namespace cdc_ft {
 // finalized with a call to Flush(). When the CdcParamsProto given during
 // construction specifies an average chunk size, then the manifest will be split
 // into balanced chunks of at most this size.
-//
-// See (internal).
 class ManifestBuilder {
  public:
   // Default permission bits for new directories and files, respectively.

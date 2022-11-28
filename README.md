@@ -143,10 +143,10 @@ The two tools can be built and used independently.
   ```
 * Build Windows components
   ```
-  bazel build --config windows --compilation_mode=opt --copt=/GL //asset_stream_manager
+  bazel build --config windows --compilation_mode=opt --copt=/GL //cdc_stream
   ```
 * Copy the Linux build output files `cdc_fuse_fs` and `libfuse.so` from 
-  `bazel-bin/cdc_fuse_fs` on the Linux system to `bazel-bin\asset_stream_manager`
+  `bazel-bin/cdc_fuse_fs` on the Linux system to `bazel-bin\cdc_stream`
   on the Windows machine.
 
 ## Usage
@@ -211,13 +211,13 @@ cdc_rsync C:\path\to\assets\* user@linux.device.com:~/assets -vr
 
 ### CDC Stream
 
-`cdc_stream` consists of a background service called `asset_stream_manager`,
-which has to be started in advance with
+`cdc_stream` consists of a background service, which has to be started in
+advance with
 ```
-asset_stream_manager
+cdc_stream start-service
 ```
 The service logs to `%APPDATA%\cdc-file-transfer\logs` by default. Try
-`asset_stream_manager --helpfull` to get a list of available flags.
+`cdc_stream --help` to get a list of available flags.
 
 To stream the Windows directory `C:\path\to\assets` to `~/assets` on the Linux
 device, run
@@ -235,17 +235,14 @@ cdc_stream stop user@linux.device.com:~/assets
 
 ## Troubleshooting
 
-`cdc_rsync` always logs to the console. By default, the `asset_stream_manager`
-service logs to a timestamped file in `%APPDATA%\cdc-file-transfer\logs`. It can
-be switched to log to console by starting it with `--log_to_stdout`:
+`cdc_rsync` always logs to the console. By default, the `cdc_stream` service
+logs to a timestamped file in `%APPDATA%\cdc-file-transfer\logs`. It can be
+switched to log to console by starting it with `--log-to-stdout`:
 ```
-asset_stream_manager --log_to_stdout
+cdc_stream start-service --log_to_stdout
 ```
 
-Both `cdc_rsync` and `asset_stream_manager` support command line flags to control log
+Both `cdc_rsync` and `cdc_stream` support command line flags to control log
 verbosity. Passing `-vvv` prints debug logs, `-vvvv` prints verbose logs. The
 debug logs contain all SSH and SCP commands that are attempted to run, which is
 very useful for troubleshooting.
-
-`cdc_stream` is just a thin client for the asset streaming service. Nothing ever
-goes wrong with it <sup>[citation needed]</sup>.
