@@ -61,7 +61,7 @@
   <PropertyGroup>
     <BazelTargets>//tests_asset_streaming_30</BazelTargets>
     <BazelOutputFile>tests_asset_streaming_30.exe</BazelOutputFile>
-    <BazelIncludePaths>..\;..\third_party\absl;..\third_party\jsoncpp\include;..\third_party\blake3\c;..\third_party\googletest\googletest\include;..\third_party\protobuf\src;..\third_party\grpc\include;..\bazel-out\x64_windows-dbg\bin;$(VC_IncludePath);$(WindowsSDK_IncludePath)</BazelIncludePaths>
+    <BazelIncludePaths>..\;..\third_party\absl;..\bazel-cdc-file-transfer\external\com_github_jsoncpp\include;..\bazel-cdc-file-transfer\external\com_github_blake3\c;..\third_party\googletest\googletest\include;..\bazel-cdc-file-transfer\external\com_google_protobuf\src;..\bazel-cdc-file-transfer\external\com_github_grpc_grpc\include;..\bazel-out\x64_windows-dbg\bin;$(VC_IncludePath);$(WindowsSDK_IncludePath)</BazelIncludePaths>
   </PropertyGroup>
   <Import Project="..\NMakeBazelProject.targets" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
