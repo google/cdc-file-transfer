@@ -313,11 +313,10 @@ TEST_F(ProcessTest, LogOutputLevelDetection) {
 }
 
 TEST_F(ProcessTest, Terminate) {
+  // Use ping to simulate a sleep instead of timeout since timeout fails with
+  // "Input redirection is not supported".
   ProcessStartInfo start_info;
-  start_info.command = "timeout /T 30";
-  // Prevents the process from shutting down immediately when run in background.
-  // https://www.ibm.com/support/pages/timeout-command-run-batch-job-exits-immediately-and-returns-error-input-redirection-not-supported-exiting-process-immediately
-  start_info.redirect_stdin = true;
+  start_info.command = "ping -n 30 127.0.0.1";
   std::unique_ptr<Process> process = process_factory_.Create(start_info);
   EXPECT_OK(process->Start());
   EXPECT_EQ(process->ExitCode(), Process::kExitCodeStillRunning);
@@ -326,18 +325,17 @@ TEST_F(ProcessTest, Terminate) {
 }
 
 TEST_F(ProcessTest, TerminateAlreadyExited) {
+  // Use ping to simulate a sleep instead of timeout since timeout fails with
+  // "Input redirection is not supported".
   ProcessStartInfo start_info;
-  start_info.command = "timeout /T 30";
-  // Prevents the process from shutting down immediately when run in background.
-  // https://www.ibm.com/support/pages/timeout-command-run-batch-job-exits-immediately-and-returns-error-input-redirection-not-supported-exiting-process-immediately
-  start_info.redirect_stdin = true;
+  start_info.command = "ping -n 30 127.0.0.1";
   std::unique_ptr<Process> process = process_factory_.Create(start_info);
   EXPECT_OK(process->Start());
   EXPECT_FALSE(process->HasExited());
   bool terminated = false;
   Stopwatch sw;
   while (sw.ElapsedSeconds() < 5 && !terminated) {
-    terminated = TerminateProcessByName("timeout.exe");
+    terminated = TerminateProcessByName("ping.exe");
     if (!terminated) Util::Sleep(1);
   }
   EXPECT_TRUE(terminated);
