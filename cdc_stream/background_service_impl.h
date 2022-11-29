@@ -17,6 +17,9 @@
 #ifndef CDC_STREAM_BACKGROUND_SERVICE_IMPL_H_
 #define CDC_STREAM_BACKGROUND_SERVICE_IMPL_H_
 
+#include <memory>
+#include <thread>
+
 #include "absl/status/status.h"
 #include "cdc_stream/background_service_impl.h"
 #include "cdc_stream/session_management_server.h"
@@ -52,6 +55,7 @@ class BackgroundServiceImpl final
 
  private:
   ExitCallback exit_callback_;
+  std::unique_ptr<std::thread> exit_thread_;
 };
 
 }  // namespace cdc_ft

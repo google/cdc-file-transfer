@@ -15,6 +15,7 @@
 #include "cdc_stream/start_command.h"
 #include "cdc_stream/start_service_command.h"
 #include "cdc_stream/stop_command.h"
+#include "cdc_stream/stop_service_command.h"
 #include "lyra/lyra.hpp"
 
 int main(int argc, char* argv[]) {
@@ -32,6 +33,9 @@ int main(int argc, char* argv[]) {
 
   cdc_ft::StartServiceCommand start_service_cmd(&exit_code);
   start_service_cmd.Register(cli);
+
+  cdc_ft::StopServiceCommand stop_service_cmd(&exit_code);
+  stop_service_cmd.Register(cli);
 
   // Parse args and run. Note that parse actually runs the commands.
   // exit_code is -1 if no command was run.

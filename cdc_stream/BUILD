@@ -12,6 +12,7 @@ cc_binary(
         ":start_command",
         ":start_service_command",
         ":stop_command",
+        ":stop_service_command",
         "//common:log",
         "//common:path",
     ],
@@ -35,6 +36,18 @@ cc_library(
     hdrs = ["start_service_command.h"],
     deps = [
         ":asset_stream_config",
+        ":base_command",
+        ":session_management_server",
+    ],
+)
+
+cc_library(
+    name = "stop_service_command",
+    srcs = ["stop_service_command.cc"],
+    hdrs = ["stop_service_command.h"],
+    deps = [
+        ":asset_stream_config",
+        ":background_service_client",
         ":base_command",
         ":session_management_server",
     ],

@@ -23,7 +23,12 @@ namespace cdc_ft {
 
 BackgroundServiceImpl::BackgroundServiceImpl() {}
 
-BackgroundServiceImpl::~BackgroundServiceImpl() = default;
+BackgroundServiceImpl::~BackgroundServiceImpl() {
+  if (exit_thread_) {
+    exit_thread_->join();
+    exit_thread_.reset();
+  }
+}
 
 void BackgroundServiceImpl::SetExitCallback(ExitCallback exit_callback) {
   exit_callback_ = std::move(exit_callback);
@@ -33,8 +38,11 @@ grpc::Status BackgroundServiceImpl::Exit(grpc::ServerContext* context,
                                          const EmptyProto* request,
                                          EmptyProto* response) {
   LOG_INFO("RPC:Exit");
-  if (exit_callback_) {
-    return ToGrpcStatus(exit_callback_());
+  if (exit_callback_ && !exit_thread_) {
+    // Fire up a thread so call the callback, since shutting down a server
+    // won't finish until all RPCs are done.
+    exit_thread_ =
+        std::make_unique<std::thread>([cb = &exit_callback_]() { (*cb)(); });
   }
   return grpc::Status::OK;
 }
