@@ -136,9 +136,24 @@ absl::Status SessionManager::StartSession(
   return status;
 }
 
-absl::Status SessionManager::StopSession(const std::string& instance_id) {
+absl::Status SessionManager::StopSession(
+    const std::string& instance_id_filter) {
   absl::MutexLock lock(&sessions_mutex_);
-  return StopSessionInternal(instance_id);
+
+  std::vector<std::string> instance_ids;
+  for (const auto& [key, ms] : sessions_) {
+    auto ids = ms->MatchSessions(instance_id_filter);
+    instance_ids.insert(instance_ids.end(), ids.begin(), ids.end());
+  }
+  if (instance_ids.empty()) {
+    return absl::NotFoundError(
+        absl::StrFormat("No session found matching '%s'", instance_id_filter));
+  }
+
+  for (const std::string& instance_id : instance_ids) {
+    RETURN_IF_ERROR(StopSessionInternal(instance_id));
+  }
+  return absl::OkStatus();
 }
 
 MultiSession* SessionManager::GetMultiSession(const std::string& src_dir) {

@@ -53,7 +53,7 @@ void StopCommand::RegisterCommandLineFlags(lyra::command& cmd) {
                 std::to_string(SessionManagementServer::kDefaultServicePort)));
 
   cmd.add_argument(
-      lyra::arg(PosArgValidator(&user_host_dir_), "[user@]host:src-dir")
+      lyra::arg(PosArgValidator(&user_host_dir_), "[user@]host:dir")
           .required()
           .help("Linux host and directory to stream to"));
 }
@@ -70,8 +70,14 @@ absl::Status StopCommand::Run() {
   LocalAssetsStreamManagerClient client(channel);
 
   std::string user_host, mount_dir;
-  RETURN_IF_ERROR(LocalAssetsStreamManagerClient::ParseUserHostDir(
-      user_host_dir_, &user_host, &mount_dir));
+  if (user_host_dir_ == "*") {
+    // Convenience shortcut "*" for "*:*".
+    user_host = "*";
+    mount_dir = "*";
+  } else {
+    RETURN_IF_ERROR(LocalAssetsStreamManagerClient::ParseUserHostDir(
+        user_host_dir_, &user_host, &mount_dir));
+  }
 
   absl::Status status = client.StopSession(user_host, mount_dir);
   if (status.ok()) {

@@ -101,7 +101,7 @@ void StartCommand::RegisterCommandLineFlags(lyra::command& cmd) {
                        .help("Windows directory to stream"));
 
   cmd.add_argument(
-      lyra::arg(PosArgValidator(&user_host_dir_), "[user@]host:src-dir")
+      lyra::arg(PosArgValidator(&user_host_dir_), "[user@]host:dir")
           .required()
           .help("Linux host and directory to stream to"));
 }
