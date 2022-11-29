@@ -21,6 +21,9 @@
 #include "common/log.h"
 #include "common/path.h"
 #include "common/status_macros.h"
+#include "grpcpp/channel.h"
+#include "grpcpp/create_channel.h"
+#include "grpcpp/support/channel_arguments.h"
 #include "lyra/lyra.hpp"
 
 namespace cdc_ft {
@@ -58,7 +61,13 @@ void StopCommand::RegisterCommandLineFlags(lyra::command& cmd) {
 absl::Status StopCommand::Run() {
   LogLevel level = Log::VerbosityToLogLevel(verbosity_);
   ScopedLog scoped_log(std::make_unique<ConsoleLog>(level));
-  LocalAssetsStreamManagerClient client(service_port_);
+
+  std::string client_address = absl::StrFormat("localhost:%u", service_port_);
+  std::shared_ptr<grpc::Channel> channel = grpc::CreateCustomChannel(
+      client_address, grpc::InsecureChannelCredentials(),
+      grpc::ChannelArguments());
+
+  LocalAssetsStreamManagerClient client(channel);
 
   std::string user_host, mount_dir;
   RETURN_IF_ERROR(LocalAssetsStreamManagerClient::ParseUserHostDir(

@@ -45,6 +45,7 @@ cc_library(
     srcs = ["start_command.cc"],
     hdrs = ["start_command.h"],
     deps = [
+        ":background_service_client",
         ":base_command",
         ":local_assets_stream_manager_client",
         ":session_management_server",
@@ -74,6 +75,18 @@ cc_library(
     deps = [
         "//common:grpc_status",
         "//proto:local_assets_stream_manager_grpc_proto",
+        "@com_google_absl//absl/status",
+    ],
+)
+
+cc_library(
+    name = "background_service_client",
+    srcs = ["background_service_client.cc"],
+    hdrs = ["background_service_client.h"],
+    deps = [
+        "//common:grpc_status",
+        "//common:status_macros",
+        "//proto:background_service_grpc_proto",
         "@com_google_absl//absl/status",
     ],
 )
@@ -112,6 +125,8 @@ cc_library(
     deps = [
         ":base_command",
         ":multi_session",
+        ":session_management_server",
+        "//absl_helper:jedec_size_flag",
         "//common:log",
         "//common:path",
         "//common:status_macros",

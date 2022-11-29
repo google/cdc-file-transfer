@@ -33,6 +33,12 @@ namespace cdc_ft {
 absl::Status LogOutput(const char* name, const char* data, size_t data_size,
                        absl::optional<LogLevel> log_level = {});
 
+enum class ProcessFlags {
+  kNone = 0,
+  kDetached = 1 << 0,
+  kNoWindow = 1 << 1,
+};
+
 struct ProcessStartInfo {
   // Handler for stdout/stderr. |data| is guaranteed to be NULL terminated, so
   // it may be used like a C-string if it's known to be text, e.g. for printf().
@@ -63,8 +69,14 @@ struct ProcessStartInfo {
   OutputHandler stdout_handler;
   OutputHandler stderr_handler;
 
+  // Flags that define additional properties of the process.
+  ProcessFlags flags = ProcessFlags::kNone;
+
   // Returns |name| if set, otherwise |command|.
   const std::string& Name() const;
+
+  // Tests ALL flags (flags & flag) == flag.
+  bool HasFlag(ProcessFlags flag) const;
 };
 
 // Runs a background process and pipes stdin/stdout/stderr.
@@ -75,6 +87,8 @@ class Process {
   static constexpr uint32_t kExitCodeFailedToGetExitCode = 4000000002;
 
   explicit Process(const ProcessStartInfo& start_info);
+
+  // Terminates the process unless it's running with ProcessFlags::kDetached.
   virtual ~Process();
 
   // Start the background process.
@@ -139,6 +153,16 @@ class WinProcessFactory : public ProcessFactory {
   // ProcessFactory:
   std::unique_ptr<Process> Create(const ProcessStartInfo& start_info) override;
 };
+
+inline ProcessFlags operator|(ProcessFlags a, ProcessFlags b) {
+  using T = std::underlying_type_t<ProcessFlags>;
+  return static_cast<ProcessFlags>(static_cast<T>(a) | static_cast<T>(b));
+}
+
+inline ProcessFlags operator&(ProcessFlags a, ProcessFlags b) {
+  using T = std::underlying_type_t<ProcessFlags>;
+  return static_cast<ProcessFlags>(static_cast<T>(a) & static_cast<T>(b));
+}
 
 }  // namespace cdc_ft
 

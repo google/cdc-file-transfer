@@ -30,8 +30,8 @@ void BackgroundServiceImpl::SetExitCallback(ExitCallback exit_callback) {
 }
 
 grpc::Status BackgroundServiceImpl::Exit(grpc::ServerContext* context,
-                                         const ExitRequest* request,
-                                         ExitResponse* response) {
+                                         const EmptyProto* request,
+                                         EmptyProto* response) {
   LOG_INFO("RPC:Exit");
   if (exit_callback_) {
     return ToGrpcStatus(exit_callback_());
@@ -40,7 +40,7 @@ grpc::Status BackgroundServiceImpl::Exit(grpc::ServerContext* context,
 }
 
 grpc::Status BackgroundServiceImpl::GetPid(grpc::ServerContext* context,
-                                           const GetPidRequest* request,
+                                           const EmptyProto* request,
                                            GetPidResponse* response) {
   LOG_INFO("RPC:GetPid");
   response->set_pid(static_cast<int32_t>(Util::GetPid()));

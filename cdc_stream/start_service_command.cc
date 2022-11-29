@@ -43,7 +43,7 @@ StartServiceCommand::StartServiceCommand(int* exit_code)
 StartServiceCommand::~StartServiceCommand() = default;
 
 void StartServiceCommand::RegisterCommandLineFlags(lyra::command& cmd) {
-  config_file_ = "%APPDATA%\\cdc-file-transfer\\assets_stream_manager.json";
+  config_file_ = "%APPDATA%\\cdc-file-transfer\\cdc_stream.json";
   cmd.add_argument(
       lyra::opt(config_file_, "path")
           .name("--config-file")
@@ -147,8 +147,7 @@ absl::Status StartServiceCommand::RunService() {
     RETURN_ABSL_IF_ERROR(
         session_service.StartSession(nullptr, &request, &response));
   }
-  RETURN_IF_ERROR(
-      sm_server.Start(SessionManagementServer::kDefaultServicePort));
+  RETURN_IF_ERROR(sm_server.Start(cfg_.service_port()));
   sm_server.RunUntilShutdown();
   return absl::OkStatus();
 }

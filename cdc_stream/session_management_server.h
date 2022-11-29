@@ -36,7 +36,7 @@ class ProcessFactory;
 // - Background
 class SessionManagementServer {
  public:
-  static constexpr int kDefaultServicePort = 44432;
+  static constexpr uint16_t kDefaultServicePort = 44432;
 
   SessionManagementServer(grpc::Service* session_service,
                           grpc::Service* background_service,

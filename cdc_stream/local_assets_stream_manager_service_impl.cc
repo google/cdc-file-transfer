@@ -277,6 +277,7 @@ absl::Status LocalAssetsStreamManagerServiceImpl::InitSsh(
         absl::StrFormat(" --organization %s", Quoted(organization_id));
   }
   start_info.name = "ggp ssh init";
+  start_info.flags = ProcessFlags::kNoWindow;
 
   std::string output;
   start_info.stdout_handler = [&output, this](const char* data,
