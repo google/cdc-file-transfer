@@ -1,12 +1,13 @@
 # Description:
 # This project provides Linux compatible Dirent interface for Microsoft Windows.
 #
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
 
 licenses(["notice"])  # MIT license
 
 exports_files(["LICENSE"])
-
-package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "dirent",

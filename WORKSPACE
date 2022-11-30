@@ -47,10 +47,10 @@ http_archive(
 http_archive(
     name = "com_github_fuse",
     build_file = "@//third_party/fuse:BUILD",
-    sha256 = "832432d1ad4f833c20e13b57cf40ce5277a9d33e483205fc63c78111b3358874",
-    strip_prefix = "fuse-2.9.7",
     patch_args = ["-p1"],
     patches = ["@//third_party/fuse:disable_symbol_versioning.patch"],
+    sha256 = "832432d1ad4f833c20e13b57cf40ce5277a9d33e483205fc63c78111b3358874",
+    strip_prefix = "fuse-2.9.7",
     url = "https://github.com/libfuse/libfuse/releases/download/fuse-2.9.7/fuse-2.9.7.tar.gz",
 )
 

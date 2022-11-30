@@ -1,0 +1,25 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: DoozyX/clang-format-lint-action@v0.15
+      with:
+        clangFormatVersion: 15
+
+  buildify:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: thompsonja/bazel-buildifier@v0.4.0
+      with:
+        warnings: all
+

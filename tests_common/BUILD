@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
 package(default_visibility = ["//visibility:public"])
 
 # Using a cc_binary rule here to avoid that this test is included when running
