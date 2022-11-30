@@ -28,17 +28,22 @@
 #include "lyra/lyra.hpp"
 
 namespace cdc_ft {
+namespace {
+constexpr int kDefaultVerbosity = 2;
+constexpr uint32_t kDefaultManifestUpdaterThreads = 4;
+constexpr uint32_t kDefaultFileChangeWaitDurationMs = 500;
+}  // namespace
 
 AssetStreamConfig::AssetStreamConfig() = default;
 
 AssetStreamConfig::~AssetStreamConfig() = default;
 
 void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd) {
-  session_cfg_.verbosity = 2;
+  session_cfg_.verbosity = kDefaultVerbosity;
   cmd.add_argument(lyra::opt(session_cfg_.verbosity, "num")
                        .name("--verbosity")
                        .help("Verbosity of the log output, default: " +
-                             std::to_string(session_cfg_.verbosity)));
+                             std::to_string(kDefaultVerbosity)));
 
   cmd.add_argument(
       lyra::opt(session_cfg_.stats)
@@ -50,21 +55,20 @@ void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd) {
           .name("--quiet")
           .help("Do not print any output except errors and stats"));
 
-  session_cfg_.manifest_updater_threads = 4;
-  cmd.add_argument(
-      lyra::opt(session_cfg_.manifest_updater_threads, "count")
-          .name("--manifest-updater-threads")
-          .help("Number of threads used to compute file hashes on "
-                "the workstation, default: " +
-                std::to_string(session_cfg_.manifest_updater_threads)));
+  session_cfg_.manifest_updater_threads = kDefaultManifestUpdaterThreads;
+  cmd.add_argument(lyra::opt(session_cfg_.manifest_updater_threads, "count")
+                       .name("--manifest-updater-threads")
+                       .help("Number of threads used to compute file hashes on "
+                             "the workstation, default: " +
+                             std::to_string(kDefaultManifestUpdaterThreads)));
 
-  session_cfg_.file_change_wait_duration_ms = 500;
+  session_cfg_.file_change_wait_duration_ms = kDefaultFileChangeWaitDurationMs;
   cmd.add_argument(
       lyra::opt(session_cfg_.file_change_wait_duration_ms, "ms")
           .name("--file-change-wait-duration-ms")
           .help("Time in milliseconds to wait until pushing a file change "
                 "to the instance after detecting it, default: " +
-                std::to_string(session_cfg_.file_change_wait_duration_ms)));
+                std::to_string(kDefaultFileChangeWaitDurationMs)));
 
   cmd.add_argument(lyra::opt(session_cfg_.fuse_debug)
                        .name("--debug")
@@ -73,39 +77,36 @@ void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd) {
   cmd.add_argument(lyra::opt(session_cfg_.fuse_singlethreaded)
                        .name("--singlethreaded")
                        .optional()
-                       .help("Run FUSE filesystem in singlethreaded mode"));
+                       .help("Run FUSE filesystem in single-threaded mode"));
 
   cmd.add_argument(lyra::opt(session_cfg_.fuse_check)
                        .name("--check")
                        .help("Check FUSE consistency and log check results"));
 
-  // TODO: Use jedec_size_flag.
-  session_cfg_.fuse_cache_capacity = cdc_ft::DiskDataStore::kDefaultCapacity;
+  session_cfg_.fuse_cache_capacity = DiskDataStore::kDefaultCapacity;
   cmd.add_argument(lyra::opt(JedecParser("--cache-capacity",
                                          &session_cfg_.fuse_cache_capacity),
                              "bytes")
                        .name("--cache-capacity")
                        .help("FUSE cache capacity, default: " +
-                             std::to_string(session_cfg_.fuse_cache_capacity) +
+                             std::to_string(DiskDataStore::kDefaultCapacity) +
                              ". Supports common unit suffixes K, M, G."));
 
-  session_cfg_.fuse_cleanup_timeout_sec =
-      cdc_ft::DataProvider::kCleanupTimeoutSec;
+  session_cfg_.fuse_cleanup_timeout_sec = DataProvider::kCleanupTimeoutSec;
   cmd.add_argument(
       lyra::opt(session_cfg_.fuse_cleanup_timeout_sec, "sec")
           .name("--cleanup-timeout")
           .help("Period in seconds at which instance cache cleanups are run, "
                 "default: " +
-                std::to_string(session_cfg_.fuse_cleanup_timeout_sec)));
+                std::to_string(DataProvider::kCleanupTimeoutSec)));
 
-  session_cfg_.fuse_access_idle_timeout_sec =
-      cdc_ft::DataProvider::kAccessIdleSec;
+  session_cfg_.fuse_access_idle_timeout_sec = DataProvider::kAccessIdleSec;
   cmd.add_argument(
       lyra::opt(session_cfg_.fuse_access_idle_timeout_sec, "sec")
           .name("--access-idle-timeout")
           .help("Do not run instance cache cleanups for this long after the "
                 "last file access, default: " +
-                std::to_string(session_cfg_.fuse_access_idle_timeout_sec)));
+                std::to_string(DataProvider::kAccessIdleSec)));
 
   cmd.add_argument(lyra::opt(log_to_stdout_)
                        .name("--log-to-stdout")
@@ -122,12 +123,12 @@ void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd) {
           .name("--dev-user-host")
           .help("Username and host to stream to. See also --dev-src-dir."));
 
-  dev_target_.ssh_port = cdc_ft::RemoteUtil::kDefaultSshPort;
+  dev_target_.ssh_port = RemoteUtil::kDefaultSshPort;
   cmd.add_argument(
       lyra::opt(dev_target_.ssh_port, "port")
           .name("--dev-ssh-port")
           .help("SSH port to use for the connection to the host, default: " +
-                std::to_string(dev_target_.ssh_port) +
+                std::to_string(RemoteUtil::kDefaultSshPort) +
                 ". See also --dev-src-dir."));
 
   cmd.add_argument(

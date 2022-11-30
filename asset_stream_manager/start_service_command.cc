@@ -65,7 +65,7 @@ absl::Status StartServiceCommand::Run() {
     return absl::InvalidArgumentError(cfg_.jedec_parse_error());
   }
 
-  // Set up config. Allow overriding this config |config_file|.
+  // Set up config. Allow overriding this config with |config_file|.
   absl::Status cfg_load_status = path::ExpandPathVariables(&config_file_);
   cfg_load_status.Update(cfg_.LoadFromFile(config_file_));
 

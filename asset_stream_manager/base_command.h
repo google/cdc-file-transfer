@@ -52,10 +52,9 @@ class BaseCommand {
   virtual absl::Status Run() = 0;
 
  private:
-  // Called by by lyra::cli::parse() after successfully parsing arguments.
-  // Catches unknown arguments (Lyra interprets those as positional args, not
-  // as an error!), and displays the help text if appropriate, otherwise calls
-  // Run().
+  // Called by lyra::cli::parse() after successfully parsing arguments. Catches
+  // unknown arguments (Lyra interprets those as positional args, not as an
+  // error!), and displays the help text if appropriate, otherwise calls Run().
   void CommandHandler(const lyra::group& g);
 
   std::string name_;
