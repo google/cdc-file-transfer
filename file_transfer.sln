@@ -8,15 +8,15 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_rsync", "cdc_rsync\cdc_
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_rsync_server", "cdc_rsync_server\cdc_rsync_server.vcxproj", "{4ECE65E0-D950-4B96-8AD5-0313261B8C8D}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Asset Streaming 3.0", "Asset Streaming 3.0", "{E4C4704F-C5C8-4A1D-B7E7-4D201DD29585}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "CDC Stream", "CDC Stream", "{E4C4704F-C5C8-4A1D-B7E7-4D201DD29585}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_fuse_fs", "cdc_fuse_fs\cdc_fuse_fs.vcxproj", "{A537310C-0571-43D5-B7FE-C867F702294F}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "asset_stream_manager", "asset_stream_manager\asset_stream_manager.vcxproj", "{84D81562-D66C-4A60-9F48-2696D7D81D26}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cdc_stream", "cdc_stream\cdc_stream.vcxproj", "{84D81562-D66C-4A60-9F48-2696D7D81D26}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "all_files", "all_files.vcxitems", "{F542AF2D-5A17-4F55-BE40-B1A2A6182811}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tests_asset_streaming_30", "tests_asset_streaming_30\tests_asset_streaming_30.vcxproj", "{2B36A6AA-FD11-4F77-A79B-29A3B185E701}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tests_cdc_stream", "tests_cdc_stream\tests_cdc_stream.vcxproj", "{2B36A6AA-FD11-4F77-A79B-29A3B185E701}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tests_cdc_rsync", "tests_cdc_rsync\tests_cdc_rsync.vcxproj", "{DBFE017C-31F0-47CA-9649-06F3C3CF0E41}"
 EndProject

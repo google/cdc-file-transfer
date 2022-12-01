@@ -53,19 +53,19 @@ jobs:
       - name: Build
         run: |
           bazel build --config=windows --compilation_mode=opt --copt=/GL `
-                       //cdc_rsync //asset_stream_manager //tests_common //tests_asset_streaming_30 //tests_cdc_rsync
+                       //cdc_rsync //cdc_stream //tests_common //tests_cdc_stream //tests_cdc_rsync
 
       - name: Test
         run: |
           bazel-bin\tests_common\tests_common.exe
-          bazel-bin\tests_asset_streaming_30\tests_asset_streaming_30.exe
+          bazel-bin\tests_cdc_stream\tests_cdc_stream.exe
           bazel-bin\tests_cdc_rsync\tests_cdc_rsync.exe
           bazel test --config=windows --compilation_mode=opt --copt=/GL --test_output=errors --local_test_jobs=1 `
-            //asset_stream_manager/... `
             //cdc_fuse_fs/... `
             //cdc_rsync/... `
             //cdc_rsync/base/... `
             //cdc_rsync_server/... `
+            //cdc_stream/... `
             //common/... `
             //data_store/... `
             //fastcdc/... `
@@ -77,7 +77,7 @@ jobs:
         run: |
           mkdir artifacts
           cp bazel-bin/cdc_rsync/cdc_rsync.exe artifacts
-          cp bazel-bin/asset_stream_manager/asset_stream_manager.exe artifacts
+          cp bazel-bin/cdc_stream/cdc_stream.exe artifacts
           cp LICENSE artifacts
           cp README.md artifacts
 
@@ -91,9 +91,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [Build-And-Test-Windows, Build-And-Test-Linux]
     steps:
-      - name: Test
-        run: echo '${{ toJSON(github) }}'
-
       - name: Download artifacts
         uses: actions/download-artifact@v3
 
