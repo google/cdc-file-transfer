@@ -14,6 +14,8 @@
 
 #include "asset_stream_manager/base_command.h"
 
+#include "absl/strings/str_format.h"
+#include "absl_helper/jedec_size_flag.h"
 #include "lyra/lyra.hpp"
 
 namespace cdc_ft {
@@ -33,12 +35,36 @@ void BaseCommand::Register(lyra::cli& cli) {
 
   RegisterCommandLineFlags(cmd);
 
-  // Workaround for Lyra treating --unknown_flags as positional argument.
-  // If this argument is not empty, it's an unknown arg.
-  cmd.add_argument(lyra::arg(invalid_arg_, ""));
+  // Detect extra positional args.
+  cmd.add_argument(lyra::arg(PosArgValidator(&extra_positional_arg_), ""));
 
   // Register command with CLI.
   cli.add_argument(std::move(cmd));
+}
+
+std::function<void(const std::string&)> BaseCommand::JedecParser(
+    const char* flag_name, uint64_t* bytes) {
+  return [flag_name, bytes,
+          error = &jedec_parse_error_](const std::string& value) {
+    JedecSize size;
+    if (AbslParseFlag(value, &size, error)) {
+      *bytes = size.Size();
+    } else {
+      *error = absl::StrFormat("Failed to parse %s=%s: %s", flag_name, value,
+                               *error);
+    }
+  };
+}
+
+std::function<void(const std::string&)> BaseCommand::PosArgValidator(
+    std::string* str) {
+  return [str, invalid_arg = &invalid_arg_](const std::string& value) {
+    if (!value.empty() && value[0] == '-') {
+      *invalid_arg = value;
+    } else {
+      *str = value;
+    }
+  };
 }
 
 void BaseCommand::CommandHandler(const lyra::group& g) {
@@ -53,6 +79,19 @@ void BaseCommand::CommandHandler(const lyra::group& g) {
   if (!invalid_arg_.empty()) {
     std::cerr << "Error: Unknown parameter '" << invalid_arg_
               << "'. Try -h for help." << std::endl;
+    *exit_code_ = 1;
+    return;
+  }
+
+  if (!jedec_parse_error_.empty()) {
+    std::cerr << "Error: " << jedec_parse_error_ << std::endl;
+    *exit_code_ = 1;
+    return;
+  }
+
+  if (!extra_positional_arg_.empty()) {
+    std::cerr << "Error: Extraneous positional argument '"
+              << extra_positional_arg_ << "'. Try -h for help." << std::endl;
     *exit_code_ = 1;
     return;
   }

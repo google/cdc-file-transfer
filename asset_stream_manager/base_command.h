@@ -42,6 +42,18 @@ class BaseCommand {
   // Registers the command with Lyra. Must be called before parsing args.
   void Register(lyra::cli& cli);
 
+  // Jedec parser for Lyra options. Usage:
+  //   lyra::opt(JedecParser("size-flag", &size_bytes), "bytes"))
+  // Automatically reports a parse failure on error.
+  std::function<void(const std::string&)> JedecParser(const char* flag_name,
+                                                      uint64_t* bytes);
+
+  // Validator that should be used for all positional arguments. Lyra interprets
+  // -u, --unknown_flag as positional argument. This validator makes sure that
+  // a positional argument starting with - is reported as an error. Otherwise,
+  // writes the value to |str|.
+  std::function<void(const std::string&)> PosArgValidator(std::string* str);
+
  protected:
   // Adds all optional and required arguments used by the command.
   // Called by Register().
@@ -66,6 +78,13 @@ class BaseCommand {
   // Workaround for invalid args. Lyra doesn't interpret --invalid as invalid
   // argument, but as positional argument "--invalid".
   std::string invalid_arg_;
+
+  // Extraneous positional args. Gets reported as error if present.
+  std::string extra_positional_arg_;
+
+  // Errors from parsing JEDEC sizes.
+  // Works around Lyra not accepting errors from parsers.
+  std::string jedec_parse_error_;
 };
 
 }  // namespace cdc_ft

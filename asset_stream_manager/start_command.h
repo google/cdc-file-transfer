@@ -14,41 +14,35 @@
  * limitations under the License.
  */
 
-#ifndef ASSET_STREAM_MANAGER_START_SERVICE_COMMAND_H_
-#define ASSET_STREAM_MANAGER_START_SERVICE_COMMAND_H_
-
-#include <memory>
+#ifndef ASSET_STREAM_MANAGER_START_COMMAND_H_
+#define ASSET_STREAM_MANAGER_START_COMMAND_H_
 
 #include "absl/status/status.h"
-#include "absl/status/statusor.h"
-#include "asset_stream_manager/asset_stream_config.h"
 #include "asset_stream_manager/base_command.h"
 
 namespace cdc_ft {
 
-// Handler for the start-service command. Starts the asset streaming service
-// and returns when the service is shut down.
-class StartServiceCommand : public BaseCommand {
+// Handler for the start command. Sends an RPC call to the service to starts a
+// new asset streaming session.
+class StartCommand : public BaseCommand {
  public:
-  explicit StartServiceCommand(int* exit_code);
-  ~StartServiceCommand();
+  explicit StartCommand(int* exit_code);
+  ~StartCommand();
 
   // BaseCommand:
   void RegisterCommandLineFlags(lyra::command& cmd) override;
   absl::Status Run() override;
 
  private:
-  // Depending on the flags, returns a console or file logger.
-  absl::StatusOr<std::unique_ptr<Log>> GetLogger();
-
-  // Runs the asset streaming service.
-  absl::Status RunService();
-
-  AssetStreamConfig cfg_;
-  std::string config_file_;
-  std::string log_dir_;
+  int verbosity_ = 0;
+  uint16_t service_port_ = 0;
+  uint16_t ssh_port_ = 0;
+  std::string ssh_command_;
+  std::string scp_command_;
+  std::string src_dir_;
+  std::string user_host_dir_;
 };
 
 }  // namespace cdc_ft
 
-#endif  // ASSET_STREAM_MANAGER_START_SERVICE_COMMAND_H_
+#endif  // ASSET_STREAM_MANAGER_START_COMMAND_H_

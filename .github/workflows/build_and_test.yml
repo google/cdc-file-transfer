@@ -45,7 +45,7 @@ jobs:
 
       - name: Build
         run: |
-          bazel build --config=windows //cdc_rsync //cdc_stream //asset_stream_manager //tests_common //tests_asset_streaming_30 //tests_cdc_rsync
+          bazel build --config=windows //cdc_rsync //asset_stream_manager //tests_common //tests_asset_streaming_30 //tests_cdc_rsync
 
       - name: Test
         run: |

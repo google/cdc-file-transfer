@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cdc_stream/local_assets_stream_manager_client.h"
+#include "asset_stream_manager/local_assets_stream_manager_client.h"
+
+#include <vector>
 
 #include "absl/status/status.h"
+#include "absl/strings/str_format.h"
+#include "absl/strings/str_split.h"
 #include "common/grpc_status.h"
 
 namespace cdc_ft {
@@ -23,6 +27,15 @@ using StartSessionRequest = localassetsstreammanager::StartSessionRequest;
 using StartSessionResponse = localassetsstreammanager::StartSessionResponse;
 using StopSessionRequest = localassetsstreammanager::StopSessionRequest;
 using StopSessionResponse = localassetsstreammanager::StopSessionResponse;
+
+LocalAssetsStreamManagerClient::LocalAssetsStreamManagerClient(
+    uint16_t service_port) {
+  std::string client_address = absl::StrFormat("localhost:%u", service_port);
+  std::shared_ptr<grpc::Channel> channel = grpc::CreateCustomChannel(
+      client_address, grpc::InsecureChannelCredentials(),
+      grpc::ChannelArguments());
+  stub_ = LocalAssetsStreamManager::NewStub(std::move(channel));
+}
 
 LocalAssetsStreamManagerClient::LocalAssetsStreamManagerClient(
     std::shared_ptr<grpc::Channel> channel) {
@@ -57,6 +70,26 @@ absl::Status LocalAssetsStreamManagerClient::StopSession(
   grpc::ClientContext context;
   StopSessionResponse response;
   return ToAbslStatus(stub_->StopSession(&context, request, &response));
+}
+
+// static
+absl::Status LocalAssetsStreamManagerClient::ParseUserHostDir(
+    const std::string& user_host_dir, std::string* user_host,
+    std::string* dir) {
+  std::vector<std::string> parts =
+      absl::StrSplit(user_host_dir, absl::MaxSplits(':', 1));
+  if (parts.size() < 2 ||
+      (parts[0].size() == 1 && toupper(parts[0][0]) >= 'A' &&
+       toupper(parts[0][0]) <= 'Z')) {
+    return absl::InvalidArgumentError(
+        absl::StrFormat("Failed to parse '%s'. Make sure it is of the form "
+                        "[user@]host:linux_dir.",
+                        user_host_dir));
+  }
+
+  *user_host = parts[0];
+  *dir = parts[1];
+  return absl::OkStatus();
 }
 
 }  // namespace cdc_ft
