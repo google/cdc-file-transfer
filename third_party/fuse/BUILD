@@ -1,4 +1,6 @@
 # Yeti's custom BUILD file
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 licenses(["restricted"])  # GPL (binary), LGPL (library)
@@ -69,10 +71,10 @@ cc_library(
         "-lpthread",
         "-ldl",
     ],
+    linkstatic = 1,  # Required to make symbols show up in libfuse.so above.
     visibility = ["//visibility:private"],
     deps = [":fuse_headers"],
     alwayslink = 1,
-    linkstatic = 1,  # Required to make symbols show up in libfuse.so above.
 )
 
 cc_library(

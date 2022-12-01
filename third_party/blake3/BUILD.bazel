@@ -2,9 +2,11 @@
 # BLAKE3 is a very fast cryptographic hash function, see README.md for details.
 #
 
-licenses(["unencumbered"])  # Creative Commons CC0
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
+
+licenses(["unencumbered"])  # Creative Commons CC0
 
 exports_files(["LICENSE"])
 
