@@ -135,6 +135,15 @@ class FileWatcherParameterizedTest : public ::testing::TestWithParam<bool> {
     return changed;
   }
 
+  // Polls for a second until the watcher is watching again.
+  bool WaitForWatching() const {
+    for (int n = 0; n < 1000; ++n) {
+      if (watcher_.IsWatching()) return true;
+      Util::Sleep(1);
+    }
+    return false;
+  }
+
   FileMap GetChangedFiles(size_t number_of_files) {
     FileMap modified_files;
 
@@ -540,6 +549,9 @@ TEST_P(FileWatcherParameterizedTest, RecreateWatchedDir) {
   EXPECT_TRUE(watcher_.GetModifiedFiles().empty());
   EXPECT_OK(watcher_.GetStatus());
 
+  // Wait until the watcher is watching again, or else we might miss the file.
+  EXPECT_TRUE(WaitForWatching());
+
   // Creation of a new file should be detected.
   EXPECT_OK(path::WriteFile(first_file_path_, kFirstData, kFirstDataSize));
 
@@ -571,6 +583,9 @@ TEST_P(FileWatcherParameterizedTest, RecreateUpperDir) {
   EXPECT_EQ(watcher_.GetDirRecreateEventCountForTesting(), 2u);
   EXPECT_TRUE(watcher_.GetModifiedFiles().empty());
   EXPECT_OK(watcher_.GetStatus());
+
+  // Wait until the watcher is watching again, or else we might miss the file.
+  EXPECT_TRUE(WaitForWatching());
 
   // Creation of a new file should be detected.
   EXPECT_OK(path::WriteFile(first_file_path_, kFirstData, kFirstDataSize));
