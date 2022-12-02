@@ -23,17 +23,26 @@ jobs:
       - name: Initialize submodules
         run: git submodule update --init --recursive
 
-      - name: Build (fastbuild)
+      - name: Create timestamp
         run: |
-          bazel build --config=linux -- //... -//third_party/...
+          printf -v date '%(%Y-%m)T' -1
+          echo "date=$date" >> $GITHUB_ENV
+
+      - name: Restore build cache
+        uses: actions/cache@v3
+        with:
+          path: bazel-cache
+          key: ${{ runner.os }}-bazel-cache-${{ env.date }}
+
+      - name: Build (fastbuild)
+        run: bazel build --config=linux --disk_cache=bazel-cache -- //... -//third_party/...
 
       # Skip file_finder_test: The test works when file_finder_test is run
       # directly, but not through bazel test. The reason is, bazel test
       # creates symlinks of test files, but the finder ignores symlinks.
       # Also run tests sequentially since some tests write to a common tmp dir.
       - name: Test (fastbuild)
-        run: |
-          bazel test --config=linux --test_output=errors --local_test_jobs=1 -- //... -//third_party/... -//cdc_rsync_server:file_finder_test
+        run: bazel test --config=linux --disk_cache=bazel-cache --test_output=errors --local_test_jobs=1 -- //... -//third_party/... -//cdc_rsync_server:file_finder_test
 
   Build-And-Test-Windows:
     runs-on: windows-2019
@@ -43,16 +52,26 @@ jobs:
       - name: Initialize submodules
         run: git submodule update --init --recursive
 
-      - name: Build
+      - name: Create timestamp
         run: |
-          bazel build --config=windows //cdc_rsync //cdc_stream //tests_common //tests_cdc_stream //tests_cdc_rsync
+          $date = Get-Date -Format "yyyy-MM"
+          echo "date=$date" >> $GITHUB_ENV
+
+      - name: Restore build cache
+        uses: actions/cache@v3
+        with:
+          path: bazel-cache
+          key: ${{ runner.os }}-bazel-cache-${{ env.date }}
+
+      - name: Build
+        run: bazel build --config=windows --disk_cache=bazel-cache //cdc_rsync //cdc_stream //tests_common //tests_cdc_stream //tests_cdc_rsync
 
       - name: Test
         run: |
           bazel-bin\tests_common\tests_common.exe
           bazel-bin\tests_cdc_stream\tests_cdc_stream.exe
           bazel-bin\tests_cdc_rsync\tests_cdc_rsync.exe
-          bazel test --config=windows --test_output=errors --local_test_jobs=1 `
+          bazel test --config=windows --disk_cache=bazel-cache --test_output=errors --local_test_jobs=1 `
             //cdc_fuse_fs/... `
             //cdc_rsync/... `
             //cdc_rsync/base/... `
