@@ -39,7 +39,7 @@ std::string GetLogPath(const char* log_dir, const char* log_base_name) {
 }  // namespace
 
 StartServiceCommand::StartServiceCommand(int* exit_code)
-    : BaseCommand("start-service", "Start streaming service", exit_code) {}
+    : BaseCommand("start-service", "Start the streaming service", exit_code) {}
 StartServiceCommand::~StartServiceCommand() = default;
 
 void StartServiceCommand::RegisterCommandLineFlags(lyra::command& cmd) {
