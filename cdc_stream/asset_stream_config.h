@@ -76,6 +76,9 @@ class AssetStreamConfig {
   // read from the JSON file.
   std::string GetFlagReadErrors();
 
+  // Gets the port to use for the asset streaming service.
+  uint16_t service_port() const { return service_port_; }
+
   // Session configuration.
   const SessionConfig& session_cfg() const { return session_cfg_; }
 
@@ -91,6 +94,13 @@ class AssetStreamConfig {
   bool log_to_stdout() const { return log_to_stdout_; }
 
  private:
+  // Jedec parser for Lyra options. Usage:
+  //   lyra::opt(JedecParser("size-flag", &size_bytes), "bytes"))
+  // Sets jedec_parse_error_ on error, Lyra doesn't support errors from lambdas.
+  std::function<void(const std::string&)> JedecParser(const char* flag_name,
+                                                      uint64_t* bytes);
+
+  uint16_t service_port_ = 0;
   SessionConfig session_cfg_;
   bool log_to_stdout_ = false;
 

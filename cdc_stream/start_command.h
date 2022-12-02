@@ -20,6 +20,10 @@
 #include "absl/status/status.h"
 #include "cdc_stream/base_command.h"
 
+namespace grpc {
+class Channel;
+}
+
 namespace cdc_ft {
 
 // Handler for the start command. Sends an RPC call to the service to starts a
@@ -34,6 +38,9 @@ class StartCommand : public BaseCommand {
   absl::Status Run() override;
 
  private:
+  // Starts the asset streaming service.
+  absl::Status StartStreamingService();
+
   int verbosity_ = 0;
   uint16_t service_port_ = 0;
   uint16_t ssh_port_ = 0;

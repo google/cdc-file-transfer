@@ -23,21 +23,15 @@ import "google/protobuf/empty.proto";
 service BackgroundService {
   // Exit is used to ask the service to exit. In the case of the process
   // manager, this cascades to all background processes.
-  rpc Exit(ExitRequest) returns (ExitResponse) {}
+  rpc Exit(google.protobuf.Empty) returns (google.protobuf.Empty) {}
 
   // GetPid is used to get the PID of the service process.
-  rpc GetPid(GetPidRequest) returns (GetPidResponse) {}
+  rpc GetPid(google.protobuf.Empty) returns (GetPidResponse) {}
 
   // HealthCheck is used to verify that the service is running. It returns an
   // empty protobuf if the service is ready to serve requests.
   rpc HealthCheck(google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
-
-message ExitRequest {}
-
-message ExitResponse {}
-
-message GetPidRequest {}
 
 message GetPidResponse {
   int32 pid = 1;

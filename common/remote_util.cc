@@ -75,6 +75,7 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
 
   // -p preserves timestamps. This enables timestamp-based up-to-date checks.
   ProcessStartInfo start_info;
+  start_info.flags = ProcessFlags::kNoWindow;
   start_info.command = absl::StrFormat(
       "%s "
       "%s %s -p -T "
@@ -147,6 +148,7 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
       QuoteForWindows(ssh_command_), quiet_ || verbosity_ < 2 ? "-q" : "",
       forward_arg, QuoteForWindows(user_host_), ssh_port_, remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
+  start_info.flags = ProcessFlags::kNoWindow;
   return start_info;
 }
 

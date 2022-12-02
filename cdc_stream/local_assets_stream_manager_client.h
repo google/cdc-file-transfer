@@ -20,7 +20,6 @@
 #include <memory>
 
 #include "absl/status/status.h"
-#include "grpcpp/channel.h"
 #include "proto/local_assets_stream_manager.grpc.pb.h"
 
 namespace grpc_impl {
@@ -32,8 +31,6 @@ namespace cdc_ft {
 // gRpc client for starting/stopping asset streaming sessions.
 class LocalAssetsStreamManagerClient {
  public:
-  explicit LocalAssetsStreamManagerClient(uint16_t service_port);
-
   // |channel| is a grpc channel to use.
   explicit LocalAssetsStreamManagerClient(
       std::shared_ptr<grpc::Channel> channel);

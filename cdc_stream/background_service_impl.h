@@ -30,9 +30,6 @@ namespace cdc_ft {
 class BackgroundServiceImpl final
     : public backgroundservice::BackgroundService::Service {
  public:
-  using ExitRequest = backgroundservice::ExitRequest;
-  using ExitResponse = backgroundservice::ExitResponse;
-  using GetPidRequest = backgroundservice::GetPidRequest;
   using GetPidResponse = backgroundservice::GetPidResponse;
   using EmptyProto = google::protobuf::Empty;
 
@@ -43,11 +40,10 @@ class BackgroundServiceImpl final
   using ExitCallback = std::function<absl::Status()>;
   void SetExitCallback(ExitCallback exit_callback);
 
-  grpc::Status Exit(grpc::ServerContext* context, const ExitRequest* request,
-                    ExitResponse* response) override;
+  grpc::Status Exit(grpc::ServerContext* context, const EmptyProto* request,
+                    EmptyProto* response) override;
 
-  grpc::Status GetPid(grpc::ServerContext* context,
-                      const GetPidRequest* request,
+  grpc::Status GetPid(grpc::ServerContext* context, const EmptyProto* request,
                       GetPidResponse* response) override;
 
   grpc::Status HealthCheck(grpc::ServerContext* context,

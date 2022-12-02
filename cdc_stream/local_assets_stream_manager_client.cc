@@ -29,15 +29,6 @@ using StopSessionRequest = localassetsstreammanager::StopSessionRequest;
 using StopSessionResponse = localassetsstreammanager::StopSessionResponse;
 
 LocalAssetsStreamManagerClient::LocalAssetsStreamManagerClient(
-    uint16_t service_port) {
-  std::string client_address = absl::StrFormat("localhost:%u", service_port);
-  std::shared_ptr<grpc::Channel> channel = grpc::CreateCustomChannel(
-      client_address, grpc::InsecureChannelCredentials(),
-      grpc::ChannelArguments());
-  stub_ = LocalAssetsStreamManager::NewStub(std::move(channel));
-}
-
-LocalAssetsStreamManagerClient::LocalAssetsStreamManagerClient(
     std::shared_ptr<grpc::Channel> channel) {
   stub_ = LocalAssetsStreamManager::NewStub(std::move(channel));
 }

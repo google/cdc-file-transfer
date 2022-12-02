@@ -211,20 +211,12 @@ cdc_rsync C:\path\to\assets\* user@linux.device.com:~/assets -vr
 
 ### CDC Stream
 
-`cdc_stream` consists of a background service, which has to be started in
-advance with
-```
-cdc_stream start-service
-```
-The service logs to `%APPDATA%\cdc-file-transfer\logs` by default. Try
-`cdc_stream --help` to get a list of available flags.
-
 To stream the Windows directory `C:\path\to\assets` to `~/assets` on the Linux
 device, run
 ```
 cdc_stream start C:\path\to\assets user@linux.device.com:~/assets
 ```
-This makes all files and directories of `C:\path\to\assets` available on
+This makes all files and directories in `C:\path\to\assets` available on
 `~/assets` immediately, as if it were a local copy. However, data is streamed
 from Windows to Linux as files are accessed.
 
@@ -235,14 +227,31 @@ cdc_stream stop user@linux.device.com:~/assets
 
 ## Troubleshooting
 
-`cdc_rsync` always logs to the console. By default, the `cdc_stream` service
-logs to a timestamped file in `%APPDATA%\cdc-file-transfer\logs`. It can be
-switched to log to console by starting it with `--log-to-stdout`:
-```
-cdc_stream start-service --log_to_stdout
-```
+On first run, `cdc_stream` starts a background service, which does all the work.
+The `cdc_stream start` and `cdc_stream stop` commands are just RPC clients that
+talk to the service.
 
-Both `cdc_rsync` and `cdc_stream` support command line flags to control log
-verbosity. Passing `-vvv` prints debug logs, `-vvvv` prints verbose logs. The
-debug logs contain all SSH and SCP commands that are attempted to run, which is
-very useful for troubleshooting.
+The service logs to `%APPDATA%\cdc-file-transfer\logs` by default. The logs are
+useful to investigate issues with asset streaming. To pass custom arguments, or
+to debug the service, create a JSON config file at
+`%APPDATA%\cdc-file-transfer\cdc_stream.json` with command line flags.
+For instance,
+```
+{ "verbosity":3 }
+```
+instructs the service to log debug messages. Try `cdc_stream start-service -h`
+for a list of available flags. Alternatively, run the service manually with
+```
+cdc_stream start-service
+```
+and pass the flags as command line arguments. When you run the service manually,
+the flag `--log-to-stdout` is particularly useful as it logs to the console
+instead of to the file.
+
+`cdc_rsync` always logs to the console. To increase log verbosity, pass `-vvv`
+for debug logs or `-vvvv` for verbose logs.
+
+For both sync and stream, the debug logs contain all SSH and SCP commands that
+are attempted to run, which is very useful for troubleshooting. If a command
+fails unexpectedly, copy it and run it in isolation. Pass `-vv` or `-vvv` for
+additional debug output.

@@ -213,6 +213,7 @@ absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableLocalPorts(
   ProcessStartInfo start_info;
   start_info.command = "netstat -a -n -p tcp";
   start_info.name = "netstat";
+  start_info.flags = ProcessFlags::kNoWindow;
 
   std::string output;
   start_info.stdout_handler = [&output](const char* data, size_t data_size) {
@@ -246,6 +247,7 @@ absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableRemotePorts(
   ProcessStartInfo start_info =
       remote_util->BuildProcessStartInfoForSsh(remote_command);
   start_info.name = "netstat";
+  start_info.flags = ProcessFlags::kNoWindow;
 
   std::string output;
   start_info.stdout_handler = [&output](const char* data, size_t data_size) {

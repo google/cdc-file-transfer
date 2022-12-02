@@ -16,17 +16,37 @@
 
 #include <memory>
 
+#include "cdc_stream/background_service_client.h"
 #include "cdc_stream/local_assets_stream_manager_client.h"
 #include "cdc_stream/session_management_server.h"
 #include "common/log.h"
 #include "common/path.h"
+#include "common/process.h"
 #include "common/remote_util.h"
 #include "common/status_macros.h"
+#include "common/stopwatch.h"
+#include "common/util.h"
+#include "grpcpp/channel.h"
+#include "grpcpp/create_channel.h"
+#include "grpcpp/support/channel_arguments.h"
 #include "lyra/lyra.hpp"
 
 namespace cdc_ft {
 namespace {
 constexpr int kDefaultVerbosity = 2;
+}  // namespace
+
+namespace {
+// Time to poll until the streaming service becomes healthy.
+constexpr double kServiceStartupTimeoutSec = 20.0;
+
+std::shared_ptr<grpc::Channel> CreateChannel(uint16_t service_port) {
+  std::string client_address = absl::StrFormat("localhost:%u", service_port);
+  return grpc::CreateCustomChannel(client_address,
+                                   grpc::InsecureChannelCredentials(),
+                                   grpc::ChannelArguments());
+}
+
 }  // namespace
 
 StartCommand::StartCommand(int* exit_code)
@@ -89,22 +109,79 @@ void StartCommand::RegisterCommandLineFlags(lyra::command& cmd) {
 absl::Status StartCommand::Run() {
   LogLevel level = Log::VerbosityToLogLevel(verbosity_);
   ScopedLog scoped_log(std::make_unique<ConsoleLog>(level));
-  LocalAssetsStreamManagerClient client(service_port_);
 
   std::string full_src_dir = path::GetFullPath(src_dir_);
   std::string user_host, mount_dir;
   RETURN_IF_ERROR(LocalAssetsStreamManagerClient::ParseUserHostDir(
       user_host_dir_, &user_host, &mount_dir));
 
+  LocalAssetsStreamManagerClient client(CreateChannel(service_port_));
   absl::Status status =
       client.StartSession(full_src_dir, user_host, ssh_port_, mount_dir,
                           ssh_command_, scp_command_);
+
+  if (absl::IsUnavailable(status)) {
+    LOG_DEBUG("StartSession status: %s", status.ToString());
+    LOG_INFO("Streaming service is unavailable. Starting it...");
+    status = StartStreamingService();
+
+    if (status.ok()) {
+      LOG_INFO("Streaming service successfully started");
+
+      // Recreate client. The old channel might still be in a transient failure
+      // state.
+      LocalAssetsStreamManagerClient new_client(CreateChannel(service_port_));
+      status = new_client.StartSession(full_src_dir, user_host, ssh_port_,
+                                       mount_dir, ssh_command_, scp_command_);
+    }
+  }
+
   if (status.ok()) {
     LOG_INFO("Started streaming directory '%s' to '%s:%s'", src_dir_, user_host,
              mount_dir);
   }
 
   return status;
+}
+
+absl::Status StartCommand::StartStreamingService() {
+  std::string exe_dir;
+  RETURN_IF_ERROR(path::GetExeDir(&exe_dir),
+                  "Failed to get executable directory");
+  std::string exe_path = path::Join(exe_dir, "cdc_stream");
+
+  // Try starting the service first.
+  WinProcessFactory process_factory;
+  ProcessStartInfo start_info;
+  start_info.command =
+      absl::StrFormat("%s start-service --verbosity=%i --service-port=%i",
+                      exe_path, verbosity_, service_port_);
+  start_info.flags = ProcessFlags::kDetached;
+  std::unique_ptr<Process> service_process = process_factory.Create(start_info);
+  RETURN_IF_ERROR(service_process->Start(),
+                  "Failed to start asset streaming service");
+
+  // Poll until the service becomes healthy.
+  LOG_INFO("Streaming service initializing...");
+  Stopwatch sw;
+  while (sw.ElapsedSeconds() < kServiceStartupTimeoutSec) {
+    // The channel is in some transient failure state, and it's faster to
+    // reconnect instead of waiting for it to return.
+    BackgroundServiceClient bg_client(CreateChannel(service_port_));
+    absl::Status status = bg_client.IsHealthy();
+    if (status.ok()) {
+      return absl::OkStatus();
+    }
+    LOG_DEBUG("Health check result: %s", status.ToString());
+    Util::Sleep(100);
+  }
+
+  // Kill the process.
+  service_process->Terminate();
+  return absl::DeadlineExceededError(
+      absl::StrFormat("Timed out after %0.0f seconds waiting for the asset "
+                      "streaming service to become healthy",
+                      kServiceStartupTimeoutSec));
 }
 
 }  // namespace cdc_ft

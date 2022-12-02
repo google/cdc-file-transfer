@@ -49,6 +49,24 @@ void SetThreadName(const std::string& name) {
   }
 }
 
+int ToCreationFlags(ProcessFlags pflags) {
+#define HANDLE_FLAG(pflag, cflag)  \
+  if ((pflags & pflag) == pflag) { \
+    cflags |= cflag;               \
+    pdone = pdone | pflag;         \
+  }
+
+  int cflags = 0;
+  ProcessFlags pdone = ProcessFlags::kNone;
+  HANDLE_FLAG(ProcessFlags::kDetached, DETACHED_PROCESS);
+  HANDLE_FLAG(ProcessFlags::kNoWindow, CREATE_NO_WINDOW);
+  assert(pflags == pdone);
+
+#undef HANDLE_FLAG
+
+  return cflags;
+}
+
 std::atomic_int g_pipe_serial_number{0};
 
 // Creates a pipe suitable for overlapped IO. Regular anonymous pipes in Windows
@@ -567,6 +585,10 @@ const std::string& ProcessStartInfo::Name() const {
   return !name.empty() ? name : command;
 }
 
+bool ProcessStartInfo::HasFlag(ProcessFlags flag) const {
+  return (flags & flag) == flag;
+}
+
 Process::Process(const ProcessStartInfo& start_info)
     : start_info_(start_info) {}
 
@@ -593,6 +615,8 @@ class WinProcess : public Process {
   absl::Status GetStatus() const override;
 
  private:
+  void Reset();
+
   std::unique_ptr<ProcessInfo> process_info_;
   std::unique_ptr<MessagePumpThread> message_pump_;
 };
@@ -600,7 +624,14 @@ class WinProcess : public Process {
 WinProcess::WinProcess(const ProcessStartInfo& start_info)
     : Process(start_info) {}
 
-WinProcess::~WinProcess() { Terminate().IgnoreError(); }
+WinProcess::~WinProcess() {
+  if (start_info_.HasFlag(ProcessFlags::kDetached)) {
+    // If the process runs detached, just reset handles, don't terminate it.
+    Reset();
+  } else {
+    Terminate().IgnoreError();
+  }
+}
 
 absl::Status WinProcess::Start() {
   LOG_INFO("Starting process %s", start_info_.command.c_str());
@@ -676,10 +707,13 @@ absl::Status WinProcess::Start() {
   }
 
   JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli = {0};
-  jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+  if (!start_info_.HasFlag(ProcessFlags::kDetached)) {
+    jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+  }
   bool success = SetInformationJobObject(process_info_->job.Get(),
                                          JobObjectExtendedLimitInformation,
                                          &jeli, sizeof(jeli));
+
   if (!success) {
     return MakeStatus("SetInformationJobObject() failed: %s",
                       Util::GetLastWin32Error());
@@ -691,7 +725,7 @@ absl::Status WinProcess::Start() {
                           NULL,  // Process handle not inheritable
                           NULL,  // Thread handle not inheritable
                           TRUE,  // Inherit handles
-                          0,     // No creation flags
+                          ToCreationFlags(start_info_.flags),
                           NULL,  // Use parent's environment block
                           NULL,  // Use parent's starting directory
                           &si, &process_info_->pi);
@@ -785,32 +819,39 @@ absl::Status WinProcess::Terminate() {
     message_pump_.reset();
   }
 
-  if (process_info_) {
-    bool result = true;
-    if (should_terminate) {
-      result = TerminateProcess(process_info_->pi.hProcess, 0);
-      if (!result && GetLastError() == ERROR_ACCESS_DENIED) {
-        // This means that the process has already exited, but in a way that
-        // the exit wasn't properly reported to this code (e.g. the process got
-        // killed somewhere). Just handle this silently.
-        LOG_DEBUG("Process '%s' already exited", start_info_.Name());
-        result = true;
-      }
+  std::string error_msg;
+  if (process_info_ && should_terminate &&
+      !TerminateProcess(process_info_->pi.hProcess, 0)) {
+    if (GetLastError() == ERROR_ACCESS_DENIED) {
+      // This means that the process has already exited, but in a way that
+      // the exit wasn't properly reported to this code (e.g. the process got
+      // killed somewhere). Just handle this silently.
+      LOG_DEBUG("Process '%s' already exited", start_info_.Name());
+    } else {
+      error_msg = Util::GetLastWin32Error();
     }
+  }
 
+  // Reset handles.
+  Reset();
+
+  if (!error_msg.empty()) {
+    return MakeStatus("TerminateProcess() failed: %s", error_msg);
+  }
+  return absl::OkStatus();
+}
+
+void WinProcess::Reset() {
+  // Shut down message pump.
+  message_pump_.reset();
+
+  if (process_info_) {
     // Close the handles that are not scoped handles.
     ScopedHandle(process_info_->pi.hProcess).Close();
     ScopedHandle(process_info_->pi.hThread).Close();
 
     process_info_.reset();
-
-    if (!result) {
-      return MakeStatus("TerminateProcess() failed: %s",
-                        Util::GetLastWin32Error());
-    }
   }
-
-  return absl::OkStatus();
 }
 
 ProcessFactory::~ProcessFactory() = default;
