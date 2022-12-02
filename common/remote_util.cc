@@ -80,8 +80,8 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
       "%s %s -p -T "
       "-P %i %s "
       "%s:%s",
-      QuoteForWindows(scp_command_), quiet_ || verbosity_ < 2 ? "-q" : "",
-      compress ? "-C" : "", ssh_port_, source_args, QuoteForWindows(user_host_),
+      scp_command_, quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
+      ssh_port_, source_args, QuoteForWindows(user_host_),
       QuoteForWindows(dest));
   start_info.name = "scp";
   start_info.forward_output_to_log = forward_output_to_log_;
@@ -144,8 +144,8 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
       "-oServerAliveCountMax=6 "  // Number of lost msgs before ssh terminates
       "-oServerAliveInterval=5 "  // Time interval between alive msgs
       "%s %s -p %i %s",
-      QuoteForWindows(ssh_command_), quiet_ || verbosity_ < 2 ? "-q" : "",
-      forward_arg, QuoteForWindows(user_host_), ssh_port_, remote_command_arg);
+      ssh_command_, quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
+      QuoteForWindows(user_host_), ssh_port_, remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
   return start_info;
 }
