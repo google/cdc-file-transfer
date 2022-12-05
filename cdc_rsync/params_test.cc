@@ -97,7 +97,6 @@ class ParamsTest : public ::testing::Test {
 TEST_F(ParamsTest, ParseSucceedsDefaults) {
   const char* argv[] = {"cdc_rsync.exe", kSrc, kUserHostDst, NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  EXPECT_EQ(RemoteUtil::kDefaultSshPort, parameters_.options.port);
   EXPECT_FALSE(parameters_.options.delete_);
   EXPECT_FALSE(parameters_.options.recursive);
   EXPECT_EQ(0, parameters_.options.verbosity);
@@ -143,13 +142,6 @@ TEST_F(ParamsTest, ParseFailsOnCompressLevelEqualsNoValue) {
   EXPECT_FALSE(
       Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   ExpectError(NeedsValueError("compress-level"));
-}
-
-TEST_F(ParamsTest, ParseFailsOnPortEqualsNoValue) {
-  const char* argv[] = {"cdc_rsync.exe", "--port=", kSrc, kUserHostDst, NULL};
-  EXPECT_FALSE(
-      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError(NeedsValueError("port"));
 }
 
 TEST_F(ParamsTest, ParseFailsOnContimeoutEqualsNoValue) {
@@ -285,13 +277,18 @@ TEST_F(ParamsTest, ParseFailsOnUnknownKey) {
 }
 
 TEST_F(ParamsTest, ParseSucceedsWithSupportedKeyValue) {
-  const char* argv[] = {
-      "cdc_rsync.exe", "--compress-level", "11", "--contimeout", "99", "--port",
-      "4086",          "--copy-dest=dest", kSrc, kUserHostDst,   NULL};
+  const char* argv[] = {"cdc_rsync.exe",
+                        "--compress-level",
+                        "11",
+                        "--contimeout",
+                        "99",
+                        "--copy-dest=dest",
+                        kSrc,
+                        kUserHostDst,
+                        NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   EXPECT_EQ(parameters_.options.compress_level, 11);
   EXPECT_EQ(parameters_.options.connection_timeout_sec, 99);
-  EXPECT_EQ(parameters_.options.port, 4086);
   EXPECT_EQ(parameters_.options.copy_dest, "dest");
   ExpectNoError();
 }
@@ -302,13 +299,6 @@ TEST_F(ParamsTest, ParseSucceedsWithSupportedKeyValueWithoutEqualityForChars) {
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
   EXPECT_EQ(parameters_.options.copy_dest, "dest");
   ExpectNoError();
-}
-
-TEST_F(ParamsTest, ParseFailsOnInvalidPort) {
-  const char* argv[] = {"cdc_rsync.exe", "--port=0", kSrc, kUserHostDst, NULL};
-  EXPECT_FALSE(
-      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError("--port must specify a valid port");
 }
 
 TEST_F(ParamsTest, ParseFailsOnDeleteNeedsRecursive) {

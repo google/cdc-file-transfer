@@ -219,12 +219,11 @@ LocalAssetsStreamManagerServiceImpl::GetTargetForStadia(
 
   // Run 'ggp ssh init' to determine IP (host) and port.
   std::string instance_ip;
-  uint16_t instance_port = 0;
-  RETURN_IF_ERROR(InitSsh(*instance_id, *project_id, *organization_id,
-                          &instance_ip, &instance_port));
+  ASSIGN_OR_RETURN(instance_ip,
+                   InitSsh(*instance_id, *project_id, *organization_id));
 
   target.user_host = "cloudcast@" + instance_ip;
-  target.ssh_port = instance_port;
+  // Note: Port must be set with ssh_command (-p) and scp_command (-P).
   return target;
 }
 
@@ -235,9 +234,6 @@ SessionTarget LocalAssetsStreamManagerServiceImpl::GetTarget(
   target.mount_dir = request.mount_dir();
   target.ssh_command = request.ssh_command();
   target.scp_command = request.scp_command();
-  target.ssh_port = request.port() > 0 && request.port() <= UINT16_MAX
-                        ? static_cast<uint16_t>(request.port())
-                        : RemoteUtil::kDefaultSshPort;
 
   *instance_id = absl::StrCat(target.user_host, ":", target.mount_dir);
   return target;
@@ -257,13 +253,10 @@ metrics::RequestOrigin LocalAssetsStreamManagerServiceImpl::ConvertOrigin(
   }
 }
 
-absl::Status LocalAssetsStreamManagerServiceImpl::InitSsh(
+absl::StatusOr<std::string> LocalAssetsStreamManagerServiceImpl::InitSsh(
     const std::string& instance_id, const std::string& project_id,
-    const std::string& organization_id, std::string* instance_ip,
-    uint16_t* instance_port) {
+    const std::string& organization_id) {
   SdkUtil sdk_util;
-  instance_ip->clear();
-  *instance_port = 0;
 
   ProcessStartInfo start_info;
   start_info.command = absl::StrFormat(
@@ -305,22 +298,13 @@ absl::Status LocalAssetsStreamManagerServiceImpl::InitSsh(
   }
 
   // Parse gamelet IP. Should be "Host: <instance_ip ip>".
-  if (!ParseValue(output, "Host", instance_ip)) {
+  std::string instance_ip;
+  if (!ParseValue(output, "Host", &instance_ip)) {
     return MakeStatus("Failed to parse host from ggp ssh init response\n%s",
                       output);
   }
 
-  // Parse ssh port. Should be "Port: <port>".
-  std::string port_string;
-  const bool result = ParseValue(output, "Port", &port_string);
-  int int_port = atoi(port_string.c_str());
-  if (!result || int_port == 0 || int_port <= 0 || int_port > UINT_MAX) {
-    return MakeStatus("Failed to parse ssh port from ggp ssh init response\n%s",
-                      output);
-  }
-
-  *instance_port = static_cast<uint16_t>(int_port);
-  return absl::OkStatus();
+  return instance_ip;
 }
 
 }  // namespace cdc_ft

@@ -43,7 +43,6 @@ class StartCommand : public BaseCommand {
 
   int verbosity_ = 0;
   uint16_t service_port_ = 0;
-  uint16_t ssh_port_ = 0;
   std::string ssh_command_;
   std::string scp_command_;
   std::string src_dir_;

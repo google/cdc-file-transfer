@@ -21,9 +21,6 @@
 namespace cdc_ft {
 namespace {
 
-constexpr int kSshPort = 12345;
-constexpr char kSshPortArg[] = "-p 12345";
-
 constexpr char kUserHost[] = "user@example.com";
 constexpr char kUserHostArg[] = "\"user@example.com\"";
 
@@ -39,12 +36,11 @@ constexpr char kCommand[] = "my_command";
 class RemoteUtilTest : public ::testing::Test {
  public:
   RemoteUtilTest()
-      : util_(/*verbosity=*/0, /*quiet=*/false, &process_factory_,
+      : util_(kUserHost, /*verbosity=*/0, /*quiet=*/false, &process_factory_,
               /*forward_output_to_log=*/true) {}
 
   void SetUp() override {
     Log::Initialize(std::make_unique<ConsoleLog>(LogLevel::kInfo));
-    util_.SetUserHostAndPort(kUserHost, kSshPort);
   }
 
   void TearDown() override { Log::Shutdown(); }
@@ -64,31 +60,29 @@ class RemoteUtilTest : public ::testing::Test {
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSsh) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSsh(kCommand);
-  ExpectContains(si.command, {"ssh", kSshPortArg, kUserHostArg, kCommand});
+  ExpectContains(si.command, {"ssh", kUserHostArg, kCommand});
 }
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForward) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSshPortForward(
       kLocalPort, kRemotePort, kRegular);
-  ExpectContains(si.command,
-                 {"ssh", kSshPortArg, kUserHostArg, kPortForwardingArg});
+  ExpectContains(si.command, {"ssh", kUserHostArg, kPortForwardingArg});
 
   si = util_.BuildProcessStartInfoForSshPortForward(kLocalPort, kRemotePort,
                                                     kReverse);
-  ExpectContains(si.command,
-                 {"ssh", kSshPortArg, kUserHostArg, kReversePortForwardingArg});
+  ExpectContains(si.command, {"ssh", kUserHostArg, kReversePortForwardingArg});
 }
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForwardAndCommand) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSshPortForwardAndCommand(
       kLocalPort, kRemotePort, kRegular, kCommand);
-  ExpectContains(si.command, {"ssh", kSshPortArg, kUserHostArg,
-                              kPortForwardingArg, kCommand});
+  ExpectContains(si.command,
+                 {"ssh", kUserHostArg, kPortForwardingArg, kCommand});
 
   si = util_.BuildProcessStartInfoForSshPortForwardAndCommand(
       kLocalPort, kRemotePort, kReverse, kCommand);
-  ExpectContains(si.command, {"ssh", kSshPortArg, kUserHostArg,
-                              kReversePortForwardingArg, kCommand});
+  ExpectContains(si.command,
+                 {"ssh", kUserHostArg, kReversePortForwardingArg, kCommand});
 }
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshWithCustomCommand) {
   constexpr char kCustomSshCmd[] = "C:\\path\\to\\ssh.exe --fooarg --bararg=42";

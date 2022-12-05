@@ -49,14 +49,14 @@ constexpr char kRemoteNetstatOutFmt[] =
 class PortManagerTest : public ::testing::Test {
  public:
   PortManagerTest()
-      : remote_util_(/*verbosity=*/0, /*quiet=*/false, &process_factory_,
+      : remote_util_(kUserHost, /*verbosity=*/0, /*quiet=*/false,
+                     &process_factory_,
                      /*forward_output_to_log=*/true),
         port_manager_(kGuid, kFirstPort, kLastPort, &process_factory_,
                       &remote_util_, &system_clock_, &steady_clock_) {}
 
   void SetUp() override {
     Log::Initialize(std::make_unique<ConsoleLog>(LogLevel::kInfo));
-    remote_util_.SetUserHostAndPort(kUserHost, kSshPort);
   }
 
   void TearDown() override { Log::Shutdown(); }

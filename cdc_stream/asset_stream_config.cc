@@ -135,14 +135,6 @@ void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd,
           .name("--dev-user-host")
           .help("Username and host to stream to. See also --dev-src-dir."));
 
-  dev_target_.ssh_port = RemoteUtil::kDefaultSshPort;
-  cmd.add_argument(
-      lyra::opt(dev_target_.ssh_port, "port")
-          .name("--dev-ssh-port")
-          .help("SSH port to use for the connection to the host, default: " +
-                std::to_string(RemoteUtil::kDefaultSshPort) +
-                ". See also --dev-src-dir."));
-
   cmd.add_argument(
       lyra::opt(dev_target_.ssh_command, "cmd")
           .name("--dev-ssh-command")
@@ -245,7 +237,6 @@ std::string AssetStreamConfig::ToString() {
      << session_cfg_.file_change_wait_duration_ms << std::endl;
   ss << "dev-src-dir                  = " << dev_src_dir_ << std::endl;
   ss << "dev-user-host                = " << dev_target_.user_host << std::endl;
-  ss << "dev-ssh-port                 = " << dev_target_.ssh_port << std::endl;
   ss << "dev-ssh-command              = " << dev_target_.ssh_command
      << std::endl;
   ss << "dev-scp-command              = " << dev_target_.scp_command

@@ -36,7 +36,6 @@ class ZstdStream;
 class CdcRsyncClient {
  public:
   struct Options {
-    int port = RemoteUtil::kDefaultSshPort;
     bool delete_ = false;
     bool recursive = false;
     int verbosity = 0;
@@ -118,7 +117,6 @@ class CdcRsyncClient {
 
   Options options_;
   std::vector<std::string> sources_;
-  const std::string user_host_;
   const std::string destination_;
   WinProcessFactory process_factory_;
   RemoteUtil remote_util_;

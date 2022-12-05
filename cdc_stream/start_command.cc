@@ -72,20 +72,12 @@ void StartCommand::RegisterCommandLineFlags(lyra::command& cmd) {
                 "asset stream service, default: " +
                 std::to_string(SessionManagementServer::kDefaultServicePort)));
 
-  ssh_port_ = RemoteUtil::kDefaultSshPort;
-  cmd.add_argument(
-      lyra::opt(ssh_port_, "port")
-          .name("--ssh-port")
-          .help("Port to use while connecting to the remote instance being "
-                "streamed to, default: " +
-                std::to_string(RemoteUtil::kDefaultSshPort)));
-
   path::GetEnv("CDC_SSH_COMMAND", &ssh_command_).IgnoreError();
   cmd.add_argument(
       lyra::opt(ssh_command_, "ssh_command")
           .name("--ssh-command")
           .help("Path and arguments of ssh command to use, e.g. "
-                "\"C:\\path\\to\\ssh.exe -F config_file\". Can also be "
+                "\"C:\\path\\to\\ssh.exe -F config_file -p 1234\". Can also be "
                 "specified by the CDC_SSH_COMMAND environment variable."));
 
   path::GetEnv("CDC_SCP_COMMAND", &scp_command_).IgnoreError();
@@ -93,7 +85,7 @@ void StartCommand::RegisterCommandLineFlags(lyra::command& cmd) {
       lyra::opt(scp_command_, "scp_command")
           .name("--scp-command")
           .help("Path and arguments of scp command to use, e.g. "
-                "\"C:\\path\\to\\scp.exe -F config_file\". Can also be "
+                "\"C:\\path\\to\\scp.exe -F config_file -P 1234\". Can also be "
                 "specified by the CDC_SCP_COMMAND environment variable."));
 
   cmd.add_argument(lyra::arg(PosArgValidator(&src_dir_), "dir")
@@ -116,9 +108,8 @@ absl::Status StartCommand::Run() {
       user_host_dir_, &user_host, &mount_dir));
 
   LocalAssetsStreamManagerClient client(CreateChannel(service_port_));
-  absl::Status status =
-      client.StartSession(full_src_dir, user_host, ssh_port_, mount_dir,
-                          ssh_command_, scp_command_);
+  absl::Status status = client.StartSession(full_src_dir, user_host, mount_dir,
+                                            ssh_command_, scp_command_);
 
   if (absl::IsUnavailable(status)) {
     LOG_DEBUG("StartSession status: %s", status.ToString());
@@ -131,8 +122,8 @@ absl::Status StartCommand::Run() {
       // Recreate client. The old channel might still be in a transient failure
       // state.
       LocalAssetsStreamManagerClient new_client(CreateChannel(service_port_));
-      status = new_client.StartSession(full_src_dir, user_host, ssh_port_,
-                                       mount_dir, ssh_command_, scp_command_);
+      status = new_client.StartSession(full_src_dir, user_host, mount_dir,
+                                       ssh_command_, scp_command_);
     }
   }
 
