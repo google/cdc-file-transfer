@@ -18,6 +18,7 @@
 #include "common/file_watcher_win.h"
 #include "common/log.h"
 #include "common/path.h"
+#include "common/path_filter.h"
 #include "common/platform.h"
 #include "common/port_manager.h"
 #include "common/process.h"
@@ -553,6 +554,21 @@ absl::Status MultiSession::StopSession(const std::string& instance_id) {
 bool MultiSession::HasSession(const std::string& instance_id) {
   absl::ReaderMutexLock lock(&sessions_mutex_);
   return sessions_.find(instance_id) != sessions_.end();
+}
+
+std::vector<std::string> MultiSession::MatchSessions(
+    const std::string& instance_id_filter) {
+  PathFilter filter;
+  filter.AddRule(PathFilter::Rule::Type::kInclude, instance_id_filter);
+  filter.AddRule(PathFilter::Rule::Type::kExclude, "*");
+
+  std::vector<std::string> matches;
+  for (const auto& [instance_id, session] : sessions_) {
+    if (filter.IsMatch(instance_id)) {
+      matches.push_back(instance_id);
+    }
+  }
+  return matches;
 }
 
 bool MultiSession::IsSessionHealthy(const std::string& instance_id) {

@@ -208,6 +208,7 @@ cc_library(
         "//common:file_watcher",
         "//common:log",
         "//common:path",
+        "//common:path_filter",
         "//common:port_manager",
         "//common:process",
         "//common:remote_util",

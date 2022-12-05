@@ -194,6 +194,11 @@ class MultiSession {
   absl::Status StopSession(const std::string& instance_id)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
+  // Returns all instance ids that match the given filter. The filter may
+  // contain Windows-style wildcards, e.g. *, foo* or f?o.
+  // Matches are case sensitive.
+  std::vector<std::string> MatchSessions(const std::string& instance_id_filter);
+
   // Returns true if there is an existing session for |instance_id|.
   bool HasSession(const std::string& instance_id)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);

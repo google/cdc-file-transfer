@@ -58,9 +58,11 @@ class SessionManager {
                             metrics::SessionStartStatus* metrics_status)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
-  // Stops the session for the given |instance_id|.
+  // Stops all sessions that match the given |instance_id_filter|.
+  // The filter may contain Windows-style wildcards like * and ?.
+  // Matching is case-sensitive.
   // Returns a NotFound error if no session exists.
-  absl::Status StopSession(const std::string& instance_id)
+  absl::Status StopSession(const std::string& instance_id_filter)
       ABSL_LOCKS_EXCLUDED(sessions_mutex_);
 
   // Shuts down all existing MultiSessions.

@@ -65,9 +65,10 @@ message StopSessionRequest {
   // ID of assets streaming target gamelet.
   // Only used by Stadia. Should set either this or user_host_dir.
   string gamelet_id = 1;
-  // Username and host, in the form [user@]host.
+  // Username and host, in the form [user@]host. Accepts wildcards * and ?.
   string user_host = 2;
   // Remote directory where the streamed directory is mounted.
+  // Accepts wildcards * and ?.
   string mount_dir = 3;
 }
 

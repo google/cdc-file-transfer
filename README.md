@@ -224,6 +224,11 @@ To stop the streaming session, enter
 ```
 cdc_stream stop user@linux.device.com:~/assets
 ```
+The command also accepts wildcards. For instance, 
+```
+cdc_stream stop user@*:*
+```
+stops all existing streaming sessions for the given user.
 
 ## Troubleshooting
 
