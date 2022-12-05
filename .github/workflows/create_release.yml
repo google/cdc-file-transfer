@@ -17,14 +17,25 @@ jobs:
       - name: Initialize submodules
         run: git submodule update --init --recursive
 
+      - name: Create timestamp
+        run: |
+          printf -v date '%(%Y-%m)T' -1
+          echo "date=$date" >> $GITHUB_ENV
+
+      - name: Restore build cache
+        uses: actions/cache@v3
+        with:
+          path: bazel-cache
+          key: ${{ runner.os }}-bazel-cache-${{ env.date }}
+
       - name: Build
         run: |
-          bazel build --config=linux --compilation_mode=opt --linkopt=-Wl,--strip-all --copt=-fdata-sections --copt=-ffunction-sections --linkopt=-Wl,--gc-sections \
+          bazel build --config=linux --disk_cache=bazel-cache --compilation_mode=opt --linkopt=-Wl,--strip-all --copt=-fdata-sections --copt=-ffunction-sections --linkopt=-Wl,--gc-sections \
             //cdc_fuse_fs //cdc_rsync_server
 
       - name: Test
         run: |
-          bazel test --config=linux --compilation_mode=opt --linkopt=-Wl,--strip-all --copt=-fdata-sections --copt=-ffunction-sections --linkopt=-Wl,--gc-sections \
+          bazel test --config=linux --disk_cache=bazel-cache --compilation_mode=opt --linkopt=-Wl,--strip-all --copt=-fdata-sections --copt=-ffunction-sections --linkopt=-Wl,--gc-sections \
                      --test_output=errors --local_test_jobs=1  \
                      -- //... -//third_party/... -//cdc_rsync_server:file_finder_test
 
@@ -50,9 +61,20 @@ jobs:
       - name: Initialize submodules
         run: git submodule update --init --recursive
 
+      - name: Create timestamp
+        run: |
+          $date = Get-Date -Format "yyyy-MM"
+          echo "date=$date" >> $GITHUB_ENV
+
+      - name: Restore build cache
+        uses: actions/cache@v3
+        with:
+          path: bazel-cache
+          key: ${{ runner.os }}-bazel-cache-${{ env.date }}
+
       - name: Build
         run: |
-          bazel build --config=windows --compilation_mode=opt --copt=/GL `
+          bazel build --config=windows --disk_cache=bazel-cache --compilation_mode=opt --copt=/GL `
                        //cdc_rsync //cdc_stream //tests_common //tests_cdc_stream //tests_cdc_rsync
 
       - name: Test
@@ -60,7 +82,7 @@ jobs:
           bazel-bin\tests_common\tests_common.exe
           bazel-bin\tests_cdc_stream\tests_cdc_stream.exe
           bazel-bin\tests_cdc_rsync\tests_cdc_rsync.exe
-          bazel test --config=windows --compilation_mode=opt --copt=/GL --test_output=errors --local_test_jobs=1 `
+          bazel test --config=windows --disk_cache=bazel-cache --compilation_mode=opt --copt=/GL --test_output=errors --local_test_jobs=1 `
             //cdc_fuse_fs/... `
             //cdc_rsync/... `
             //cdc_rsync/base/... `
