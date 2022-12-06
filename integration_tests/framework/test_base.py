@@ -27,7 +27,7 @@ from integration_tests.framework import test_runner
 class Flags(object):
   binary_path = None
   user_host = None
-  ssh_port = 22
+  service_port = 0
 
 
 def main():
@@ -35,17 +35,17 @@ def main():
   parser.add_argument('--binary_path', help='Target [user@]host', required=True)
   parser.add_argument('--user_host', help='Target [user@]host', required=True)
   parser.add_argument(
-      '--ssh_port',
+      '--service_port',
       type=int,
-      help='SSH port for connecting to the host',
-      default=22)
+      help='Asset streaming service port',
+      default=44432)
   parser.add_argument('--log_file', help='Log file path')
 
   # Capture all remaining arguments to pass to unittest.main().
   args, unittest_args = parser.parse_known_args()
   Flags.binary_path = args.binary_path
   Flags.user_host = args.user_host
-  Flags.ssh_port = args.ssh_port
+  Flags.service_port = args.service_port
 
   # Log to STDERR
   log_format = ('%(levelname)-8s%(asctime)s '

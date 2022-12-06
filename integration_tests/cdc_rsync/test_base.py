@@ -39,7 +39,8 @@ class CdcRsyncTest(unittest.TestCase):
     super(CdcRsyncTest, self).setUp()
     logging.debug('CdcRsyncTest -> setUp')
 
-    utils.initialize(test_base.Flags.binary_path, test_base.Flags.user_host)
+    utils.initialize(test_base.Flags.binary_path, None,
+                     test_base.Flags.user_host)
 
     now_str = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     self.tmp_dir = tempfile.TemporaryDirectory(
