@@ -18,7 +18,21 @@
 #include "cdc_stream/stop_service_command.h"
 #include "lyra/lyra.hpp"
 
-int main(int argc, char* argv[]) {
+int wmain(int argc, wchar_t* argv[]) {
+  // Convert args from wide to UTF8 strings.
+  std::vector<std::string> utf8_str_args;
+  utf8_str_args.reserve(argc);
+  for (int i = 0; i < argc; i++) {
+    utf8_str_args.push_back(cdc_ft::Util::WideToUtf8Str(argv[i]));
+  }
+
+  // Convert args from UTF8 strings to UTF8 c-strings.
+  std::vector<const char*> utf8_args;
+  utf8_args.reserve(argc);
+  for (const auto& utf8_str_arg : utf8_str_args) {
+    utf8_args.push_back(utf8_str_arg.c_str());
+  }
+
   // Set up commands.
   auto cli = lyra::cli();
   bool show_help = false;
@@ -39,7 +53,7 @@ int main(int argc, char* argv[]) {
 
   // Parse args and run. Note that parse actually runs the commands.
   // exit_code is -1 if no command was run.
-  auto result = cli.parse({argc, argv});
+  auto result = cli.parse({argc, utf8_args.data()});
   if (show_help || exit_code == -1) {
     std::cout << cli;
     return 0;

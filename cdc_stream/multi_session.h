@@ -148,7 +148,7 @@ class MultiSession {
   // |process_factory| abstracts process creation.
   // |data_store| can be passed for tests to override the default store used.
   // By default, the class uses a DiskDataStore that writes to
-  // %APPDATA%\GGP\asset_streaming|<dir_derived_from_src_dir> on Windows.
+  // %APPDATA%\cdc-file-transfer\chunks\<dir_derived_from_src_dir> on Windows.
   MultiSession(std::string src_dir, SessionConfig cfg,
                ProcessFactory* process_factory,
                MultiSessionMetricsRecorder const* metrics_recorder,
@@ -220,7 +220,7 @@ class MultiSession {
   static std::string GetCacheDir(std::string dir);
 
   // Returns the directory where manifest chunks are cached, e.g.
-  // "%APPDATA%\GGP\asset_streaming\c__path_to_game_abcdef01" for
+  // "%APPDATA%\cdc-file-transfer\chunks\c__path_to_game_abcdef01" for
   // "C:\path\to\game".
   // The returned path is shortened to |max_len| by removing UTF8 code points
   // from the beginning of the actual cache directory (c__path...) if necessary.

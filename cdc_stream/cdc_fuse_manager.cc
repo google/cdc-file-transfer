@@ -95,7 +95,7 @@ absl::Status CdcFuseManager::Start(const std::string& mount_dir,
   if (!status.ok()) {
     return absl::NotFoundError(absl::StrFormat(
         "Required gamelet component not found. Make sure the files %s and %s "
-        "reside in the same folder as stadia_assets_stream_manager_v3.exe.",
+        "reside in the same folder as cdc_stream.exe.",
         kFuseFilename, kLibFuseFilename));
   }
   std::string component_args = GameletComponent::ToCommandLineArgs(components);
@@ -113,8 +113,8 @@ absl::Status CdcFuseManager::Start(const std::string& mount_dir,
       RemoteUtil::QuoteForSsh(instance_),
       RemoteUtil::QuoteForSsh(component_args), remote_port, kCacheDir,
       verbosity, cleanup_timeout_sec, access_idle_timeout_sec, enable_stats,
-      check, cache_capacity, RemoteUtil::QuoteForSsh(mount_dir),
-      debug ? " -d" : "", singlethreaded ? " -s" : "");
+      check, cache_capacity, debug ? "-d " : "", singlethreaded ? "-s " : "",
+      RemoteUtil::QuoteForSsh(mount_dir));
 
   bool needs_deploy = false;
   RETURN_IF_ERROR(

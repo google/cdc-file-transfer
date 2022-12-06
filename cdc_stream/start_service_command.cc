@@ -116,7 +116,7 @@ absl::StatusOr<std::unique_ptr<Log>> StartServiceCommand::GetLogger() {
   }
 
   return std::make_unique<FileLog>(
-      level, GetLogPath(log_dir_.c_str(), "assets_stream_manager").c_str());
+      level, GetLogPath(log_dir_.c_str(), "cdc_stream").c_str());
 }
 
 // Runs the session management service and returns when it finishes.
