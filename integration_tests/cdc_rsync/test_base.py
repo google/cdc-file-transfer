@@ -53,8 +53,7 @@ class CdcRsyncTest(test_base.TestCase):
     utils.initialize_random()
 
   def tearDown(self):
-    """Logs a marker."""
-
+    """Cleans up the local and remote temp directories."""
     super(CdcRsyncTest, self).tearDown()
     logging.debug('CdcRsyncTest -> tearDown')
     self.tmp_dir.cleanup()

@@ -21,9 +21,7 @@ import logging
 import sys
 import unittest
 
-from integration_tests.framework import xml_test_runner
-
-APPDATA = 'APPDATA'
+from integration_tests.framework import test_runner
 
 
 class Flags(object):
@@ -51,8 +49,7 @@ class TestCase(unittest.TestCase):
     with super(TestCase, self).subTest(name=name, **kwargs):
       yield
       succeeded = True
-    self.assertTrue(succeeded or not must_pass,
-                    'Cannot continue after failure in subtest "%s"' % name)
+    raise test_runner.SubTestFailure()
 
 
 def main():
@@ -64,7 +61,6 @@ def main():
       type=int,
       help='SSH port for connecting to the host',
       default=22)
-  parser.add_argument('--xml_result_file', help='XML file with test results')
   parser.add_argument('--log_file', help='Log file path')
 
   # Capture all remaining arguments to pass to unittest.main().
@@ -74,8 +70,8 @@ def main():
   Flags.ssh_port = args.ssh_port
 
   # Log to STDERR
-  log_format = ('%(levelname)-8s%(asctime)s  %(process)-8d'
-                '%(filename)s:%(lineno)-3d] %(message)s')
+  log_format = ('%(levelname)-8s%(asctime)s '
+                '%(filename)s:%(lineno)-3d %(message)s')
   log_stream = sys.stderr
 
   if args.log_file:
@@ -86,6 +82,4 @@ def main():
         format=log_format, level=logging.DEBUG, stream=log_stream)
 
     unittest.main(
-        argv=sys.argv[:1] + unittest_args,
-        testRunner=xml_test_runner.XmlTestRunner(
-            flags=Flags, filename=args.xml_result_file))
+        argv=sys.argv[:1] + unittest_args, testRunner=test_runner.TestRunner())

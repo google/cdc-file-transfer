@@ -98,7 +98,8 @@ def run_rsync(*args):
   res = subprocess.run(command, capture_output=True)
   # Remove lines ending with \r since those are temp display lines.
   res.stdout = _remove_carriage_return_lines(res.stdout.decode('ascii'))
-  logging.debug('\r\n%s', res.stdout)
+  if res.stdout.strip():
+    logging.debug('\r\n%s', res.stdout)
   return res
 
 
