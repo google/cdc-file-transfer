@@ -26,6 +26,7 @@
 namespace cdc_ft {
 namespace {
 
+constexpr char kExeFilename[] = "cdc_stream.exe";
 constexpr char kFuseFilename[] = "cdc_fuse_fs";
 constexpr char kLibFuseFilename[] = "libfuse.so";
 constexpr char kFuseStdoutPrefix[] = "cdc_fuse_fs_stdout";
@@ -95,8 +96,8 @@ absl::Status CdcFuseManager::Start(const std::string& mount_dir,
   if (!status.ok()) {
     return absl::NotFoundError(absl::StrFormat(
         "Required gamelet component not found. Make sure the files %s and %s "
-        "reside in the same folder as cdc_stream.exe.",
-        kFuseFilename, kLibFuseFilename));
+        "reside in the same folder as %s.",
+        kFuseFilename, kLibFuseFilename, kExeFilename));
   }
   std::string component_args = GameletComponent::ToCommandLineArgs(components);
 
