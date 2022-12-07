@@ -16,9 +16,30 @@
 #include "cdc_stream/start_service_command.h"
 #include "cdc_stream/stop_command.h"
 #include "cdc_stream/stop_service_command.h"
+#include "common/platform.h"
 #include "lyra/lyra.hpp"
 
-int main(int argc, char* argv[]) {
+#if PLATFORM_WINDOWS
+int wmain(int argc, wchar_t* wargv[]) {
+  // Convert args from wide to UTF8 strings.
+  std::vector<std::string> utf8_str_args;
+  utf8_str_args.reserve(argc);
+  for (int i = 0; i < argc; i++) {
+    utf8_str_args.push_back(cdc_ft::Util::WideToUtf8Str(wargv[i]));
+  }
+
+  // Convert args from UTF8 strings to UTF8 c-strings.
+  std::vector<const char*> utf8_args;
+  utf8_args.reserve(argc);
+  for (const auto& utf8_str_arg : utf8_str_args) {
+    utf8_args.push_back(utf8_str_arg.c_str());
+  }
+
+  const char** argv = utf8_args.data();
+#else
+int main(int argc, char** argv) {
+#endif
+
   // Set up commands.
   auto cli = lyra::cli();
   bool show_help = false;

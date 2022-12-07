@@ -625,7 +625,8 @@ absl::StatusOr<std::string> MultiSession::GetCachePath(
   path::Append(&appdata_path, ".cache");
 #endif
 
-  std::string base_dir = path::Join(appdata_path, "GGP", "asset_streaming");
+  std::string base_dir =
+      path::Join(appdata_path, "cdc-file-transfer", "chunks");
   std::string cache_dir = GetCacheDir(src_dir);
 
   size_t total_size = base_dir.size() + 1 + cache_dir.size();

@@ -241,7 +241,7 @@ TEST_F(MultiSessionTest, GetCachePath_ContainsExpectedParts) {
   ASSERT_OK(cache_path);
   EXPECT_TRUE(absl::EndsWith(*cache_path, kCacheDir)) << *cache_path;
   EXPECT_TRUE(
-      absl::StrContains(*cache_path, path::Join("GGP", "asset_streaming")))
+      absl::StrContains(*cache_path, path::Join("cdc-file-transfer", "chunks")))
       << *cache_path;
 }
 
@@ -253,7 +253,7 @@ TEST_F(MultiSessionTest, GetCachePath_ShortensLongPaths) {
   ASSERT_OK(cache_path);
   EXPECT_EQ(cache_path->size(), MultiSession::kDefaultMaxCachePathLen);
   EXPECT_TRUE(
-      absl::StrContains(*cache_path, path::Join("GGP", "asset_streaming")))
+      absl::StrContains(*cache_path, path::Join("cdc-file-transfer", "chunks")))
       << *cache_path;
   // The hash in the end of the path is kept and not shortened.
   EXPECT_EQ(cache_dir.substr(cache_dir.size() - MultiSession::kDirHashLen),
@@ -261,7 +261,8 @@ TEST_F(MultiSessionTest, GetCachePath_ShortensLongPaths) {
 }
 
 TEST_F(MultiSessionTest, GetCachePath_DoesNotSplitUtfCodePoints) {
-  // Find out the length of the %APPDATA%\GGP\asset_streaming\" + hash part.
+  // Find out the length of the %APPDATA%\cdc-file-transfer\chunks\" + hash
+  // part.
   absl::StatusOr<std::string> cache_path = MultiSession::GetCachePath("");
   ASSERT_OK(cache_path);
   size_t base_len = cache_path->size();
@@ -271,17 +272,17 @@ TEST_F(MultiSessionTest, GetCachePath_DoesNotSplitUtfCodePoints) {
   ASSERT_OK(cache_path);
   EXPECT_EQ(cache_path->size(), base_len);
 
-  // %APPDATA%\GGP\asset_streaming\abcdefg
+  // %APPDATA%\cdc-file-transfer\chunks\abcdefg
   cache_path = MultiSession::GetCachePath(u8"\u0200\u0200", base_len + 1);
   ASSERT_OK(cache_path);
   EXPECT_EQ(cache_path->size(), base_len);
 
-  // %APPDATA%\GGP\asset_streaming\\u0200abcdefg
+  // %APPDATA%\cdc-file-transfer\chunks\\u0200abcdefg
   cache_path = MultiSession::GetCachePath(u8"\u0200\u0200", base_len + 2);
   ASSERT_OK(cache_path);
   EXPECT_EQ(cache_path->size(), base_len + 2);
 
-  // %APPDATA%\GGP\asset_streaming\\u0200abcdefg
+  // %APPDATA%\cdc-file-transfer\chunks\\u0200abcdefg
   cache_path = MultiSession::GetCachePath(u8"\u0200\u0200", base_len + 3);
   ASSERT_OK(cache_path);
   EXPECT_EQ(cache_path->size(), base_len + 2);

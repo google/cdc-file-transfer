@@ -330,10 +330,10 @@ void DataProvider::CleanupThreadMain() {
       WriterMutexLockList locks;
       LockAllMutexes(&locks);
       chunks_updated_ = false;
-      LOG_DEBUG("Starting cache cleanup");
+      LOG_INFO("Starting cache cleanup");
       Stopwatch sw;
       absl::Status status = writer_->Cleanup();
-      LOG_DEBUG("Finished cache cleanup in %0.3f seconds", sw.ElapsedSeconds());
+      LOG_INFO("Finished cache cleanup in %0.3f seconds", sw.ElapsedSeconds());
       next_cleanup_time =
           steady_clock_->Now() + std::chrono::seconds(cleanup_timeout_sec_);
       absl::MutexLock cleaned_lock(&cleaned_mutex_);
