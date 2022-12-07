@@ -15,16 +15,17 @@
 # Lint as: python3
 """cdc_rsync base test class."""
 
-import logging
 import datetime
+import logging
 import tempfile
 import re
+import unittest
 
 from integration_tests.framework import utils
 from integration_tests.framework import test_base
 
 
-class CdcRsyncTest(test_base.TestCase):
+class CdcRsyncTest(unittest.TestCase):
   """cdc_rsync base test class."""
 
   tmp_dir = None

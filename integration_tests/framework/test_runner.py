@@ -20,10 +20,6 @@ import traceback
 import unittest
 
 
-class SubTestFailure(RuntimeError):
-  """Raised when a must-pass subtest fails."""
-
-
 class TestRunner(object):
   """Runner producing test xml output."""
 
@@ -56,9 +52,6 @@ class TestResult(unittest.TestResult):
     unittest.TestResult.stopTest(self, test)
     logging.info('\n\n===== END TEST CASE: %s =====\n', test)
 
-  def addSuccess(self, test):
-    unittest.TestResult.addSuccess(self, test)
-
   def addError(self, test, err):
     unittest.TestResult.addError(self, test, err)
     self._LogFailureInfo(err)
@@ -67,22 +60,7 @@ class TestResult(unittest.TestResult):
     unittest.TestResult.addFailure(self, test, err)
     self._LogFailureInfo(err)
 
-  def addSkip(self, test, reason):
-    unittest.TestResult.addSkip(self, test, reason)
-
-  def addSubTest(self, test, subtest, outcome):  # pylint: disable=invalid-name
-    unittest.TestResult.addSubTest(self, test, subtest, outcome)
-    self._HandleSubTest(outcome, **subtest.params)
-
-  def _HandleSubTest(self, outcome, name='Missing Name', **kwargs):
-    if outcome:
-      self._LogFailureInfo(outcome)
-    logging.info('===== END SUBTEST: %s %s =====', name, repr(kwargs))
-
   def _LogFailureInfo(self, err):
     exctype, exc, tb = err
-    if type(exc) is SubTestFailure:
-      # Subtest errors have already been logged, don't log them again.
-      return
     detail = ''.join(traceback.format_exception(exctype, exc, tb))
     logging.error('FAILURE: %s', detail)

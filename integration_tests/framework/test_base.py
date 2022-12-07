@@ -30,28 +30,6 @@ class Flags(object):
   ssh_port = 22
 
 
-class TestCase(unittest.TestCase):
-
-  @contextlib.contextmanager
-  def subTest(self, name='Missing Name', must_pass=True, **kwargs):
-    """Create a block of code that is reported as a separate subtest.
-
-    Args:
-      name: str, identifier for the subtest
-      must_pass: bool, if True, testcase will fail immediately if subtest fails
-      **kwargs: keyword arguments passed to the subTest
-
-    Yields:
-       Yields a context manager which executes the enclosed code block as a
-       subtest.
-    """
-    succeeded = False
-    with super(TestCase, self).subTest(name=name, **kwargs):
-      yield
-      succeeded = True
-    raise test_runner.SubTestFailure()
-
-
 def main():
   parser = argparse.ArgumentParser(description='End-to-end integration test.')
   parser.add_argument('--binary_path', help='Target [user@]host', required=True)
