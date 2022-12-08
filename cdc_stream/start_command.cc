@@ -22,7 +22,6 @@
 #include "common/log.h"
 #include "common/path.h"
 #include "common/process.h"
-#include "common/remote_util.h"
 #include "common/status_macros.h"
 #include "common/stopwatch.h"
 #include "common/util.h"

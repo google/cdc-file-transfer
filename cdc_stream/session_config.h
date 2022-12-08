@@ -56,6 +56,10 @@ struct SessionConfig {
 
   // Time to wait until running a manifest update after detecting a file change.
   uint32_t file_change_wait_duration_ms = 0;
+
+  // Ports used for local port forwarding.
+  uint16_t forward_port_first = 0;
+  uint16_t forward_port_last = 0;
 };
 
 }  // namespace cdc_ft

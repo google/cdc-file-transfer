@@ -48,18 +48,21 @@ class AssetStreamConfig {
   // Loads a configuration from the JSON file at |path| and overrides any config
   // values that are set in this file. Sample json file:
   // {
+  //   "service-port":44432
+  //   "forward-port-first":"44433"
+  //   "forward-port-last":"44442"
   //   "verbosity":3,
   //   "debug":0,
   //   "singlethreaded":0,
   //   "stats":0,
   //   "quiet":0,
   //   "check":0,
-  //   "log_to_stdout":0,
-  //   "cache_capacity":"150G",
-  //   "cleanup_timeout":300,
-  //   "access_idle_timeout":5,
-  //   "manifest_updater_threads":4,
-  //   "file_change_wait_duration_ms":500
+  //   "log-to-stdout":0,
+  //   "cache-capacity":"150G",
+  //   "cleanup-timeout":300,
+  //   "access-idle-timeout":5,
+  //   "manifest-updater-threads":4,
+  //   "file-change-wait-duration-ms":500
   // }
   // Returns NotFoundError if the file does not exist.
   // Returns InvalidArgumentError if the file is not valid JSON.

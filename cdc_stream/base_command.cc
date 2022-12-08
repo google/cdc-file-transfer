@@ -15,6 +15,7 @@
 #include "cdc_stream/base_command.h"
 
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_split.h"
 #include "absl_helper/jedec_size_flag.h"
 #include "lyra/lyra.hpp"
 
@@ -44,8 +45,7 @@ void BaseCommand::Register(lyra::cli& cli) {
 
 std::function<void(const std::string&)> BaseCommand::JedecParser(
     const char* flag_name, uint64_t* bytes) {
-  return [flag_name, bytes,
-          error = &jedec_parse_error_](const std::string& value) {
+  return [flag_name, bytes, error = &parse_error_](const std::string& value) {
     JedecSize size;
     if (AbslParseFlag(value, &size, error)) {
       *bytes = size.Size();
@@ -53,6 +53,30 @@ std::function<void(const std::string&)> BaseCommand::JedecParser(
       *error = absl::StrFormat("Failed to parse %s=%s: %s", flag_name, value,
                                *error);
     }
+  };
+}
+
+std::function<void(const std::string&)> BaseCommand::PortRangeParser(
+    const char* flag_name, uint16_t* first, uint16_t* last) {
+  return [flag_name, first, last,
+          error = &parse_error_](const std::string& value) {
+    std::vector<std::string> parts = absl::StrSplit(value, '-');
+    if (parts.empty() || parts.size() > 2) {
+      *error = absl::StrFormat("Failed to parse %s=%s: Invalid port range",
+                               flag_name, value);
+      return;
+    }
+    const int ifirst = atoi(parts[0].c_str());
+    const int ilast = parts.size() > 1 ? atoi(parts[1].c_str()) : ifirst;
+    if (ifirst <= 0 || ifirst > UINT16_MAX || ilast <= 0 ||
+        ilast > UINT16_MAX || ifirst > ilast) {
+      const char* range = parts.size() > 1 ? " range" : "";
+      *error = absl::StrFormat("Failed to parse %s=%s: Invalid port%s",
+                               flag_name, value, range);
+      return;
+    }
+    *first = static_cast<uint16_t>(ifirst);
+    *last = static_cast<uint16_t>(ilast);
   };
 }
 
@@ -83,8 +107,8 @@ void BaseCommand::CommandHandler(const lyra::group& g) {
     return;
   }
 
-  if (!jedec_parse_error_.empty()) {
-    std::cerr << "Error: " << jedec_parse_error_ << std::endl;
+  if (!parse_error_.empty()) {
+    std::cerr << "Error: " << parse_error_ << std::endl;
     *exit_code_ = 1;
     return;
   }
