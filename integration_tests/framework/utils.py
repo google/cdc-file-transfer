@@ -24,8 +24,10 @@ import shutil
 import string
 import subprocess
 import time
+import sys
 
 CDC_RSYNC_PATH = None
+CDC_STREAM_PATH = None
 USER_HOST = None
 
 SHA1_LEN = 40
@@ -33,11 +35,12 @@ SHA1_BUF_SIZE = 65536
 RANDOM = random.Random()
 
 
-def initialize(cdc_rsync_path, user_host):
+def initialize(cdc_rsync_path, cdc_stream_path, user_host):
   """Sets global variables."""
-  global CDC_RSYNC_PATH, USER_HOST
+  global CDC_RSYNC_PATH, CDC_STREAM_PATH, USER_HOST
 
   CDC_RSYNC_PATH = cdc_rsync_path
+  CDC_STREAM_PATH = cdc_stream_path
   USER_HOST = user_host
 
 
@@ -66,6 +69,11 @@ def _remove_carriage_return_lines(text):
   return ret
 
 
+def target(dir):
+  """Prepends user@host: to dir."""
+  return USER_HOST + ":" + dir
+
+
 def run_rsync(*args):
   """Runs cdc_rsync with given args.
 
@@ -86,7 +94,7 @@ def run_rsync(*args):
   args_list = list(filter(None, args))
   for n in range(len(args_list) - 1, 0, -1):
     if args_list[n][0] != '-' and not ':' in args_list[n]:
-      args_list[n] = USER_HOST + ":" + args_list[n]
+      args_list[n] = target(args_list[n])
       break
 
   command = [CDC_RSYNC_PATH, *args_list]
@@ -101,6 +109,25 @@ def run_rsync(*args):
   if res.stdout.strip():
     logging.debug('\r\n%s', res.stdout)
   return res
+
+
+def run_stream(*args):
+  """Runs cdc_stream with given args.
+
+  Args:
+      *args (string): cdc_stream arguments.
+
+  Returns:
+      CompletedProcess: cdc_stream process info with exit code and stdout/stderr.
+  """
+
+  command = [CDC_STREAM_PATH, *filter(None, args)]
+
+  # Workaround issue with unicode logging.
+  logging.debug(
+      'Executing %s ',
+      ' '.join(command).encode('utf-8').decode('ascii', 'backslashreplace'))
+  return subprocess.run(command)
 
 
 def files_count_is(cdc_rsync_res,
@@ -317,15 +344,3 @@ def get_sorted_files(remote_dir, pattern='"*.[t|d]*"'):
   found = sorted(
       filter(lambda item: item and item != '.', find_res.split('\r\n')))
   return found
-
-
-def write_file(path, content):
-  """Writes a file and creates the parent directory if it does not exist yet.
-
-  Args:
-      path (string): File path to create.
-      content (string): File content.
-  """
-  pathlib.Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
-  with open(path, 'wt') as file:
-    file.write(content)
