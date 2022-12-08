@@ -26,14 +26,14 @@ jobs:
         uses: actions/cache@v3
         with:
           path: bazel-cache
-          key: ${{ runner.os }}-bazel-cache-${{ env.date }}
+          key: ${{ runner.os }}-bazel-cache-opt-${{ env.date }}
 
-      - name: Build
+      - name: Build (opt)
         run: |
           bazel build --config=linux --disk_cache=bazel-cache --compilation_mode=opt --linkopt=-Wl,--strip-all --copt=-fdata-sections --copt=-ffunction-sections --linkopt=-Wl,--gc-sections \
             //cdc_fuse_fs //cdc_rsync_server
 
-      - name: Test
+      - name: Test (opt)
         run: |
           bazel test --config=linux --disk_cache=bazel-cache --compilation_mode=opt --linkopt=-Wl,--strip-all --copt=-fdata-sections --copt=-ffunction-sections --linkopt=-Wl,--gc-sections \
                      --test_output=errors --local_test_jobs=1  \
@@ -64,20 +64,20 @@ jobs:
       - name: Create timestamp
         run: |
           $date = Get-Date -Format "yyyy-MM"
-          echo "date=$date" >> $GITHUB_ENV
+          echo "date=$date" >> $env:GITHUB_ENV
 
       - name: Restore build cache
         uses: actions/cache@v3
         with:
           path: bazel-cache
-          key: ${{ runner.os }}-bazel-cache-${{ env.date }}
+          key: ${{ runner.os }}-bazel-cache-opt-${{ env.date }}
 
-      - name: Build
+      - name: Build (opt)
         run: |
           bazel build --config=windows --disk_cache=bazel-cache --compilation_mode=opt --copt=/GL `
                        //cdc_rsync //cdc_stream //tests_common //tests_cdc_stream //tests_cdc_rsync
 
-      - name: Test
+      - name: Test (opt)
         run: |
           bazel-bin\tests_common\tests_common.exe
           bazel-bin\tests_cdc_stream\tests_cdc_stream.exe

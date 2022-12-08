@@ -32,7 +32,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: bazel-cache
-          key: ${{ runner.os }}-bazel-cache-${{ env.date }}
+          key: ${{ runner.os }}-bazel-cache-fastbuild-${{ env.date }}
 
       - name: Build (fastbuild)
         run: bazel build --config=linux --disk_cache=bazel-cache -- //... -//third_party/...
@@ -55,18 +55,18 @@ jobs:
       - name: Create timestamp
         run: |
           $date = Get-Date -Format "yyyy-MM"
-          echo "date=$date" >> $GITHUB_ENV
+          echo "date=$date" >> $env:GITHUB_ENV
 
       - name: Restore build cache
         uses: actions/cache@v3
         with:
           path: bazel-cache
-          key: ${{ runner.os }}-bazel-cache-${{ env.date }}
+          key: ${{ runner.os }}-bazel-cache-fastbuild-${{ env.date }}
 
-      - name: Build
+      - name: Build (fastbuild)
         run: bazel build --config=windows --disk_cache=bazel-cache //cdc_rsync //cdc_stream //tests_common //tests_cdc_stream //tests_cdc_rsync
 
-      - name: Test
+      - name: Test (fastbuild)
         run: |
           bazel-bin\tests_common\tests_common.exe
           bazel-bin\tests_cdc_stream\tests_cdc_stream.exe
