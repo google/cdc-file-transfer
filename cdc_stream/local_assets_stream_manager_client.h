@@ -41,12 +41,11 @@ class LocalAssetsStreamManagerClient {
   // Starting a second session to the same target will stop the first one.
   // |src_dir| is the Windows source directory to stream.
   // |user_host| is the Linux host, formatted as [user@:host].
-  // |ssh_port| is the SSH port to use while connecting to the host.
   // |mount_dir| is the Linux target directory to stream to.
   // |ssh_command| is the ssh command and extra arguments to use.
   // |scp_command| is the scp command and extra arguments to use.
   absl::Status StartSession(const std::string& src_dir,
-                            const std::string& user_host, uint16_t ssh_port,
+                            const std::string& user_host,
                             const std::string& mount_dir,
                             const std::string& ssh_command,
                             const std::string& scp_command);

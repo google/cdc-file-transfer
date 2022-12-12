@@ -29,46 +29,36 @@ namespace cdc_ft {
 // Windows-only.
 class RemoteUtil {
  public:
-  static constexpr int kDefaultSshPort = 22;
-
+  // |user_host| is the SSH [user@]host of the remote instance.
   // If |verbosity| is > 0 and |quiet| is false, output from scp, ssh etc.
   // commands is shown.
   // If |quiet| is true, scp, ssh etc. commands use quiet mode.
   // If |forward_output_to_log| is true, process output is forwarded to logging
   // instead of this process's stdout/stderr.
-  RemoteUtil(int verbosity, bool quiet, ProcessFactory* process_factory,
-             bool forward_output_to_log);
-
-  // Sets the SSH username and hostname of the remote instance, as well as the
-  // SSH tunnel port. |user_host| must be of the form [user@]host.
-  void SetUserHostAndPort(std::string user_host, int port);
+  RemoteUtil(std::string user_host, int verbosity, bool quiet,
+             ProcessFactory* process_factory, bool forward_output_to_log);
 
   // Sets the SCP command binary path and additional arguments, e.g.
-  //   C:\path\to\scp.exe -F <ssh_config> -i <key_file>
-  //     -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
+  //   C:\path\to\scp.exe -p 1234 -i <key_file> -oUserKnownHostsFile=known_hosts
   // By default, searches scp.exe on the path environment variables.
   void SetScpCommand(std::string scp_command);
 
   // Sets the SSH command binary path and additional arguments, e.g.
-  //   C:\path\to\ssh.exe -F <ssh_config> -i <key_file>
-  //     -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
+  //   C:\path\to\ssh.exe -P 1234 -i <key_file> -oUserKnownHostsFile=known_hosts
   // By default, searches ssh.exe on the path environment variables.
   void SetSshCommand(std::string ssh_command);
 
   // Copies |source_filepaths| to the remote folder |dest| on the gamelet using
   // scp. If |compress| is true, compressed upload is used.
-  // Must call SetUserHostAndPort before calling this method.
   absl::Status Scp(std::vector<std::string> source_filepaths,
                    const std::string& dest, bool compress);
 
   // Calls 'chmod |mode| |remote_path|' on the gamelet.
-  // Must call SetUserHostAndPort before calling this method.
   absl::Status Chmod(const std::string& mode, const std::string& remote_path,
                      bool quiet = false);
 
   // Runs |remote_command| on the gamelet. The command must be properly escaped.
   // |name| is the name of the command displayed in the logs.
-  // Must call SetUserHostAndPort before calling this method.
   absl::Status Run(std::string remote_command, std::string name);
 
   // Builds an SSH command that executes |remote_command| on the gamelet.
@@ -77,7 +67,6 @@ class RemoteUtil {
   // Builds an SSH command that runs SSH port forwarding to the gamelet, using
   // the given |local_port| and |remote_port|.
   // If |reverse| is true, sets up reverse port forwarding.
-  // Must call SetUserHostAndPort before calling this method.
   ProcessStartInfo BuildProcessStartInfoForSshPortForward(int local_port,
                                                           int remote_port,
                                                           bool reverse);
@@ -85,7 +74,6 @@ class RemoteUtil {
   // Builds an SSH command that executes |remote_command| on the gamelet, using
   // port forwarding with given |local_port| and |remote_port|.
   // If |reverse| is true, sets up reverse port forwarding.
-  // Must call SetUserHostAndPort before calling this method.
   ProcessStartInfo BuildProcessStartInfoForSshPortForwardAndCommand(
       int local_port, int remote_port, bool reverse,
       std::string remote_command);
@@ -117,9 +105,6 @@ class RemoteUtil {
   static std::string QuoteForSsh(const std::string& argument);
 
  private:
-  // Verifies that both |user_host_| and |ssh_port_| are set.
-  absl::Status CheckUserHostPort();
-
   // Common code for BuildProcessStartInfoForSsh*.
   ProcessStartInfo BuildProcessStartInfoForSshInternal(
       std::string forward_arg, std::string remote_command);
@@ -132,7 +117,6 @@ class RemoteUtil {
   std::string scp_command_ = "scp";
   std::string ssh_command_ = "ssh";
   std::string user_host_;
-  int ssh_port_ = kDefaultSshPort;
 };
 
 }  // namespace cdc_ft

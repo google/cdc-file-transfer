@@ -167,14 +167,34 @@ scp somefile.txt user@linux.device.com:
 Here, `user` is the Linux user and `linux.device.com` is the Linux host to
 SSH into or copy the file to.
 
-If `ssh.exe` or `scp.exe` cannot be found, or if additional arguments are
-required, it is recommended to set the environment variables `CDC_SSH_COMMAND`
-and `CDC_SCP_COMMAND`. The following example specifies a custom path to the SSH
-and SCP binaries, a custom SSH config file, a key file and a known hosts file:
+If additional arguments are required, it is recommended to provide an SSH config
+file. By default, both `ssh.exe` and `scp.exe` use the file at
+`%USERPROFILE%\.ssh\config` on Windows, if it exists. A possible config file
+that sets a username, a port, an identity file and a known host file could look
+as follows:
 ```
-set CDC_SSH_COMMAND="C:\path with space\to\ssh.exe" -F C:\path\to\ssh_config -i C:\path\to\id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""C:\path\to\known_hosts"""
-set CDC_SCP_COMMAND="C:\path with space\to\scp.exe" -F C:\path\to\ssh_config -i C:\path\to\id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""C:\path\to\known_hosts"""
+Host linux_device
+	HostName linux.device.com
+	User user
+	Port 12345
+	IdentityFile C:\path\to\id_rsa
+	UserKnownHostsFile C:\path\to\known_hosts
 ```
+If `ssh.exe` or `scp.exe` cannot be found, you can specify the full paths via
+the command line arguments `--ssh-command` and `--scp-command` for `cdc_rsync`
+and `cdc_stream start` (see below), or set the environment variables
+`CDC_SSH_COMMAND` and `CDC_SCP_COMMAND`, e.g.
+```
+set CDC_SSH_COMMAND="C:\path with space\to\ssh.exe"
+set CDC_SCP_COMMAND="C:\path with space\to\scp.exe"
+```
+Note that you can also specify SSH configuration via the environment variables
+instead of using a config file:
+```
+set CDC_SSH_COMMAND=C:\path\to\ssh.exe -p 12345 -i C:\path\to\id_rsa -oUserKnownHostsFile=C:\path\to\known_hosts
+set CDC_SCP_COMMAND=C:\path\to\scp.exe -P 12345 -i C:\path\to\id_rsa -oUserKnownHostsFile=C:\path\to\known_hosts
+```
+Note the small `-p` for `ssh.exe` and the capital `-P` for `scp.exe`.
 
 #### Google Specific
 

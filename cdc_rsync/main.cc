@@ -75,9 +75,9 @@ ReturnCode TagToMessage(cdc_ft::Tag tag,
     case cdc_ft::Tag::kConnectionTimeout:
       // Server connection timed out. SSH probably stale.
       *msg = absl::StrFormat(
-          "Server connection timed out. Verify that host '%s' and port '%i' "
-          "are correct, or specify a larger timeout with --contimeout.",
-          params.user_host, params.options.port);
+          "Server connection timed out. Verify that the host '%s' "
+          "is correct, or specify a larger timeout with --contimeout.",
+          params.user_host);
       return ReturnCode::kConnectionTimeout;
 
     case cdc_ft::Tag::kCount:

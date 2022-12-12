@@ -36,8 +36,6 @@ class Process;
 struct SessionTarget {
   // SSH username and hostname of the remote target, formed as [user@]host.
   std::string user_host;
-  // Port to use for SSH connections to the remote target.
-  uint16_t ssh_port;
   // Ssh command to use to connect to the remote target.
   std::string ssh_command;
   // Scp command to use to copy files to the remote target.

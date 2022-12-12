@@ -99,9 +99,9 @@ CdcRsyncClient::CdcRsyncClient(const Options& options,
                                std::string user_host, std::string destination)
     : options_(options),
       sources_(std::move(sources)),
-      user_host_(std::move(user_host)),
       destination_(std::move(destination)),
-      remote_util_(options.verbosity, options.quiet, &process_factory_,
+      remote_util_(std::move(user_host), options.verbosity, options.quiet,
+                   &process_factory_,
                    /*forward_output_to_log=*/false),
       port_manager_("cdc_rsync_ports_f77bcdfe-368c-4c45-9f01-230c5e7e2132",
                     kForwardPortFirst, kForwardPortLast, &process_factory_,
@@ -122,9 +122,6 @@ CdcRsyncClient::~CdcRsyncClient() {
 }
 
 absl::Status CdcRsyncClient::Run() {
-  // Initialize |remote_util_|.
-  remote_util_.SetUserHostAndPort(user_host_, options_.port);
-
   // Start the server process.
   absl::Status status = StartServer();
   if (HasTag(status, Tag::kDeployServer)) {

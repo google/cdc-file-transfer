@@ -140,7 +140,6 @@ absl::Status StartServiceCommand::RunService() {
     request.set_workstation_directory(cfg_.dev_src_dir());
     request.set_user_host(cfg_.dev_target().user_host);
     request.set_mount_dir(cfg_.dev_target().mount_dir);
-    request.set_port(cfg_.dev_target().ssh_port);
     request.set_ssh_command(cfg_.dev_target().ssh_command);
     request.set_scp_command(cfg_.dev_target().scp_command);
     localassetsstreammanager::StartSessionResponse response;

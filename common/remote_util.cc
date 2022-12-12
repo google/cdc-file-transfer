@@ -20,7 +20,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "common/path.h"
-#include "common/status.h"
 
 namespace cdc_ft {
 namespace {
@@ -35,18 +34,14 @@ std::string GetPortForwardingArg(int local_port, int remote_port,
 
 }  // namespace
 
-RemoteUtil::RemoteUtil(int verbosity, bool quiet,
+RemoteUtil::RemoteUtil(std::string user_host, int verbosity, bool quiet,
                        ProcessFactory* process_factory,
                        bool forward_output_to_log)
-    : verbosity_(verbosity),
+    : user_host_(std::move(user_host)),
+      verbosity_(verbosity),
       quiet_(quiet),
       process_factory_(process_factory),
       forward_output_to_log_(forward_output_to_log) {}
-
-void RemoteUtil::SetUserHostAndPort(std::string user_host, int port) {
-  user_host_ = std::move(user_host);
-  ssh_port_ = port;
-}
 
 void RemoteUtil::SetScpCommand(std::string scp_command) {
   scp_command_ = std::move(scp_command);
@@ -58,11 +53,6 @@ void RemoteUtil::SetSshCommand(std::string ssh_command) {
 
 absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
                              const std::string& dest, bool compress) {
-  absl::Status status = CheckUserHostPort();
-  if (!status.ok()) {
-    return status;
-  }
-
   std::string source_args;
   for (const std::string& sourceFilePath : source_filepaths) {
     // Workaround for scp thinking that C is a host in C:\path\to\foo.
@@ -77,13 +67,10 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
   ProcessStartInfo start_info;
   start_info.flags = ProcessFlags::kNoWindow;
   start_info.command = absl::StrFormat(
-      "%s "
-      "%s %s -p -T "
-      "-P %i %s "
-      "%s:%s",
+      "%s %s %s -p -T "
+      "%s %s:%s",
       scp_command_, quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
-      ssh_port_, source_args, QuoteForWindows(user_host_),
-      QuoteForWindows(dest));
+      source_args, QuoteForWindows(user_host_), QuoteForWindows(dest));
   start_info.name = "scp";
   start_info.forward_output_to_log = forward_output_to_log_;
 
@@ -100,11 +87,6 @@ absl::Status RemoteUtil::Chmod(const std::string& mode,
 }
 
 absl::Status RemoteUtil::Run(std::string remote_command, std::string name) {
-  absl::Status status = CheckUserHostPort();
-  if (!status.ok()) {
-    return status;
-  }
-
   ProcessStartInfo start_info =
       BuildProcessStartInfoForSsh(std::move(remote_command));
   start_info.name = std::move(name);
@@ -140,13 +122,12 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
     std::string forward_arg, std::string remote_command_arg) {
   ProcessStartInfo start_info;
   start_info.command = absl::StrFormat(
-      "%s "
-      "%s -tt "
+      "%s %s -tt %s "
       "-oServerAliveCountMax=6 "  // Number of lost msgs before ssh terminates
       "-oServerAliveInterval=5 "  // Time interval between alive msgs
-      "%s %s -p %i %s",
+      "%s %s",
       ssh_command_, quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
-      QuoteForWindows(user_host_), ssh_port_, remote_command_arg);
+      QuoteForWindows(user_host_), remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;
   start_info.flags = ProcessFlags::kNoWindow;
   return start_info;
@@ -198,14 +179,6 @@ std::string RemoteUtil::QuoteForSsh(const std::string& argument) {
   // E.g.  or ~username/foo -> Quote(~username/"foo")
   return QuoteForWindows(absl::StrCat(escaped.substr(0, slash_pos + 1), "\"",
                                       escaped.substr(slash_pos + 1), "\""));
-}
-
-absl::Status RemoteUtil::CheckUserHostPort() {
-  if (user_host_.empty() || ssh_port_ == 0) {
-    return MakeStatus("IP or port not set");
-  }
-
-  return absl::OkStatus();
 }
 
 }  // namespace cdc_ft

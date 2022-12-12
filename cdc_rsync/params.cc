@@ -51,8 +51,6 @@ Parameters:
   destination             Remote destination directory
 
 Options:
-    --ip string           Gamelet IP. Required.
-    --port number         SSH port to use. Required.
     --contimeout sec      Gamelet connection timeout in seconds (default: 10)
 -q, --quiet               Quiet mode, only print errors
 -v, --verbose             Increase output verbosity
@@ -74,10 +72,10 @@ Options:
     --existing            Skip creating new files on instance
     --copy-dest dir       Use files from dir as sync base if files are missing
     --ssh-command         Path and arguments of ssh command to use, e.g.
-                          C:\path\to\ssh.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
+                          "C:\path\to\ssh.exe -p 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
                           Can also be specified by the CDC_SSH_COMMAND environment variable.
     --scp-command         Path and arguments of scp command to use, e.g.
-                          C:\path\to\scp.exe -F config -i id_rsa -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""known_hosts"""
+                          "C:\path\to\scp.exe -P 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
                           Can also be specified by the CDC_SCP_COMMAND environment variable.
 -h  --help                Help for cdc_rsync
 )";
@@ -164,13 +162,6 @@ bool LoadFilesFrom(const std::string& files_from,
 
 OptionResult HandleParameter(const std::string& key, const char* value,
                              Parameters* params, bool* help) {
-  if (key == "port") {
-    if (value) {
-      params->options.port = atoi(value);
-    }
-    return OptionResult::kConsumedKeyValue;
-  }
-
   if (key == "delete") {
     params->options.delete_ = true;
     return OptionResult::kConsumedKey;
@@ -299,11 +290,6 @@ bool ValidateParameters(const Parameters& params, bool help) {
 
   if (params.options.delete_ && !params.options.recursive) {
     PrintError("--delete does not work without --recursive (-r).");
-    return false;
-  }
-
-  if (params.options.port <= 0 || params.options.port > UINT16_MAX) {
-    PrintError("--port must specify a valid port");
     return false;
   }
 

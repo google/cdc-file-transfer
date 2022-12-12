@@ -45,9 +45,6 @@ message StartSessionRequest {
   string user_host = 7;
   // Remote directory where to mount the streamed directory.
   string mount_dir = 8;
-  // SSH port to use while connecting to the remote instance.
-  // Optional, falls back to port 22 (default SSH port).
-  int32 port = 9;
   // SSH command to connect to the remote instance.
   // Optional, falls back to searching ssh.
   string ssh_command = 10;
@@ -55,7 +52,7 @@ message StartSessionRequest {
   // Optional, falls back to searching scp.
   string scp_command = 11;
 
-  reserved 1, 3, 4;
+  reserved 1, 3, 4, 9;
 }
 
 message StartSessionResponse {}

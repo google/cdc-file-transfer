@@ -36,13 +36,12 @@ LocalAssetsStreamManagerClient::LocalAssetsStreamManagerClient(
 LocalAssetsStreamManagerClient::~LocalAssetsStreamManagerClient() = default;
 
 absl::Status LocalAssetsStreamManagerClient::StartSession(
-    const std::string& src_dir, const std::string& user_host, uint16_t ssh_port,
+    const std::string& src_dir, const std::string& user_host,
     const std::string& mount_dir, const std::string& ssh_command,
     const std::string& scp_command) {
   StartSessionRequest request;
   request.set_workstation_directory(src_dir);
   request.set_user_host(user_host);
-  request.set_port(ssh_port);
   request.set_mount_dir(mount_dir);
   request.set_ssh_command(ssh_command);
   request.set_scp_command(scp_command);

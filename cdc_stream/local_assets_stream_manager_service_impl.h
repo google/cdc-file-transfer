@@ -93,11 +93,10 @@ class LocalAssetsStreamManagerServiceImpl final
 
   // Initializes an ssh connection to a gamelet by calling 'ggp ssh init'.
   // |instance_id| must be set, |project_id|, |organization_id| are optional.
-  // Returns |instance_ip| and |instance_port| (SSH port).
-  absl::Status InitSsh(const std::string& instance_id,
-                       const std::string& project_id,
-                       const std::string& organization_id,
-                       std::string* instance_ip, uint16_t* instance_port);
+  // Returns the instance's IP address.
+  absl::StatusOr<std::string> InitSsh(const std::string& instance_id,
+                                      const std::string& project_id,
+                                      const std::string& organization_id);
 
   const SessionConfig cfg_;
   SessionManager* const session_manager_;

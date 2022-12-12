@@ -47,11 +47,11 @@ Session::Session(std::string instance_id, const SessionTarget& target,
       mount_dir_(target.mount_dir),
       cfg_(std::move(cfg)),
       process_factory_(process_factory),
-      remote_util_(cfg_.verbosity, cfg_.quiet, process_factory,
+      remote_util_(target.user_host, cfg_.verbosity, cfg_.quiet,
+                   process_factory,
                    /*forward_output_to_logging=*/true),
       metrics_recorder_(std::move(metrics_recorder)) {
   assert(metrics_recorder_);
-  remote_util_.SetUserHostAndPort(target.user_host, target.ssh_port);
   if (!target.ssh_command.empty()) {
     remote_util_.SetSshCommand(target.ssh_command);
   }
