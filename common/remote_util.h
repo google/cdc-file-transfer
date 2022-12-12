@@ -39,14 +39,12 @@ class RemoteUtil {
              ProcessFactory* process_factory, bool forward_output_to_log);
 
   // Sets the SCP command binary path and additional arguments, e.g.
-  //   C:\path\to\scp.exe -p 1234 -F <ssh_config> -i <key_file>
-  //     -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
+  //   C:\path\to\scp.exe -p 1234 -i <key_file> -oUserKnownHostsFile=known_hosts
   // By default, searches scp.exe on the path environment variables.
   void SetScpCommand(std::string scp_command);
 
   // Sets the SSH command binary path and additional arguments, e.g.
-  //   C:\path\to\ssh.exe -P 1234 -F <ssh_config> -i <key_file>
-  //     -oStrictHostKeyChecking=yes -oUserKnownHostsFile="""file"""
+  //   C:\path\to\ssh.exe -P 1234 -i <key_file> -oUserKnownHostsFile=known_hosts
   // By default, searches ssh.exe on the path environment variables.
   void SetSshCommand(std::string ssh_command);
 
