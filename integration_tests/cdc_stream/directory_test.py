@@ -59,7 +59,7 @@ class DirectoryTest(test_base.CdcStreamTest):
     self._assert_cdc_fuse_mounted()
     original = utils.get_ssh_command_output(self.ls_cmd)
 
-    # Remove directory on workstation => empty directory on gamelet.
+    # Remove directory on workstation => empty remote directory.
     utils.remove_test_directory(self.local_base_dir)
     self.assertTrue(self._wait_until_remote_dir_changed(original))
     self._test_dir_content(files=[], dirs=[])
@@ -101,7 +101,7 @@ class DirectoryTest(test_base.CdcStreamTest):
     self._assert_cdc_fuse_mounted()
     original = utils.get_ssh_command_output(self.ls_cmd)
 
-    # Remove directory on workstation => empty directory on gamelet.
+    # Remove directory on workstation => empty remote directory.
     utils.remove_test_directory(self.local_base_dir)
     self.assertTrue(self._wait_until_remote_dir_changed(original))
     self._test_dir_content(files=[], dirs=[])

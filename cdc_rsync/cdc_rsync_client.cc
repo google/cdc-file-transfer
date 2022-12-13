@@ -25,6 +25,7 @@
 #include "cdc_rsync/parallel_file_opener.h"
 #include "cdc_rsync/progress_tracker.h"
 #include "cdc_rsync/protos/messages.pb.h"
+#include "cdc_rsync/server_arch.h"
 #include "cdc_rsync/zstd_stream.h"
 #include "common/gamelet_component.h"
 #include "common/log.h"
@@ -44,8 +45,7 @@ constexpr int kExitCodeCouldNotExecute = 126;
 // Bash exit code if binary was not found.
 constexpr int kExitCodeNotFound = 127;
 
-constexpr char kCdcServerFilename[] = "cdc_rsync_server";
-constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/bin/";
+constexpr char kCdcRsyncFilename[] = "cdc_rsync.exe";
 
 SetOptionsRequest::FilterRule::Type ToProtoType(PathFilter::Rule::Type type) {
   switch (type) {
@@ -120,16 +120,21 @@ CdcRsyncClient::~CdcRsyncClient() {
 }
 
 absl::Status CdcRsyncClient::Run() {
+  int port;
+  ASSIGN_OR_RETURN(port, FindAvailablePort(), "Failed to find available port");
+
+  ServerArch server_arch(ServerArch::Detect(destination_));
+
   // Start the server process.
-  absl::Status status = StartServer();
+  absl::Status status = StartServer(port, server_arch);
   if (HasTag(status, Tag::kDeployServer)) {
     // Gamelet components are not deployed or out-dated. Deploy and retry.
-    status = DeployServer();
+    status = DeployServer(server_arch);
     if (!status.ok()) {
       return WrapStatus(status, "Failed to deploy server");
     }
 
-    status = StartServer();
+    status = StartServer(port, server_arch);
   }
   if (!status.ok()) {
     return WrapStatus(status, "Failed to start server");
@@ -161,7 +166,27 @@ absl::Status CdcRsyncClient::Run() {
   return status;
 }
 
-absl::Status CdcRsyncClient::StartServer() {
+absl::StatusOr<int> CdcRsyncClient::FindAvailablePort() {
+  // Find available local and remote ports for port forwarding.
+  // If only one port is in the given range, try that without checking.
+  if (options_.forward_port_first >= options_.forward_port_last) {
+    return options_.forward_port_first;
+  }
+
+  absl::StatusOr<int> port =
+      port_manager_.ReservePort(options_.connection_timeout_sec);
+  if (absl::IsDeadlineExceeded(port.status())) {
+    // Server didn't respond in time.
+    return SetTag(port.status(), Tag::kConnectionTimeout);
+  }
+  if (absl::IsResourceExhausted(port.status())) {
+    // Port in use.
+    return SetTag(port.status(), Tag::kAddressInUse);
+  }
+  return port;
+}
+
+absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
   assert(!server_process_);
 
   // Components are expected to reside in the same dir as the executable.
@@ -173,46 +198,19 @@ absl::Status CdcRsyncClient::StartServer() {
 
   std::vector<GameletComponent> components;
   status = GameletComponent::Get(
-      {path::Join(component_dir, kCdcServerFilename)}, &components);
+      {path::Join(component_dir, arch.CdcServerFilename())}, &components);
   if (!status.ok()) {
     return MakeStatus(
         "Required instance component not found. Make sure the file "
-        "cdc_rsync_server resides in the same folder as cdc_rsync.exe.");
+        "%s resides in the same folder as %s.",
+        arch.CdcServerFilename(), kCdcRsyncFilename);
   }
   std::string component_args = GameletComponent::ToCommandLineArgs(components);
-
-  // Find available local and remote ports for port forwarding.
-  // If only one port is in the given range, try that without checking.
-  int port = options_.forward_port_first;
-  if (options_.forward_port_first < options_.forward_port_last) {
-    absl::StatusOr<int> port_res =
-        port_manager_.ReservePort(options_.connection_timeout_sec);
-    constexpr char kErrorMsg[] = "Failed to find available port";
-    if (absl::IsDeadlineExceeded(port_res.status())) {
-      // Server didn't respond in time.
-      return SetTag(WrapStatus(port_res.status(), kErrorMsg),
-                    Tag::kConnectionTimeout);
-    }
-    if (absl::IsResourceExhausted(port_res.status()))
-      return SetTag(WrapStatus(port_res.status(), kErrorMsg),
-                    Tag::kAddressInUse);
-    if (!port_res.ok())
-      return WrapStatus(port_res.status(), "Failed to find available port");
-    port = *port_res;
-  }
-
-  std::string remote_server_path =
-      std::string(kRemoteToolsBinDir) + kCdcServerFilename;
-  // Test existence manually to prevent misleading bash output message
-  // "bash: .../cdc_rsync_server: No such file or directory".
-  // Also create the bin dir because otherwise scp below might fail.
-  std::string remote_command =
-      absl::StrFormat("mkdir -p %s; if [ ! -f %s ]; then exit %i; fi; %s %i %s",
-                      kRemoteToolsBinDir, remote_server_path, kExitCodeNotFound,
-                      remote_server_path, port, component_args);
+  std::string remote_command = arch.GetStartServerCommand(
+      kExitCodeNotFound, absl::StrFormat("%i %s", port, component_args));
   ProcessStartInfo start_info =
       remote_util_.BuildProcessStartInfoForSshPortForwardAndCommand(
-          port, port, false, remote_command);
+          port, port, /*reverse=*/false, remote_command);
   start_info.name = "cdc_rsync_server";
 
   // Capture stdout, but forward to stdout for debugging purposes.
@@ -394,7 +392,7 @@ absl::Status CdcRsyncClient::Sync() {
   return status;
 }
 
-absl::Status CdcRsyncClient::DeployServer() {
+absl::Status CdcRsyncClient::DeployServer(const ServerArch& arch) {
   assert(!server_process_);
 
   std::string exe_dir;
@@ -417,26 +415,20 @@ absl::Status CdcRsyncClient::DeployServer() {
 
   // scp cdc_rsync_server to a temp location on the gamelet.
   std::string remoteServerTmpPath =
-      absl::StrFormat("%s%s.%s", kRemoteToolsBinDir, kCdcServerFilename,
-                      Util::GenerateUniqueId());
-  std::string localServerPath = path::Join(exe_dir, kCdcServerFilename);
+      absl::StrFormat("%s%s.%s", arch.RemoteToolsBinDir(),
+                      arch.CdcServerFilename(), Util::GenerateUniqueId());
+  std::string localServerPath = path::Join(exe_dir, arch.CdcServerFilename());
   status = remote_util_.Scp({localServerPath}, remoteServerTmpPath,
                             /*compress=*/true);
   if (!status.ok()) {
     return WrapStatus(status, "Failed to copy cdc_rsync_server to instance");
   }
 
-  // Do 3 things in one SSH command, to save time:
-  // - Make the old cdc_rsync_server writable (if it exists).
-  // - Make the new cdc_rsync_server executable.
-  // - Replace the old cdc_rsync_server by the new one.
-  std::string old_path = RemoteUtil::QuoteForWindows(
-      std::string(kRemoteToolsBinDir) + kCdcServerFilename);
-  std::string new_path = RemoteUtil::QuoteForWindows(remoteServerTmpPath);
-  std::string replace_cmd = absl::StrFormat(
-      " ([ ! -f %s ] || chmod u+w %s) && chmod a+x %s && mv %s %s", old_path,
-      old_path, new_path, new_path, old_path);
-  status = remote_util_.Run(replace_cmd, "chmod && chmod && mv");
+  // Replace cdc_rsync_server file by the temp file.
+  std::string old_path = arch.RemoteToolsBinDir() + arch.CdcServerFilename();
+  std::string new_path = remoteServerTmpPath;
+  std::string replace_cmd = arch.GetDeployReplaceCommand(old_path, new_path);
+  status = remote_util_.Run(replace_cmd, "replace");
   if (!status.ok()) {
     return WrapStatus(status,
                       "Failed to replace old cdc_rsync_server by new one");
