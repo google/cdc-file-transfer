@@ -127,11 +127,17 @@ cc_library(
     name = "server_socket",
     srcs = ["server_socket.cc"],
     hdrs = ["server_socket.h"],
-    target_compatible_with = ["@platforms//os:linux"],
+    linkopts = select({
+        "//tools:windows": [
+            "/DEFAULTLIB:Ws2_32.lib",  # Sockets, e.g. recv, send, WSA*.
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//cdc_rsync/base:socket",
         "//common:log",
         "//common:status",
+        "//common:util",
         "@com_google_absl//absl/status",
     ],
 )

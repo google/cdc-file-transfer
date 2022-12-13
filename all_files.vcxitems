@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)absl_helper\jedec_size_flag.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\socket.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\asset_stream_config.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\asset_stream_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\background_service_impl.cc" />

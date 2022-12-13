@@ -26,6 +26,14 @@ class Socket {
   Socket() = default;
   virtual ~Socket() = default;
 
+  // Calls WSAStartup() on Windows, no-op on Linux.
+  // Must be called before using sockets.
+  static absl::Status Initialize();
+
+  // Calls WSACleanup() on Windows, no-op on Linux.
+  // Must be called after using sockets.
+  static absl::Status Shutdown();
+
   // Send data to the socket.
   virtual absl::Status Send(const void* buffer, size_t size) = 0;
 
@@ -38,6 +46,12 @@ class Socket {
   virtual absl::Status Receive(void* buffer, size_t size,
                                bool allow_partial_read,
                                size_t* bytes_received) = 0;
+};
+
+// Convenience class that calls Shutdown() on destruction. Logs on errors.
+class SocketFinalizer {
+ public:
+  ~SocketFinalizer();
 };
 
 }  // namespace cdc_ft

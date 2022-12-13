@@ -80,7 +80,15 @@ cc_library(
 
 cc_library(
     name = "socket",
+    srcs = ["socket.cc"],
     hdrs = ["socket.h"],
+    deps = [
+        "//common:log",
+        "//common:platform",
+        "//common:status",
+        "//common:util",
+        "@com_google_absl//absl/status",
+    ],
 )
 
 filegroup(
