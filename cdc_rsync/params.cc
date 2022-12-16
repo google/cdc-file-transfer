@@ -20,6 +20,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "common/path.h"
+#include "common/port_range_parser.h"
 #include "lib/zstd.h"
 
 namespace cdc_ft {
@@ -121,28 +122,6 @@ OptionResult HandleFilterRuleFile(const std::string& option_name,
     params->options.filter.AddRule(type, std::move(pattern));
   }
   return OptionResult::kConsumedKeyValue;
-}
-
-// Parses |value| into a port range |first|-|last|.
-// If |value| is a single number, assigns |first|=|last|=atoi(|value|).
-// If |value| is a range a-b, assigns |first|=a, |last|=b.
-bool ParsePortRange(const std::string& option_name, const char* value,
-                    int* first, int* last) {
-  assert(value);
-  std::vector<std::string> parts = absl::StrSplit(value, '-');
-  if (parts.empty() || parts.size() > 2) {
-    PrintError("Invalid port range '%s' for %s option", value, option_name);
-    return false;
-  }
-  *first = atoi(parts[0].c_str());
-  *last = parts.size() > 1 ? atoi(parts[1].c_str()) : *first;
-  if (*first <= 0 || *first > UINT16_MAX || *last <= 0 || *last > UINT16_MAX ||
-      *first > *last) {
-    const char* range = parts.size() > 1 ? "range " : "";
-    PrintError("Invalid port %s'%s' for %s option", range, value, option_name);
-    return false;
-  }
-  return true;
 }
 
 // Loads sources for --files-from option. |sources| must contain at most one
@@ -315,8 +294,12 @@ OptionResult HandleParameter(const std::string& key, const char* value,
 
   if (key == "forward-port") {
     if (!ValidateValue(key, value)) return OptionResult::kError;
-    int first, last;
-    if (!ParsePortRange(key, value, &first, &last)) return OptionResult::kError;
+    uint16_t first, last;
+    if (!port_range::Parse(value, &first, &last)) {
+      PrintError("Failed to parse %s=%s, expected <port> or <port1>-<port2>",
+                 key, value);
+      return OptionResult::kError;
+    }
     params->options.forward_port_first = first;
     params->options.forward_port_last = last;
     return OptionResult::kConsumedKeyValue;

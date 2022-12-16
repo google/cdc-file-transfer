@@ -34,6 +34,8 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\start_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\start_service_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\stop_service_command.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser_test.cc" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_stream\stop_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\testing_asset_stream_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset.cc" />
@@ -144,6 +146,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)metrics\messages_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)metrics\metrics.cc" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_stream\stop_service_command.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)common\port_range_parser.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)absl_helper\jedec_size_flag.h" />

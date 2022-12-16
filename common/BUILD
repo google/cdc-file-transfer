@@ -255,6 +255,25 @@ cc_test(
 )
 
 cc_library(
+    name = "port_range_parser",
+    srcs = ["port_range_parser.cc"],
+    hdrs = ["port_range_parser.h"],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "port_range_parser_test",
+    srcs = ["port_range_parser_test.cc"],
+    deps = [
+        ":port_range_parser",
+        ":test_main",
+        "@com_google_googletest//:gtest",
+    ],
+)
+
+cc_library(
     name = "process",
     srcs = ["process_win.cc"],
     hdrs = ["process.h"],
