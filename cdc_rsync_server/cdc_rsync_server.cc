@@ -148,10 +148,7 @@ PathFilter::Rule::Type ToInternalType(
 
 CdcRsyncServer::CdcRsyncServer() = default;
 
-CdcRsyncServer::~CdcRsyncServer() {
-  message_pump_.reset();
-  socket_.reset();
-}
+CdcRsyncServer::~CdcRsyncServer() = default;
 
 bool CdcRsyncServer::CheckComponents(
     const std::vector<GameletComponent>& components) {
@@ -173,8 +170,14 @@ bool CdcRsyncServer::CheckComponents(
 }
 
 absl::Status CdcRsyncServer::Run(int port) {
+  absl::Status status = Socket::Initialize();
+  if (!status.ok()) {
+    return WrapStatus(status, "Failed to initialize sockets");
+  }
+  socket_finalizer_ = std::make_unique<SocketFinalizer>();
+
   socket_ = std::make_unique<ServerSocket>();
-  absl::Status status = socket_->StartListening(port);
+  status = socket_->StartListening(port);
   if (!status.ok()) {
     return WrapStatus(status, "Failed to start listening on port %i", port);
   }
@@ -563,7 +566,7 @@ absl::Status CdcRsyncServer::HandleSendMissingFileData() {
     // Verify that there is no directory existing with the same name.
     if (path::Exists(filepath) && path::DirExists(filepath)) {
       assert(!diff_.extraneous_dirs.empty());
-      absl::Status status = path::RemoveFile(filepath);
+      status = path::RemoveFile(filepath);
       if (!status.ok()) {
         return WrapStatus(
             status, "Failed to remove folder '%s' before creating file '%s'",

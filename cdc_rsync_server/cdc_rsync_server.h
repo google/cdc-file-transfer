@@ -32,6 +32,7 @@ namespace cdc_ft {
 
 class MessagePump;
 class ServerSocket;
+class SocketFinalizer;
 
 class CdcRsyncServer {
  public:
@@ -90,6 +91,8 @@ class CdcRsyncServer {
   // Used to toggle decompression.
   void Thread_OnPackageReceived(PacketType type);
 
+  // The order determines the correct destruction order, so keep it!
+  std::unique_ptr<SocketFinalizer> socket_finalizer_;
   std::unique_ptr<ServerSocket> socket_;
   std::unique_ptr<MessagePump> message_pump_;
 

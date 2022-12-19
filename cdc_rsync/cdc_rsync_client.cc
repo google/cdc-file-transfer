@@ -263,6 +263,12 @@ absl::Status CdcRsyncClient::StartServer() {
     return SetTag(MakeStatus("Redeploy server"), Tag::kDeployServer);
   }
 
+  status = Socket::Initialize();
+  if (!status.ok()) {
+    return WrapStatus(status, "Failed to initialize sockets");
+  }
+  socket_finalizer_ = std::make_unique<SocketFinalizer>();
+
   assert(is_server_listening_);
   status = socket_.Connect(port);
   if (!status.ok()) {

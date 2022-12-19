@@ -39,10 +39,10 @@ absl::Status MakeSocketStatus(const char* message) {
 
 }  // namespace
 
-struct SocketInfo {
+struct ClientSocketInfo {
   SOCKET socket;
 
-  SocketInfo() : socket(INVALID_SOCKET) {}
+  ClientSocketInfo() : socket(INVALID_SOCKET) {}
 };
 
 ClientSocket::ClientSocket() = default;
@@ -50,12 +50,6 @@ ClientSocket::ClientSocket() = default;
 ClientSocket::~ClientSocket() { Disconnect(); }
 
 absl::Status ClientSocket::Connect(int port) {
-  WSADATA wsaData;
-  int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-  if (result != 0) {
-    return MakeStatus("WSAStartup() failed: %i", result);
-  }
-
   addrinfo hints;
   ZeroMemory(&hints, sizeof(hints));
   hints.ai_family = AF_INET;
@@ -64,14 +58,13 @@ absl::Status ClientSocket::Connect(int port) {
 
   // Resolve the server address and port.
   addrinfo* addr_infos = nullptr;
-  result = getaddrinfo("localhost", std::to_string(port).c_str(), &hints,
-                       &addr_infos);
+  int result = getaddrinfo("localhost", std::to_string(port).c_str(), &hints,
+                           &addr_infos);
   if (result != 0) {
-    WSACleanup();
     return MakeStatus("getaddrinfo() failed: %i", result);
   }
 
-  socket_info_ = std::make_unique<SocketInfo>();
+  socket_info_ = std::make_unique<ClientSocketInfo>();
   int count = 0;
   for (addrinfo* curr = addr_infos; curr; curr = curr->ai_next, count++) {
     socket_info_->socket =
@@ -101,7 +94,6 @@ absl::Status ClientSocket::Connect(int port) {
 
   if (socket_info_->socket == INVALID_SOCKET) {
     socket_info_.reset();
-    WSACleanup();
     return MakeStatus("Unable to connect to port %i", port);
   }
 
@@ -120,7 +112,6 @@ void ClientSocket::Disconnect() {
   }
 
   socket_info_.reset();
-  WSACleanup();
 }
 
 absl::Status ClientSocket::Send(const void* buffer, size_t size) {

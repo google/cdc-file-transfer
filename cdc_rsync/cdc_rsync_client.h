@@ -123,6 +123,7 @@ class CdcRsyncClient {
   WinProcessFactory process_factory_;
   RemoteUtil remote_util_;
   PortManager port_manager_;
+  std::unique_ptr<SocketFinalizer> socket_finalizer_;
   ClientSocket socket_;
   MessagePump message_pump_{&socket_, MessagePump::PacketReceivedDelegate()};
   ConsoleProgressPrinter printer_;

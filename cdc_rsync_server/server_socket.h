@@ -50,11 +50,7 @@ class ServerSocket : public Socket {
                        size_t* bytes_received) override;
 
  private:
-  // Listening socket file descriptor (where new connections are accepted).
-  int listen_sockfd_;
-
-  // Connection socket file descriptor (where data is sent to/received from).
-  int conn_sockfd_;
+  std::unique_ptr<struct ServerSocketInfo> socket_info_;
 };
 
 }  // namespace cdc_ft

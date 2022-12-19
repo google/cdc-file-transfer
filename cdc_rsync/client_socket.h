@@ -45,7 +45,7 @@ class ClientSocket : public Socket {
                        size_t* bytes_received) override;
 
  private:
-  std::unique_ptr<struct SocketInfo> socket_info_;
+  std::unique_ptr<struct ClientSocketInfo> socket_info_;
 };
 
 }  // namespace cdc_ft
