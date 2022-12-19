@@ -71,16 +71,19 @@ Session::~Session() {
 absl::Status Session::Start(int local_port, int first_remote_port,
                             int last_remote_port) {
   // Find an available remote port.
-  std::unordered_set<int> ports;
-  ASSIGN_OR_RETURN(
-      ports,
-      PortManager::FindAvailableRemotePorts(
-          first_remote_port, last_remote_port, "127.0.0.1", process_factory_,
-          &remote_util_, kInstanceConnectionTimeoutSec),
-      "Failed to find an available remote port in the range [%d, %d]",
-      first_remote_port, last_remote_port);
-  assert(!ports.empty());
-  int remote_port = *ports.begin();
+  int remote_port = first_remote_port;
+  if (first_remote_port < last_remote_port) {
+    std::unordered_set<int> ports;
+    ASSIGN_OR_RETURN(
+        ports,
+        PortManager::FindAvailableRemotePorts(
+            first_remote_port, last_remote_port, "127.0.0.1", process_factory_,
+            &remote_util_, kInstanceConnectionTimeoutSec),
+        "Failed to find an available remote port in the range [%d, %d]",
+        first_remote_port, last_remote_port);
+    assert(!ports.empty());
+    remote_port = *ports.begin();
+  }
 
   assert(!fuse_);
   fuse_ = std::make_unique<CdcFuseManager>(instance_id_, process_factory_,

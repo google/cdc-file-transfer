@@ -34,11 +34,6 @@
 namespace cdc_ft {
 namespace {
 
-// Ports used by the asset streaming service for local port forwarding on
-// workstation and gamelet.
-constexpr int kAssetStreamPortFirst = 44433;
-constexpr int kAssetStreamPortLast = 44442;
-
 // Stats output period (if enabled).
 constexpr double kStatsPrintDelaySec = 0.1f;
 
@@ -441,16 +436,19 @@ absl::Status MultiSession::Initialize() {
   }
 
   // Find an available local port.
-  std::unordered_set<int> ports;
-  ASSIGN_OR_RETURN(
-      ports,
-      PortManager::FindAvailableLocalPorts(kAssetStreamPortFirst,
-                                           kAssetStreamPortLast, "127.0.0.1",
-                                           process_factory_),
-      "Failed to find an available local port in the range [%d, %d]",
-      kAssetStreamPortFirst, kAssetStreamPortLast);
-  assert(!ports.empty());
-  local_asset_stream_port_ = *ports.begin();
+  local_asset_stream_port_ = cfg_.forward_port_first;
+  if (cfg_.forward_port_first < cfg_.forward_port_last) {
+    std::unordered_set<int> ports;
+    ASSIGN_OR_RETURN(
+        ports,
+        PortManager::FindAvailableLocalPorts(cfg_.forward_port_first,
+                                             cfg_.forward_port_last,
+                                             "127.0.0.1", process_factory_),
+        "Failed to find an available local port in the range [%d, %d]",
+        cfg_.forward_port_first, cfg_.forward_port_last);
+    assert(!ports.empty());
+    local_asset_stream_port_ = *ports.begin();
+  }
 
   assert(!runner_);
   runner_ = std::make_unique<MultiSessionRunner>(
@@ -526,7 +524,8 @@ absl::Status MultiSession::StartSession(const std::string& instance_id,
   auto session = std::make_unique<Session>(
       instance_id, target, cfg_, process_factory_, std::move(metrics_recorder));
   RETURN_IF_ERROR(session->Start(local_asset_stream_port_,
-                                 kAssetStreamPortFirst, kAssetStreamPortLast));
+                                 cfg_.forward_port_first,
+                                 cfg_.forward_port_last));
 
   // Wait for the FUSE to receive the first intermediate manifest.
   RETURN_IF_ERROR(runner_->WaitForManifestAck(instance_id, absl::Seconds(5)));

@@ -44,8 +44,6 @@ constexpr int kExitCodeCouldNotExecute = 126;
 // Bash exit code if binary was not found.
 constexpr int kExitCodeNotFound = 127;
 
-constexpr int kForwardPortFirst = 44450;
-constexpr int kForwardPortLast = 44459;
 constexpr char kCdcServerFilename[] = "cdc_rsync_server";
 constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/bin/";
 
@@ -104,8 +102,8 @@ CdcRsyncClient::CdcRsyncClient(const Options& options,
                    &process_factory_,
                    /*forward_output_to_log=*/false),
       port_manager_("cdc_rsync_ports_f77bcdfe-368c-4c45-9f01-230c5e7e2132",
-                    kForwardPortFirst, kForwardPortLast, &process_factory_,
-                    &remote_util_),
+                    options.forward_port_first, options.forward_port_last,
+                    &process_factory_, &remote_util_),
       printer_(options.quiet, Util::IsTTY() && !options.json),
       progress_(&printer_, options.verbosity, options.json) {
   if (!options_.ssh_command.empty()) {
@@ -184,19 +182,24 @@ absl::Status CdcRsyncClient::StartServer() {
   std::string component_args = GameletComponent::ToCommandLineArgs(components);
 
   // Find available local and remote ports for port forwarding.
-  absl::StatusOr<int> port_res = port_manager_.ReservePort(
-      /*check_remote=*/false, /*remote_timeout_sec unused*/ 0);
-  constexpr char kErrorMsg[] = "Failed to find available port";
-  if (absl::IsDeadlineExceeded(port_res.status())) {
-    // Server didn't respond in time.
-    return SetTag(WrapStatus(port_res.status(), kErrorMsg),
-                  Tag::kConnectionTimeout);
+  // If only one port is in the given range, try that without checking.
+  int port = options_.forward_port_first;
+  if (options_.forward_port_first < options_.forward_port_last) {
+    absl::StatusOr<int> port_res =
+        port_manager_.ReservePort(options_.connection_timeout_sec);
+    constexpr char kErrorMsg[] = "Failed to find available port";
+    if (absl::IsDeadlineExceeded(port_res.status())) {
+      // Server didn't respond in time.
+      return SetTag(WrapStatus(port_res.status(), kErrorMsg),
+                    Tag::kConnectionTimeout);
+    }
+    if (absl::IsResourceExhausted(port_res.status()))
+      return SetTag(WrapStatus(port_res.status(), kErrorMsg),
+                    Tag::kAddressInUse);
+    if (!port_res.ok())
+      return WrapStatus(port_res.status(), "Failed to find available port");
+    port = *port_res;
   }
-  if (absl::IsResourceExhausted(port_res.status()))
-    return SetTag(WrapStatus(port_res.status(), kErrorMsg), Tag::kAddressInUse);
-  if (!port_res.ok())
-    return WrapStatus(port_res.status(), "Failed to find available port");
-  int port = *port_res;
 
   std::string remote_server_path =
       std::string(kRemoteToolsBinDir) + kCdcServerFilename;

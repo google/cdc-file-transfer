@@ -50,6 +50,8 @@ class CdcRsyncClient {
     std::string copy_dest;
     int compress_level = 6;
     int connection_timeout_sec = 10;
+    int forward_port_first = 44450;
+    int forward_port_last = 44459;
     std::string ssh_command;
     std::string scp_command;
     std::string sources_dir;  // Base dir for files loaded for --files-from.

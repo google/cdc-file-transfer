@@ -121,8 +121,7 @@ PortManager::~PortManager() {
   }
 }
 
-absl::StatusOr<int> PortManager::ReservePort(bool check_remote,
-                                             int remote_timeout_sec) {
+absl::StatusOr<int> PortManager::ReservePort(int remote_timeout_sec) {
   // Find available port on workstation.
   std::unordered_set<int> local_ports;
   ASSIGN_OR_RETURN(local_ports,
@@ -132,13 +131,11 @@ absl::StatusOr<int> PortManager::ReservePort(bool check_remote,
 
   // Find available port on remote instance.
   std::unordered_set<int> remote_ports = local_ports;
-  if (check_remote) {
-    ASSIGN_OR_RETURN(remote_ports,
-                     FindAvailableRemotePorts(
-                         first_port_, last_port_, "0.0.0.0", process_factory_,
-                         remote_util_, remote_timeout_sec, steady_clock_),
-                     "Failed to find available ports on instance");
-  }
+  ASSIGN_OR_RETURN(remote_ports,
+                   FindAvailableRemotePorts(first_port_, last_port_, "0.0.0.0",
+                                            process_factory_, remote_util_,
+                                            remote_timeout_sec, steady_clock_),
+                   "Failed to find available ports on instance");
 
   // Fetch shared memory.
   void* mem;
@@ -290,9 +287,14 @@ absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailablePorts(
     int first_port, int last_port, const std::string& netstat_output,
     const char* ip) {
   std::unordered_set<int> available_ports;
-  for (int port = first_port; port <= last_port; ++port) {
-    std::vector<std::string> lines = absl::StrSplit(netstat_output, '\n');
+  std::vector<std::string> lines;
+  for (const auto& line : absl::StrSplit(netstat_output, '\n')) {
+    if (absl::StrContains(line, ip)) {
+      lines.push_back(std::string(line));
+    }
+  }
 
+  for (int port = first_port; port <= last_port; ++port) {
     bool port_occupied = false;
     std::string portToken = absl::StrFormat("%s:%i", ip, port);
     for (const std::string& line : lines) {

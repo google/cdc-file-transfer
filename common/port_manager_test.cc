@@ -38,9 +38,6 @@ constexpr int kTimeoutSec = 1;
 constexpr char kLocalNetstat[] = "netstat -a -n -p tcp";
 constexpr char kRemoteNetstat[] = "netstat --numeric --listening --tcp";
 
-constexpr bool kCheckRemote = true;
-constexpr bool kNoCheckRemote = false;
-
 constexpr char kLocalNetstatOutFmt[] =
     "TCP    127.0.0.1:50000        127.0.0.1:%i        ESTABLISHED";
 constexpr char kRemoteNetstatOutFmt[] =
@@ -73,16 +70,7 @@ TEST_F(PortManagerTest, ReservePortSuccess) {
   process_factory_.SetProcessOutput(kLocalNetstat, "", "", 0);
   process_factory_.SetProcessOutput(kRemoteNetstat, "", "", 0);
 
-  absl::StatusOr<int> port =
-      port_manager_.ReservePort(kCheckRemote, kTimeoutSec);
-  ASSERT_OK(port);
-  EXPECT_EQ(*port, kFirstPort);
-}
-
-TEST_F(PortManagerTest, ReservePortNoRemoteSuccess) {
-  process_factory_.SetProcessOutput(kLocalNetstat, "", "", 0);
-
-  absl::StatusOr<int> port = port_manager_.ReservePort(kNoCheckRemote, 0);
+  absl::StatusOr<int> port = port_manager_.ReservePort(kTimeoutSec);
   ASSERT_OK(port);
   EXPECT_EQ(*port, kFirstPort);
 }
@@ -95,8 +83,7 @@ TEST_F(PortManagerTest, ReservePortAllLocalPortsTaken) {
   process_factory_.SetProcessOutput(kLocalNetstat, local_netstat_out, "", 0);
   process_factory_.SetProcessOutput(kRemoteNetstat, "", "", 0);
 
-  absl::StatusOr<int> port =
-      port_manager_.ReservePort(kCheckRemote, kTimeoutSec);
+  absl::StatusOr<int> port = port_manager_.ReservePort(kTimeoutSec);
   EXPECT_TRUE(absl::IsResourceExhausted(port.status()));
   EXPECT_TRUE(
       absl::StrContains(port.status().message(), "No port available in range"));
@@ -110,8 +97,7 @@ TEST_F(PortManagerTest, ReservePortAllRemotePortsTaken) {
   process_factory_.SetProcessOutput(kLocalNetstat, "", "", 0);
   process_factory_.SetProcessOutput(kRemoteNetstat, remote_netstat_out, "", 0);
 
-  absl::StatusOr<int> port =
-      port_manager_.ReservePort(kCheckRemote, kTimeoutSec);
+  absl::StatusOr<int> port = port_manager_.ReservePort(kTimeoutSec);
   EXPECT_TRUE(absl::IsResourceExhausted(port.status()));
   EXPECT_TRUE(
       absl::StrContains(port.status().message(), "No port available in range"));
@@ -121,8 +107,7 @@ TEST_F(PortManagerTest, ReservePortLocalNetstatFails) {
   process_factory_.SetProcessOutput(kLocalNetstat, "", "", 1);
   process_factory_.SetProcessOutput(kRemoteNetstat, "", "", 0);
 
-  absl::StatusOr<int> port =
-      port_manager_.ReservePort(kCheckRemote, kTimeoutSec);
+  absl::StatusOr<int> port = port_manager_.ReservePort(kTimeoutSec);
   EXPECT_NOT_OK(port);
   EXPECT_TRUE(
       absl::StrContains(port.status().message(),
@@ -133,8 +118,7 @@ TEST_F(PortManagerTest, ReservePortRemoteNetstatFails) {
   process_factory_.SetProcessOutput(kLocalNetstat, "", "", 0);
   process_factory_.SetProcessOutput(kRemoteNetstat, "", "", 1);
 
-  absl::StatusOr<int> port =
-      port_manager_.ReservePort(kCheckRemote, kTimeoutSec);
+  absl::StatusOr<int> port = port_manager_.ReservePort(kTimeoutSec);
   EXPECT_NOT_OK(port);
   EXPECT_TRUE(absl::StrContains(port.status().message(),
                                 "Failed to find available ports on instance"));
@@ -145,8 +129,7 @@ TEST_F(PortManagerTest, ReservePortRemoteNetstatTimesOut) {
   process_factory_.SetProcessNeverExits(kRemoteNetstat);
   steady_clock_.AutoAdvance(kTimeoutSec * 2 * 1000);
 
-  absl::StatusOr<int> port =
-      port_manager_.ReservePort(kCheckRemote, kTimeoutSec);
+  absl::StatusOr<int> port = port_manager_.ReservePort(kTimeoutSec);
   EXPECT_NOT_OK(port);
   EXPECT_TRUE(absl::IsDeadlineExceeded(port.status()));
   EXPECT_TRUE(absl::StrContains(port.status().message(),
@@ -163,14 +146,10 @@ TEST_F(PortManagerTest, ReservePortMultipleInstances) {
   // Port managers use shared memory, so different instances know about each
   // other. This would even work if |port_manager_| and |port_manager2| belonged
   // to different processes, but we don't test that here.
-  EXPECT_EQ(*port_manager_.ReservePort(kCheckRemote, kTimeoutSec),
-            kFirstPort + 0);
-  EXPECT_EQ(*port_manager2.ReservePort(kCheckRemote, kTimeoutSec),
-            kFirstPort + 1);
-  EXPECT_EQ(*port_manager_.ReservePort(kCheckRemote, kTimeoutSec),
-            kFirstPort + 2);
-  EXPECT_EQ(*port_manager2.ReservePort(kCheckRemote, kTimeoutSec),
-            kFirstPort + 3);
+  EXPECT_EQ(*port_manager_.ReservePort(kTimeoutSec), kFirstPort + 0);
+  EXPECT_EQ(*port_manager2.ReservePort(kTimeoutSec), kFirstPort + 1);
+  EXPECT_EQ(*port_manager_.ReservePort(kTimeoutSec), kFirstPort + 2);
+  EXPECT_EQ(*port_manager2.ReservePort(kTimeoutSec), kFirstPort + 3);
 }
 
 TEST_F(PortManagerTest, ReservePortReusesPortsInLRUOrder) {
@@ -178,7 +157,7 @@ TEST_F(PortManagerTest, ReservePortReusesPortsInLRUOrder) {
   process_factory_.SetProcessOutput(kRemoteNetstat, "", "", 0);
 
   for (int n = 0; n < kNumPorts * 2; ++n) {
-    EXPECT_EQ(*port_manager_.ReservePort(kCheckRemote, kTimeoutSec),
+    EXPECT_EQ(*port_manager_.ReservePort(kTimeoutSec),
               kFirstPort + n % kNumPorts);
     system_clock_.Advance(1000);
   }
@@ -188,11 +167,10 @@ TEST_F(PortManagerTest, ReleasePort) {
   process_factory_.SetProcessOutput(kLocalNetstat, "", "", 0);
   process_factory_.SetProcessOutput(kRemoteNetstat, "", "", 0);
 
-  absl::StatusOr<int> port =
-      port_manager_.ReservePort(kCheckRemote, kTimeoutSec);
+  absl::StatusOr<int> port = port_manager_.ReservePort(kTimeoutSec);
   EXPECT_EQ(*port, kFirstPort);
   EXPECT_OK(port_manager_.ReleasePort(*port));
-  port = port_manager_.ReservePort(kCheckRemote, kTimeoutSec);
+  port = port_manager_.ReservePort(kTimeoutSec);
   EXPECT_EQ(*port, kFirstPort);
 }
 
@@ -202,13 +180,10 @@ TEST_F(PortManagerTest, ReleasePortOnDestruction) {
 
   auto port_manager2 = std::make_unique<PortManager>(
       kGuid, kFirstPort, kLastPort, &process_factory_, &remote_util_);
-  EXPECT_EQ(*port_manager2->ReservePort(kCheckRemote, kTimeoutSec),
-            kFirstPort + 0);
-  EXPECT_EQ(*port_manager_.ReservePort(kCheckRemote, kTimeoutSec),
-            kFirstPort + 1);
+  EXPECT_EQ(*port_manager2->ReservePort(kTimeoutSec), kFirstPort + 0);
+  EXPECT_EQ(*port_manager_.ReservePort(kTimeoutSec), kFirstPort + 1);
   port_manager2.reset();
-  EXPECT_EQ(*port_manager_.ReservePort(kCheckRemote, kTimeoutSec),
-            kFirstPort + 0);
+  EXPECT_EQ(*port_manager_.ReservePort(kTimeoutSec), kFirstPort + 0);
 }
 
 TEST_F(PortManagerTest, FindAvailableLocalPortsSuccess) {

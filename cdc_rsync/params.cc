@@ -20,6 +20,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "common/path.h"
+#include "common/port_range_parser.h"
 #include "lib/zstd.h"
 
 namespace cdc_ft {
@@ -45,39 +46,41 @@ Usage:
   cdc_rsync [options] source [source]... [user@]host:destination
 
 Parameters:
-  source                  Local file or directory to be copied
-  user                    Remote SSH user name
-  host                    Remote host or IP address
-  destination             Remote destination directory
+  source                    Local file or directory to be copied
+  user                      Remote SSH user name
+  host                      Remote host or IP address
+  destination               Remote destination directory
 
 Options:
-    --contimeout sec      Gamelet connection timeout in seconds (default: 10)
--q, --quiet               Quiet mode, only print errors
--v, --verbose             Increase output verbosity
-    --json                Print JSON progress
--n, --dry-run             Perform a trial run with no changes made
--r, --recursive           Recurse into directories
-    --delete              Delete extraneous files from destination directory
--z, --compress            Compress file data during the transfer
-    --compress-level num  Explicitly set compression level (default: 6)
--c, --checksum            Skip files based on checksum, not mod-time & size
--W, --whole-file          Always copy files whole,
-                          do not apply delta-transfer algorithm
-    --exclude pattern     Exclude files matching pattern
-    --exclude-from file   Read exclude patterns from file
-    --include pattern     Don't exclude files matching pattern
-    --include-from file   Read include patterns from file
-    --files-from file     Read list of source files from file
--R, --relative            Use relative path names
-    --existing            Skip creating new files on instance
-    --copy-dest dir       Use files from dir as sync base if files are missing
-    --ssh-command         Path and arguments of ssh command to use, e.g.
-                          "C:\path\to\ssh.exe -p 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
-                          Can also be specified by the CDC_SSH_COMMAND environment variable.
-    --scp-command         Path and arguments of scp command to use, e.g.
-                          "C:\path\to\scp.exe -P 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
-                          Can also be specified by the CDC_SCP_COMMAND environment variable.
--h  --help                Help for cdc_rsync
+    --contimeout sec        Gamelet connection timeout in seconds (default: 10)
+-q, --quiet                 Quiet mode, only print errors
+-v, --verbose               Increase output verbosity
+    --json                  Print JSON progress
+-n, --dry-run               Perform a trial run with no changes made
+-r, --recursive             Recurse into directories
+    --delete                Delete extraneous files from destination directory
+-z, --compress              Compress file data during the transfer
+    --compress-level <num>  Explicitly set compression level (default: 6)
+-c, --checksum              Skip files based on checksum, not mod-time & size
+-W, --whole-file            Always copy files whole,
+                            do not apply delta-transfer algorithm
+    --exclude pattern       Exclude files matching pattern
+    --exclude-from <file>   Read exclude patterns from file
+    --include pattern       Don't exclude files matching pattern
+    --include-from <file>   Read include patterns from file
+    --files-from <file>     Read list of source files from file
+-R, --relative              Use relative path names
+    --existing              Skip creating new files on instance
+    --copy-dest <dir>       Use files from dir as sync base if files are missing
+    --ssh-command <cmd>     Path and arguments of ssh command to use, e.g.
+                            "C:\path\to\ssh.exe -p 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
+                            Can also be specified by the CDC_SSH_COMMAND environment variable.
+    --scp-command <cmd>     Path and arguments of scp command to use, e.g.
+                            "C:\path\to\scp.exe -P 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
+                            Can also be specified by the CDC_SCP_COMMAND environment variable.
+    --forward-port <port>   TCP port or range used for SSH port forwarding (default: 44450-44459).
+                            If a range is specified, searches for available ports (slower).
+-h  --help                  Help for cdc_rsync
 )";
 
 constexpr char kSshCommandEnvVar[] = "CDC_SSH_COMMAND";
@@ -91,15 +94,20 @@ void PopulateFromEnvVars(Parameters* parameters) {
       .IgnoreError();
 }
 
+// Returns false and prints an error if |value| is null or empty.
+bool ValidateValue(const std::string& option_name, const char* value) {
+  if (!value) {
+    PrintError("Option '%s' needs a value", option_name);
+    return false;
+  }
+  return true;
+}
+
 // Handles the --exclude-from and --include-from options.
 OptionResult HandleFilterRuleFile(const std::string& option_name,
                                   const char* path, PathFilter::Rule::Type type,
                                   Parameters* params) {
-  if (!path) {
-    PrintError("Option '%s' needs a value", option_name);
-    return OptionResult::kError;
-  }
-
+  assert(path);
   std::vector<std::string> patterns;
   absl::Status status = path::ReadAllLines(
       path, &patterns,
@@ -188,29 +196,34 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "include") {
+    if (!ValidateValue(key, value)) return OptionResult::kError;
     params->options.filter.AddRule(PathFilter::Rule::Type::kInclude, value);
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "include-from") {
+    if (!ValidateValue(key, value)) return OptionResult::kError;
     return HandleFilterRuleFile(key, value, PathFilter::Rule::Type::kInclude,
                                 params);
   }
 
   if (key == "exclude") {
+    if (!ValidateValue(key, value)) return OptionResult::kError;
     params->options.filter.AddRule(PathFilter::Rule::Type::kExclude, value);
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "exclude-from") {
+    if (!ValidateValue(key, value)) return OptionResult::kError;
     return HandleFilterRuleFile(key, value, PathFilter::Rule::Type::kExclude,
                                 params);
   }
 
   if (key == "files-from") {
     // Implies -R.
+    if (!ValidateValue(key, value)) return OptionResult::kError;
     params->options.relative = true;
-    params->files_from = value ? value : std::string();
+    params->files_from = value;
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -225,16 +238,14 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "compress-level") {
-    if (value) {
-      params->options.compress_level = atoi(value);
-    }
+    if (!ValidateValue(key, value)) return OptionResult::kError;
+    params->options.compress_level = atoi(value);
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "contimeout") {
-    if (value) {
-      params->options.connection_timeout_sec = atoi(value);
-    }
+    if (!ValidateValue(key, value)) return OptionResult::kError;
+    params->options.connection_timeout_sec = atoi(value);
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -259,7 +270,8 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "copy-dest") {
-    params->options.copy_dest = value ? value : std::string();
+    if (!ValidateValue(key, value)) return OptionResult::kError;
+    params->options.copy_dest = value;
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -269,12 +281,27 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "ssh-command") {
-    params->options.ssh_command = value ? value : std::string();
+    if (!ValidateValue(key, value)) return OptionResult::kError;
+    params->options.ssh_command = value;
     return OptionResult::kConsumedKeyValue;
   }
 
   if (key == "scp-command") {
-    params->options.scp_command = value ? value : std::string();
+    if (!ValidateValue(key, value)) return OptionResult::kError;
+    params->options.scp_command = value;
+    return OptionResult::kConsumedKeyValue;
+  }
+
+  if (key == "forward-port") {
+    if (!ValidateValue(key, value)) return OptionResult::kError;
+    uint16_t first, last;
+    if (!port_range::Parse(value, &first, &last)) {
+      PrintError("Failed to parse %s=%s, expected <port> or <port1>-<port2>",
+                 key, value);
+      return OptionResult::kError;
+    }
+    params->options.forward_port_first = first;
+    params->options.forward_port_last = last;
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -355,11 +382,7 @@ bool CheckOptionResult(OptionResult result, const std::string& name,
       return true;
 
     case OptionResult::kConsumedKeyValue:
-      if (!value) {
-        PrintError("Option '%s' needs a value", name);
-        return false;
-      }
-      return true;
+      return ValidateValue(name, value);
 
     case OptionResult::kError:
       // Error message was already printed.

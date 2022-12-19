@@ -47,7 +47,7 @@
     <AdditionalOptions>/std:c++17</AdditionalOptions>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)bazel-out\x64_windows-opt\bin\asset_stcdc_streamream_manager\</OutDir>
+    <OutDir>$(SolutionDir)bazel-out\x64_windows-opt\bin\cdc_stream\</OutDir>
     <NMakePreprocessorDefinitions>UNICODE</NMakePreprocessorDefinitions>
     <AdditionalOptions>/std:c++17</AdditionalOptions>
   </PropertyGroup>

@@ -134,6 +134,11 @@ class MultiSessionRunner {
 // to an arbitrary number of gamelets.
 class MultiSession {
  public:
+  // Ports used by the asset streaming service for local port forwarding on
+  // workstation and gamelet.
+  static constexpr int kDefaultForwardPortFirst = 44433;
+  static constexpr int kDefaultForwardPortLast = 44442;
+
   // Maximum length of cache path. We must be able to write content hashes into
   // this path:
   // <cache path>\01234567890123456789<null terminator> = 260 characters.
