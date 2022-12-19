@@ -148,11 +148,7 @@ PathFilter::Rule::Type ToInternalType(
 
 CdcRsyncServer::CdcRsyncServer() = default;
 
-CdcRsyncServer::~CdcRsyncServer() {
-  message_pump_.reset();
-  socket_.reset();
-  socket_finalizer_.reset();
-}
+CdcRsyncServer::~CdcRsyncServer() = default;
 
 bool CdcRsyncServer::CheckComponents(
     const std::vector<GameletComponent>& components) {

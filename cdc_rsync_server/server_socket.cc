@@ -50,7 +50,12 @@ constexpr int kErrAddrInUse = WSAEADDRINUSE;
 
 int GetLastError() { return WSAGetLastError(); }
 std::string GetErrorStr(int err) { return Util::GetWin32Error(err); }
-void Close(SocketType socket) { closesocket(socket); }
+void Close(SocketType* socket) {
+  if (*socket != kInvalidSocket) {
+    closesocket(*socket);
+    *socket = kInvalidSocket;
+  }
+}
 
 // Not necessary on Windows.
 #define HANDLE_EINTR(x) (x)
@@ -69,7 +74,12 @@ constexpr int kErrAddrInUse = EADDRINUSE;
 
 int GetLastError() { return errno; }
 std::string GetErrorStr(int err) { return strerror(err); }
-void Close(SocketType socket) { close(socket); }
+void Close(SocketType* socket) {
+  if (*socket != kInvalidSocket) {
+    close(*socket);
+    *socket = kInvalidSocket;
+  }
+}
 
 // Keep re-evaluating the expression |x| while it returns EINTR.
 #define HANDLE_EINTR(x)                                     \
@@ -145,8 +155,7 @@ absl::Status ServerSocket::StartListening(int port) {
       // print reasonable errors.
       status = SetTag(status, Tag::kAddressInUse);
     }
-    Close(socket_info_->listen_sock);
-    socket_info_->listen_sock = kInvalidSocket;
+    Close(&socket_info_->listen_sock);
     return status;
   }
 
@@ -154,8 +163,7 @@ absl::Status ServerSocket::StartListening(int port) {
   result = listen(socket_info_->listen_sock, 1);
   if (result == kSocketError) {
     int err = GetLastError();
-    Close(socket_info_->listen_sock);
-    socket_info_->listen_sock = kInvalidSocket;
+    Close(&socket_info_->listen_sock);
     return MakeStatus("Listening to socket failed: %s", GetErrorStr(err));
   }
 
@@ -163,11 +171,7 @@ absl::Status ServerSocket::StartListening(int port) {
 }
 
 void ServerSocket::StopListening() {
-  if (socket_info_->listen_sock != kInvalidSocket) {
-    Close(socket_info_->listen_sock);
-    socket_info_->listen_sock = kInvalidSocket;
-  }
-
+  Close(&socket_info_->listen_sock);
   LOG_INFO("Stopped listening.");
 }
 
@@ -186,11 +190,7 @@ absl::Status ServerSocket::WaitForConnection() {
 }
 
 void ServerSocket::Disconnect() {
-  if (socket_info_->conn_sock != kInvalidSocket) {
-    Close(socket_info_->conn_sock);
-    socket_info_->conn_sock = kInvalidSocket;
-  }
-
+  Close(&socket_info_->conn_sock);
   LOG_INFO("Disconnected");
 }
 
