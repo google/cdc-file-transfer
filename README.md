@@ -38,20 +38,91 @@ version of the files available in the target directory.
 </p>
 
 The remote diffing algorithm is based on CDC. In our tests, it is up to 30x
-faster than the one used in rsync (1500 MB/s vs 50 MB/s).
+faster than the one used in `rsync` (1500 MB/s vs 50 MB/s).
 
-The following chart shows a comparison of `cdc_rsync` and Linux rsync running
+The following chart shows a comparison of `cdc_rsync` and Linux `rsync` running
 under Cygwin on Windows. The test data consists of 58 development builds
 of some game provided to us for evaluation purposes. The builds are 40-45 GB
 large. For this experiment, we uploaded the first build, then synced the second
 build with each of the two tools and measured the time. For example, syncing
-from build 1 to build 2 took 210 seconds with the Linux rsync, but only 75
+from build 1 to build 2 took 210 seconds with the Cygwin `rsync`, but only 75
 seconds with `cdc_rsync`. The three outliers are probably feature drops from
 another development branch, where the delta was much higher. Overall,
-`cdc_rsync` syncs files about **3 times faster** than Linux rsync.
+`cdc_rsync` syncs files about **3 times faster** than Cygwin `rsync`.
+
+We also ran the experiment with the native Linux `rsync`, i.e syncing Linux to
+Linux, to rule out issues with Cygwin. Linux `rsync` performed on average 35%
+worse than Cygwin `rsync`, which can be attributed to CPU differences. We did
+not include the graph due to this.
 
 <p align="center">
   <img src="docs/cdc_rsync_vs_cygwin_rsync.png" alt="Comparison of cdc_rsync and Linux rsync running in Cygwin" width="753" />
+</p>
+
+So how does it work and why is it faster? The **standard Linux `rsync`** splits
+a file into fixed-size chunks of typically several KB.
+
+<p align="center">
+  <img src="docs/fixed_size_chunks.png" alt="Linux rsync uses fixed size chunks" width="258" />
+</p>
+
+If the file is modified in the middle, e.g. by inserting `xxxx` after `567`,
+this usually means that <span style="color: red">the modified chunks as well as
+all subsequent chunks</span> change.
+
+<p align="center">
+  <img src="docs/fixed_size_chunks_inserted.png" alt="Fixed size chunks after inserting data" width="301" />
+</p>
+
+The **original `rsync` algorithm** hashes the chunks of the remote "old" file
+and sends the hashes to the local device. The local device then figures out 
+which parts of the "new" file matches known chunks.
+
+<p align="center">
+  <img src="docs/linux_rsync_animation.gif" alt="Syncing a file with the standard Linux rsync" width="855" />
+  Original rsync algorithm
+</p>
+
+This is a simplification. The actual algorithm is more complicated and uses
+two hashes, a weak rolling hash and a strong hash, see
+[here](https://rsync.samba.org/tech_report/) for a great overview. What makes
+`rsync` relatively slow is the "no match" situation where the rolling hash does
+not match any remote hash, and the algorithm has to roll the hash forward and
+perform a hash map lookup for each byte. `rsync` goes to
+[great lengths](https://github.com/librsync/librsync/blob/master/src/hashtable.h)
+optimizing lookups.
+
+**`cdc_rsync`** does not use fixed-size chunks, but instead variable-size,
+content-defined chunks. That means, chunk boundaries are determined by the
+*local content* of the file, in practice a 64 byte sliding window. For more
+details, see
+[the FastCDC paper](https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia)
+or take a look at [our implementation](fastcdc/fastcdc.h).
+
+<p align="center">
+  <img src="docs/variable_size_chunks.png" alt="cdc_rsync uses variable, content-defined size chunks" width="260" />
+</p>
+
+If the file is modified in the middle, only <span style="color: red">the modified
+chunks</span>, but not <span style="color: #38761d">subsequent chunks</span>
+change (unless they are less than 64 bytes away from the modifications).
+
+<p align="center">
+  <img src="docs/variable_size_chunks_inserted.png" alt="Content-defined chunks after inserting data" width="314" />
+</p>
+
+Computing the chunk boundaries is cheap and involves only a left-shift, a memory
+lookup, an `add` and an `and` operation for each input byte. This is cheaper
+than the hash map lookup for the original `rsync` algorithm.
+
+Because of this, the **`cdc_rsync` algorithm** is faster than the original
+`rsync`. It is also simpler. Since chunk boundaries move along with insertions
+or deletions, the task to match local and remote hashes is a trivial set
+difference operation. It does not involve a per-byte hash map lookup.
+
+<p align="center">
+  <img src="docs/cdc_rsync_animation.gif" alt="Syncing a file with cdc_rsync" width="857" />
+  cdc_rsync algorithm
 </p>
 
 ## CDC Stream
