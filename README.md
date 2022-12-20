@@ -1,8 +1,8 @@
 # CDC File Transfer
 
 Born from the ashes of Stadia, this repository contains tools for syncing and
-streaming files from Windows to Linux. They are based on Content Defined
-Chunking (CDC), in particular
+streaming files from Windows to Windows or Linux. The tools are based on Content
+Defined Chunking (CDC), in particular
 [FastCDC](https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia),
 to split up files into chunks.
 
@@ -132,9 +132,9 @@ difference operation. It does not involve a per-byte hash map lookup.
 
 ## CDC Stream
 
-`cdc_stream` is a tool to stream files and directories from a Windows machine to a
-Linux device. Conceptually, it is similar to [sshfs](https://github.com/libfuse/sshfs),
-but it is optimized for read speed.
+`cdc_stream` is a tool to stream files and directories from a Windows machine to
+a Linux device. Conceptually, it is similar to
+[sshfs](https://github.com/libfuse/sshfs), but it is optimized for read speed.
 * It caches streamed data on the Linux device.
 * If a file is re-read on Linux after it changed on Windows, only the
   differences are streamed again. The rest is read from the cache.
@@ -160,6 +160,34 @@ In one case, the game is streamed via `sshfs`, in the other case we use
 <p align="center">
   <img src="docs/cdc_stream_vs_sshfs.png" alt="Comparison of cdc_stream and sshfs" width="752" />
 </p>
+
+# Supported Platforms
+
+| `cdc_rsync`                  | From                 | To                   |
+|:-----------------------------|:--------------------:|:--------------------:|
+| Windows x86_64               | &check;              | &check; <sup>1</sup> |
+| Ubuntu 22.04 x86_64          | &cross; <sup>2</sup> | &check;              |
+| Ubuntu 22.04 aarch64         | &cross;              | &cross;              |
+| macOS 13 x86_64 <sup>3</sup> | &cross;              | &cross;              |
+| macOS 13 aarch64 <sup>3</sup>| &cross;              | &cross;              |
+
+| `cdc_stream`                 | From                 | To                   |
+|:-----------------------------|:--------------------:|:--------------------:|
+| Windows x86_64               | &check;              | &cross;              |
+| Ubuntu 22.04 x86_64          | &cross;              | &check;              |
+| Ubuntu 22.04 aarch64         | &cross;              | &cross;              |
+| macOS 13 x86_64 <sup>3</sup> | &cross;              | &cross;              |
+| macOS 13 aarch64 <sup>3</sup>| &cross;              | &cross;              |
+
+<span style="font-size: 0.8rem">
+
+<sup>1</sup> Only local syncs, e.g. `cdc_rsync C:\src\* C:\dst`. Support for
+remote syncs is being added, see
+[#61](https://github.com/google/cdc-file-transfer/issues/61).  
+<sup>2</sup> See [#56](https://github.com/google/cdc-file-transfer/issues/56).  
+<sup>3</sup> See [#62](https://github.com/google/cdc-file-transfer/issues/62).
+
+</span>
 
 # Getting Started
 
@@ -190,7 +218,7 @@ To build the tools from source, the following steps have to be executed on
   git submodule update --init --recursive
   ```
 
-Finally, install an SSH client on the Windows device if not present.
+Finally, install an SSH client on the Windows machine if not present.
 The file transfer tools require `ssh.exe` and `sftp.exe`.
 
 ## Building
@@ -303,6 +331,10 @@ cdc_rsync C:\path\to\assets\* user@linux.device.com:~/assets -r
 To get per file progress, add `-v`:
 ```
 cdc_rsync C:\path\to\assets\* user@linux.device.com:~/assets -vr
+```
+The tool also supports local syncs:
+```
+cdc_rsync C:\path\to\assets\* C:\path\to\destination -vr
 ```
 
 ### CDC Stream

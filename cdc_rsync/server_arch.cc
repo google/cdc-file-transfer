@@ -20,6 +20,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "common/path.h"
+#include "common/platform.h"
 #include "common/remote_util.h"
 #include "common/util.h"
 
@@ -56,6 +57,28 @@ ServerArch::Type ServerArch::Detect(const std::string& destination) {
 
   // Default to Linux.
   return Type::kLinux;
+}
+
+// static
+ServerArch::Type ServerArch::LocalType() {
+#if PLATFORM_WINDOWS
+  return ServerArch::Type::kWindows;
+#elif PLATFORM_LINUX
+  return ServerArch::Type::kLinux;
+#endif
+}
+
+// static
+std::string ServerArch::CdcRsyncFilename() {
+  switch (LocalType()) {
+    case Type::kWindows:
+      return "cdc_rsync.exe";
+    case Type::kLinux:
+      return "cdc_rsync";
+    default:
+      assert(!kErrorArchTypeUnhandled);
+      return std::string();
+  }
 }
 
 ServerArch::ServerArch(Type type) : type_(type) {}

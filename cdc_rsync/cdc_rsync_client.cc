@@ -30,7 +30,9 @@
 #include "common/gamelet_component.h"
 #include "common/log.h"
 #include "common/path.h"
+#include "common/port_manager.h"
 #include "common/process.h"
+#include "common/remote_util.h"
 #include "common/status.h"
 #include "common/status_macros.h"
 #include "common/stopwatch.h"
@@ -44,8 +46,6 @@ constexpr int kExitCodeCouldNotExecute = 126;
 
 // Bash exit code if binary was not found.
 constexpr int kExitCodeNotFound = 127;
-
-constexpr char kCdcRsyncFilename[] = "cdc_rsync.exe";
 
 SetOptionsRequest::FilterRule::Type ToProtoType(PathFilter::Rule::Type type) {
   switch (type) {
@@ -98,20 +98,27 @@ CdcRsyncClient::CdcRsyncClient(const Options& options,
     : options_(options),
       sources_(std::move(sources)),
       destination_(std::move(destination)),
-      remote_util_(std::move(user_host), options.verbosity, options.quiet,
-                   &process_factory_,
-                   /*forward_output_to_log=*/false),
-      port_manager_("cdc_rsync_ports_f77bcdfe-368c-4c45-9f01-230c5e7e2132",
-                    options.forward_port_first, options.forward_port_last,
-                    &process_factory_, &remote_util_),
       printer_(options.quiet, Util::IsTTY() && !options.json),
       progress_(&printer_, options.verbosity, options.json) {
-  if (!options_.ssh_command.empty()) {
-    remote_util_.SetSshCommand(options_.ssh_command);
+  // If there is no |user_host|, we sync files locally!
+  if (!user_host.empty()) {
+    remote_util_ =
+        std::make_unique<RemoteUtil>(std::move(user_host), options.verbosity,
+                                     options.quiet, &process_factory_,
+                                     /*forward_output_to_log=*/false);
+    if (!options_.ssh_command.empty()) {
+      remote_util_->SetSshCommand(options_.ssh_command);
+    }
+    if (!options_.sftp_command.empty()) {
+      remote_util_->SetSftpCommand(options_.sftp_command);
+    }
   }
-  if (!options_.sftp_command.empty()) {
-    remote_util_.SetSftpCommand(options_.sftp_command);
-  }
+
+  // Note that remote_util_.get() may be null.
+  port_manager_ = std::make_unique<PortManager>(
+      "cdc_rsync_ports_f77bcdfe-368c-4c45-9f01-230c5e7e2132",
+      options.forward_port_first, options.forward_port_last, &process_factory_,
+      remote_util_.get());
 }
 
 CdcRsyncClient::~CdcRsyncClient() {
@@ -123,7 +130,10 @@ absl::Status CdcRsyncClient::Run() {
   int port;
   ASSIGN_OR_RETURN(port, FindAvailablePort(), "Failed to find available port");
 
-  ServerArch server_arch(ServerArch::Detect(destination_));
+  // If |remote_util_| is not set, it's a local sync.
+  ServerArch::Type arch_type =
+      remote_util_ ? ServerArch::Detect(destination_) : ServerArch::LocalType();
+  ServerArch server_arch(arch_type);
 
   // Start the server process.
   absl::Status status = StartServer(port, server_arch);
@@ -174,7 +184,7 @@ absl::StatusOr<int> CdcRsyncClient::FindAvailablePort() {
   }
 
   absl::StatusOr<int> port =
-      port_manager_.ReservePort(options_.connection_timeout_sec);
+      port_manager_->ReservePort(options_.connection_timeout_sec);
   if (absl::IsDeadlineExceeded(port.status())) {
     // Server didn't respond in time.
     return SetTag(port.status(), Tag::kConnectionTimeout);
@@ -203,15 +213,31 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
     return MakeStatus(
         "Required instance component not found. Make sure the file "
         "%s resides in the same folder as %s.",
-        arch.CdcServerFilename(), kCdcRsyncFilename);
+        arch.CdcServerFilename(), ServerArch::CdcRsyncFilename());
   }
   std::string component_args = GameletComponent::ToCommandLineArgs(components);
-  std::string remote_command = arch.GetStartServerCommand(
-      kExitCodeNotFound, absl::StrFormat("%i %s", port, component_args));
-  ProcessStartInfo start_info =
-      remote_util_.BuildProcessStartInfoForSshPortForwardAndCommand(
-          port, port, /*reverse=*/false, remote_command);
+
+  ProcessStartInfo start_info;
   start_info.name = "cdc_rsync_server";
+
+  if (remote_util_) {
+    // Run cdc_rsync_server on the remote instance.
+    std::string remote_command = arch.GetStartServerCommand(
+        kExitCodeNotFound, absl::StrFormat("%i %s", port, component_args));
+    start_info = remote_util_->BuildProcessStartInfoForSshPortForwardAndCommand(
+        port, port, /*reverse=*/false, remote_command);
+  } else {
+    // Run cdc_rsync_server locally.
+    std::string exe_dir;
+    absl::Status status = path::GetExeDir(&exe_dir);
+    if (!status.ok()) {
+      return WrapStatus(status, "Failed to get exe directory");
+    }
+
+    std::string server_path = path::Join(exe_dir, arch.CdcServerFilename());
+    start_info.command =
+        absl::StrFormat("%s %i %s", server_path, port, component_args);
+  }
 
   // Capture stdout, but forward to stdout for debugging purposes.
   start_info.stdout_handler = [this](const char* data, size_t /*data_size*/) {
@@ -251,6 +277,12 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
     server_exit_code_ = process->ExitCode();
     if (server_exit_code_ > kServerExitCodeOutOfDate &&
         server_exit_code_ <= kServerExitCodeMax) {
+      return GetServerExitStatus(server_exit_code_, server_error_);
+    }
+
+    // Don't re-deploy if we're not copying to a remote device. We can start
+    // cdc_rsync_server from the original location directly.
+    if (!remote_util_) {
       return GetServerExitStatus(server_exit_code_, server_error_);
     }
 
@@ -394,6 +426,7 @@ absl::Status CdcRsyncClient::Sync() {
 
 absl::Status CdcRsyncClient::DeployServer(const ServerArch& arch) {
   assert(!server_process_);
+  assert(remote_util_);
 
   std::string exe_dir;
   absl::Status status = path::GetExeDir(&exe_dir);
@@ -415,7 +448,7 @@ absl::Status CdcRsyncClient::DeployServer(const ServerArch& arch) {
 
   // sftp cdc_rsync_server to the target.
   std::string commands = arch.GetDeploySftpCommands();
-  RETURN_IF_ERROR(remote_util_.Sftp(commands, exe_dir, /*compress=*/false),
+  RETURN_IF_ERROR(remote_util_->Sftp(commands, exe_dir, /*compress=*/false),
                   "Failed to deploy cdc_rsync_server");
 
   return absl::OkStatus();

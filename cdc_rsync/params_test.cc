@@ -228,18 +228,15 @@ TEST_F(ParamsTest, ParseSucceedsWithNoSftpCommand) {
   ExpectError(NeedsValueError("sftp-command"));
 }
 
-TEST_F(ParamsTest, ParseFailsOnNoUserHost) {
+TEST_F(ParamsTest, ParseSucceedsOnNoUserHost) {
   const char* argv[] = {"cdc_rsync.exe", kSrc, kDst, NULL};
-  EXPECT_FALSE(
-      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError("No remote host specified");
+  EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 }
 
 TEST_F(ParamsTest, ParseDoesNotThinkCIsAHost) {
   const char* argv[] = {"cdc_rsync.exe", kSrc, "C:\\foo", NULL};
-  EXPECT_FALSE(
-      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError("No remote host specified");
+  EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  EXPECT_TRUE(parameters_.user_host.empty());
 }
 
 TEST_F(ParamsTest, ParseWithoutParametersFailsOnMissingSourceAndDestination) {

@@ -38,22 +38,23 @@ void PrintError(const absl::FormatSpec<Args...>& format, Args... args) {
 enum class OptionResult { kConsumedKey, kConsumedKeyValue, kError };
 
 const char kHelpText[] =
-    R"(Copy local files to a gamelet
+    R"(Synchronize files and directories
 
-Synchronizes local files and files on a gamelet. Matching files are skipped.
-For partially matching files only the deltas are transferred.
+Matching files are skipped based on file size and modified time. For partially
+matching files only the differences are transferred. The destination directory
+can be the same Windows machine or a remote Windows or Linux device.
 
 Usage:
-  cdc_rsync [options] source [source]... [user@]host:destination
+  cdc_rsync [options] source [source]... [[user@]host:]destination
 
 Parameters:
-  source                    Local file or directory to be copied
+  source                    Local file or directory to be copied or synced
   user                      Remote SSH user name
   host                      Remote host or IP address
-  destination               Remote destination directory
+  destination               Local or remote destination directory
 
 Options:
-    --contimeout sec        Gamelet connection timeout in seconds (default: 10)
+    --contimeout sec        Remote connection timeout in seconds (default: 10)
 -q, --quiet                 Quiet mode, only print errors
 -v, --verbose               Increase output verbosity
     --json                  Print JSON progress
@@ -81,7 +82,7 @@ Options:
                             Can also be specified by the CDC_SFTP_COMMAND environment variable.
     --forward-port <port>   TCP port or range used for SSH port forwarding (default: 44450-44459).
                             If a range is specified, searches for available ports (slower).
--h  --help                  Help for cdc_rsync
+-h, --help                  Help for cdc_rsync
 )";
 
 constexpr char kSshCommandEnvVar[] = "CDC_SSH_COMMAND";
@@ -375,14 +376,6 @@ bool ValidateParameters(const Parameters& params, bool help) {
     return false;
   }
 
-  if (params.user_host.empty()) {
-    PrintError(
-        "No remote host specified in destination '%s'. "
-        "Expected [user@]host:destination.",
-        params.destination);
-    return false;
-  }
-
   return true;
 }
 
@@ -408,6 +401,7 @@ bool CheckOptionResult(OptionResult result, const std::string& name,
 // afterward and |user_host| is |user@foo.com|. Does not touch Windows drives,
 // e.g. C:\foo.
 void PopUserHost(std::string* destination, std::string* user_host) {
+  user_host->clear();
   std::vector<std::string> parts =
       absl::StrSplit(*destination, absl::MaxSplits(':', 1));
   if (parts.size() < 2) return;
