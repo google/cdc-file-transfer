@@ -29,6 +29,8 @@ class ServerArch {
     kWindows = 1,
   };
 
+  enum class UseCase { kSsh = 0, kScp = 1 };
+
   // Detects the architecture type based on the destination path, e.g. path
   // starting with C: indicate Windows.
   static Type Detect(const std::string& destination);
@@ -40,7 +42,11 @@ class ServerArch {
   std::string CdcServerFilename() const;
 
   // Returns the arch-specific directory where cdc_rsync_server is deployed.
-  std::string RemoteToolsBinDir() const;
+  // On Windows, |use_case| determines what type of env variables to use:
+  // - kSsh uses $env:appdata and works for ssh commands.
+  // - kScp uses AppData\\Roaming and works for scp commands.
+  // On Linux, this flag is ignored.
+  std::string RemoteToolsBinDir(UseCase use_case) const;
 
   // Returns an arch-specific SSH shell command that gets invoked in order to
   // start cdc_rsync_server. The command
@@ -63,7 +69,6 @@ class ServerArch {
 
  private:
   Type type_;
-  std::string appdata_path_;
 };
 
 }  // namespace cdc_ft

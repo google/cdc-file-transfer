@@ -60,9 +60,23 @@ TEST(ServerArchTest, CdcServerFilename) {
 }
 
 TEST(ServerArchTest, RemoteToolsBinDir) {
-  EXPECT_TRUE(absl::StrContains(ServerArch(kLinux).RemoteToolsBinDir(), "/"));
-  EXPECT_TRUE(
-      absl::StrContains(ServerArch(kWindows).RemoteToolsBinDir(), "\\"));
+  const std::string linux_ssh_dir =
+      ServerArch(kLinux).RemoteToolsBinDir(ServerArch::UseCase::kSsh);
+  EXPECT_TRUE(absl::StrContains(linux_ssh_dir, "/"));
+
+  const std::string linux_scp_dir =
+      ServerArch(kLinux).RemoteToolsBinDir(ServerArch::UseCase::kScp);
+  EXPECT_EQ(linux_ssh_dir, linux_scp_dir);
+
+  const std::string win_ssh_dir =
+      ServerArch(kWindows).RemoteToolsBinDir(ServerArch::UseCase::kSsh);
+  EXPECT_TRUE(absl::StrContains(win_ssh_dir, "\\"));
+  EXPECT_TRUE(absl::StrContains(win_ssh_dir, "$env:appdata"));
+
+  std::string win_scp_dir =
+      ServerArch(kWindows).RemoteToolsBinDir(ServerArch::UseCase::kScp);
+  EXPECT_TRUE(absl::StrContains(win_scp_dir, "\\"));
+  EXPECT_TRUE(absl::StrContains(win_scp_dir, "AppData\\Roaming"));
 }
 
 TEST(ServerArchTest, GetStartServerCommand) {

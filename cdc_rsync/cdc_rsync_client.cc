@@ -237,7 +237,7 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
   if (!status.ok()) {
     // Some internal process error. Note that this does NOT mean that
     // cdc_rsync_server does not exist. In that case, the ssh process exits with
-    // code 127.
+    // code kExitCodeNotFound.
     return status;
   }
   if (is_timeout) {
@@ -414,9 +414,10 @@ absl::Status CdcRsyncClient::DeployServer(const ServerArch& arch) {
   printer_.Print(deploy_msg, true, Util::GetConsoleWidth());
 
   // scp cdc_rsync_server to a temp location on the gamelet.
-  std::string remoteServerTmpPath =
-      absl::StrFormat("%s%s.%s", arch.RemoteToolsBinDir(),
-                      arch.CdcServerFilename(), Util::GenerateUniqueId());
+  std::string remoteServerPath =
+      arch.RemoteToolsBinDir(ServerArch::UseCase::kScp) +
+      arch.CdcServerFilename();
+  std::string remoteServerTmpPath = remoteServerPath + Util::GenerateUniqueId();
   std::string localServerPath = path::Join(exe_dir, arch.CdcServerFilename());
   status = remote_util_.Scp({localServerPath}, remoteServerTmpPath,
                             /*compress=*/true);
@@ -425,9 +426,8 @@ absl::Status CdcRsyncClient::DeployServer(const ServerArch& arch) {
   }
 
   // Replace cdc_rsync_server file by the temp file.
-  std::string old_path = arch.RemoteToolsBinDir() + arch.CdcServerFilename();
-  std::string new_path = remoteServerTmpPath;
-  std::string replace_cmd = arch.GetDeployReplaceCommand(old_path, new_path);
+  std::string replace_cmd =
+      arch.GetDeployReplaceCommand(remoteServerPath, remoteServerTmpPath);
   status = remote_util_.Run(replace_cmd, "replace");
   if (!status.ok()) {
     return WrapStatus(status,

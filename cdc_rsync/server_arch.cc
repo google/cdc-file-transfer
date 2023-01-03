@@ -18,7 +18,6 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
-#include "common/log.h"
 #include "common/path.h"
 #include "common/remote_util.h"
 
@@ -41,13 +40,13 @@ ServerArch::Type ServerArch::Detect(const std::string& destination) {
     return Type::kWindows;
   }
 
-  // Path with only forward slashes -> Linux.
+  // Path with only / -> Linux.
   if (absl::StrContains(destination, "/") &&
       !absl::StrContains(destination, "\\")) {
     return Type::kLinux;
   }
 
-  // Path with only forward backslashes -> Windows.
+  // Path with only \\ -> Windows.
   if (absl::StrContains(destination, "\\") &&
       !absl::StrContains(destination, "/")) {
     return Type::kWindows;
@@ -57,16 +56,7 @@ ServerArch::Type ServerArch::Detect(const std::string& destination) {
   return Type::kLinux;
 }
 
-ServerArch::ServerArch(Type type) : type_(type) {
-  absl::Status status =
-      path::GetKnownFolderPath(path::FolderId::kRoamingAppData, &appdata_path_);
-  if (!status.ok()) {
-    // Should be extremely rare.
-    LOG_ERROR("Failed to get roaming appdata path: %s", status.ToString());
-    appdata_path_ = kErrorFailedToGetKnownFolderPath;
-  }
-  path::EnsureEndsWithPathSeparator(&appdata_path_);
-}
+ServerArch::ServerArch(Type type) : type_(type) {}
 
 ServerArch::~ServerArch() {}
 
@@ -82,10 +72,17 @@ std::string ServerArch::CdcServerFilename() const {
   }
 }
 
-std::string ServerArch::RemoteToolsBinDir() const {
+std::string ServerArch::RemoteToolsBinDir(UseCase use_case) const {
   switch (type_) {
-    case Type::kWindows:
-      return appdata_path_ + "cdc-file-transfer\\bin\\";
+    case Type::kWindows: {
+      // TODO(ljusten): Unfortunately, scp doesn't seem to support shell var
+      // expansion, so %AppData% can't be used. This relies on scp copying
+      // files relative to %UserProfile% and %AppData% mapping to
+      // "AppData\\Roaming" relative to that.
+      std::string app_data =
+          use_case == UseCase::kScp ? "AppData\\Roaming" : "$env:appdata";
+      return app_data + "\\cdc-file-transfer\\bin\\";
+    }
     case Type::kLinux:
       return "~/.cache/cdc-file-transfer/bin/";
     default:
@@ -96,14 +93,18 @@ std::string ServerArch::RemoteToolsBinDir() const {
 
 std::string ServerArch::GetStartServerCommand(int exit_code_not_found,
                                               const std::string& args) const {
-  std::string server_dir = RemoteToolsBinDir();
+  std::string server_dir = RemoteToolsBinDir(UseCase::kSsh);
+  std::string server_path =
+      RemoteUtil::QuoteForSsh(server_dir + CdcServerFilename());
   path::EnsureDoesNotEndWithPathSeparator(&server_dir);
   server_dir = RemoteUtil::QuoteForSsh(server_dir);
-  std::string server_path =
-      RemoteUtil::QuoteForSsh(RemoteToolsBinDir() + CdcServerFilename());
 
   switch (type_) {
     case Type::kWindows:
+      // TODO(ljusten): On Windows, ssh does not seem to forward the Powershell
+      // exit code (exit_code_not_found) to the process. However, that's really
+      // a minor issue and means we display "Deploying server..." instead of
+      // "Server not deployed. Deploying...";
       return RemoteUtil::QuoteForWindows(
           absl::StrFormat("Set-StrictMode -Version 2; "
                           "$ErrorActionPreference = 'Stop'; "
