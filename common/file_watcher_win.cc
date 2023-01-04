@@ -164,6 +164,11 @@ class AsyncFileWatcher {
            state_ != FileWatcherState::kShuttingDown;
   }
 
+  bool IsRunning() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
+    absl::MutexLock mutex(&state_mutex_);
+    return state_ == FileWatcherState::kRunning;
+  }
+
   bool IsShuttingDown() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
     absl::MutexLock mutex(&state_mutex_);
     return state_ == FileWatcherState::kShuttingDown;
@@ -612,6 +617,10 @@ absl::Status FileWatcherWin::StopWatching() {
 
 bool FileWatcherWin::IsWatching() const {
   return async_watcher_ ? async_watcher_->IsWatching() : false;
+}
+
+bool FileWatcherWin::IsRunning() const {
+  return async_watcher_ ? async_watcher_->IsRunning() : false;
 }
 
 absl::Status FileWatcherWin::GetStatus() const {
