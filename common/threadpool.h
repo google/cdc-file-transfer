@@ -18,7 +18,6 @@
 #define COMMON_THREADPOOL_H_
 
 #include <atomic>
-#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <queue>
@@ -57,7 +56,8 @@ class Threadpool {
   void QueueTask(std::unique_ptr<Task> task)
       ABSL_LOCKS_EXCLUDED(task_queue_mutex_);
 
-  // If available, returns the next completed task.
+  // Returns the next completed task if available or nullptr all are either
+  // queued or in progress.
   // For a single worker thread (|num_threads| == 1), tasks are completed in
   // FIFO order. This is no longer the case for multiple threads
   // (|num_threads| > 1). Tasks that got queued later might complete first.
@@ -71,6 +71,14 @@ class Threadpool {
   std::unique_ptr<Task> GetCompletedTask()
       ABSL_LOCKS_EXCLUDED(completed_tasks_mutex_);
 
+  using TaskCompletedCallback = std::function<void(std::unique_ptr<Task>)>;
+
+  // Set a callback that is called immediately in a background thread when a
+  // task is completed. The task will not be put onto the completed queue, so
+  // if this callback is set, do not call (Try)GetCompletedTask.
+  void SetTaskCompletedCallback(TaskCompletedCallback cb)
+      ABSL_LOCKS_EXCLUDED(completed_tasks_mutex_);
+
   // Returns the total number of worker threads in the pool.
   size_t NumThreads() const { return workers_.size(); }
 
@@ -79,6 +87,9 @@ class Threadpool {
     absl::ReaderMutexLock lock(&task_queue_mutex_);
     return outstanding_task_count_;
   }
+
+  // Block until the number of queued tasks drops below |count|.
+  void WaitForQueuedTasksAtMost(size_t count) const ABSL_LOCKS_EXCLUDED(mutex_);
 
  private:
   // Background thread worker method. Picks tasks and runs them.
@@ -93,6 +104,8 @@ class Threadpool {
 
   absl::Mutex completed_tasks_mutex_;
   std::queue<std::unique_ptr<Task>> completed_tasks_
+      ABSL_GUARDED_BY(completed_tasks_mutex_);
+  TaskCompletedCallback on_task_completed_
       ABSL_GUARDED_BY(completed_tasks_mutex_);
 
   std::vector<std::thread> workers_;

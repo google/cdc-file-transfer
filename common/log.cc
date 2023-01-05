@@ -126,21 +126,22 @@ void ConsoleLog::WriteLogMessage(LogLevel level, const char* file, int line,
   absl::MutexLock lock(&mutex_);
 
   // Show leaner log messages in non-verbose mode.
-  bool show_file_func = GetLogLevel() <= LogLevel::kDebug;
+  bool show_time_file_func = GetLogLevel() <= LogLevel::kDebug;
   FILE* stdfile = level >= LogLevel::kError ? stderr : stdout;
 #if PLATFORM_WINDOWS
   HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
   SetConsoleTextAttribute(hConsole, GetConsoleColor(level));
-  if (show_file_func) {
-    fprintf(stdfile, "%s(%i): %s(): %s\n", file, line, func, message);
+  if (show_time_file_func) {
+    fprintf(stdfile, "%0.3f %s(%i): %s(): %s\n", stopwatch_.ElapsedSeconds(),
+            file, line, func, message);
   } else {
     fprintf(stdfile, "%s\n", message);
   }
   SetConsoleTextAttribute(hConsole, kLightGray);
 #else
-  if (show_file_func) {
-    fprintf(stdfile, "%-7s %s(%i): %s(): %s\n", GetLogLevelString(level), file,
-            line, func, message);
+  if (show_time_file_func) {
+    fprintf(stdfile, "%-7s %0.3f %s(%i): %s(): %s\n", GetLogLevelString(level),
+            stopwatch_.ElapsedSeconds(), file, line, func, message);
   } else {
     fprintf(stdfile, "%-7s %s\n", GetLogLevelString(level), message);
   }

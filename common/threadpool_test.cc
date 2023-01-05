@@ -151,5 +151,33 @@ TEST_F(ThreadpoolTest, GetCompletedTask) {
   EXPECT_EQ(completed_task.get(), task);
 }
 
+TEST_F(ThreadpoolTest, SetTaskCompletedCallback) {
+  auto task_func = [](Task::IsCancelledPredicate) { /* empty */ };
+
+  Semaphore task_finished(0);
+  Threadpool pool(1);
+  std::atomic_bool finished = false;
+  pool.SetTaskCompletedCallback(
+      [&task_finished, &finished](std::unique_ptr<Task> task) {
+        finished = true;
+        task_finished.Signal();
+      });
+  pool.QueueTask(std::make_unique<TestTask>(task_func));
+  task_finished.Wait();
+  EXPECT_TRUE(finished);
+  EXPECT_FALSE(pool.TryGetCompletedTask());
+}
+
+TEST_F(ThreadpoolTest, WaitForQueuedTasksAtMost) {
+  auto task_func = [](Task::IsCancelledPredicate) { Util::Sleep(10); };
+
+  Semaphore task_finished(0);
+  Threadpool pool(1);
+  pool.QueueTask(std::make_unique<TestTask>(task_func));
+  pool.QueueTask(std::make_unique<TestTask>(task_func));
+  pool.WaitForQueuedTasksAtMost(1);
+  EXPECT_EQ(pool.NumQueuedTasks(), 1);
+}
+
 }  // namespace
 }  // namespace cdc_ft

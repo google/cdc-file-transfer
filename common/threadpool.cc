@@ -45,6 +45,11 @@ void Threadpool::Shutdown() {
   for (auto& worker : workers_) {
     if (worker.joinable()) worker.join();
   }
+
+  // Discard all completed tasks.
+  absl::MutexLock lock(&completed_tasks_mutex_);
+  std::queue<std::unique_ptr<Task>> empty;
+  std::swap(completed_tasks_, empty);
 }
 
 void Threadpool::QueueTask(std::unique_ptr<Task> task) {
@@ -77,6 +82,19 @@ std::unique_ptr<Task> Threadpool::GetCompletedTask() {
   return task;
 }
 
+void Threadpool::SetTaskCompletedCallback(TaskCompletedCallback cb) {
+  absl::MutexLock lock(&completed_tasks_mutex_);
+  on_task_completed_ = std::move(cb);
+}
+
+void Threadpool::WaitForQueuedTasksAtMost(size_t count) const {
+  absl::MutexLock lock(&task_queue_mutex_);
+  auto cond = [this, count]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(task_queue_mutex_) {
+    return shutdown_ || outstanding_task_count_ <= count;
+  };
+  task_queue_mutex_.Await(absl::Condition(&cond));
+}
+
 void Threadpool::ThreadWorkerMain() {
   bool task_finished = false;
   for (;;) {
@@ -85,7 +103,8 @@ void Threadpool::ThreadWorkerMain() {
       absl::MutexLock lock(&task_queue_mutex_);
 
       // Decrease task count here, so we don't have to lock again at the end of
-      // the loop.
+      // the loop. It is important to first push the task, then decrease this
+      // count. Otherwise, there's a race between Wait() and GetCompletedTask().
       if (task_finished) {
         assert(outstanding_task_count_ > 0);
         --outstanding_task_count_;
@@ -104,17 +123,18 @@ void Threadpool::ThreadWorkerMain() {
     }
 
     // Run task, but make it cancellable.
-    task->ThreadRun([this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(
-                        task_queue_mutex_) -> bool { return shutdown_; });
-
-    {
+    task->ThreadRun([this]() ABSL_LOCKS_EXCLUDED(task_queue_mutex_) -> bool {
       absl::MutexLock lock(&task_queue_mutex_);
-      if (shutdown_) break;
-    }
+      return shutdown_;
+    });
 
     // Push task to completed queue.
     absl::MutexLock lock(&completed_tasks_mutex_);
-    completed_tasks_.push(std::move(task));
+    if (on_task_completed_) {
+      on_task_completed_(std::move(task));
+    } else {
+      completed_tasks_.push(std::move(task));
+    }
     task_finished = true;
   }
 }

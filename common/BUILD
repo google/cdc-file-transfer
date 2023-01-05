@@ -142,6 +142,7 @@ cc_library(
     deps = [
         ":clock",
         ":platform",
+        ":stopwatch",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/synchronization",
     ],

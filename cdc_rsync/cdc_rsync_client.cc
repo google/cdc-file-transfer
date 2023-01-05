@@ -623,7 +623,7 @@ absl::Status CdcRsyncClient::SendMissingFiles() {
 
   ParallelFileOpener file_opener(&files_, missing_file_indices_);
 
-  constexpr size_t kBufferSize = 16000;
+  constexpr size_t kBufferSize = 128 * 1024;
   for (uint32_t server_index = 0; server_index < missing_file_indices_.size();
        ++server_index) {
     uint32_t client_index = missing_file_indices_[server_index];
