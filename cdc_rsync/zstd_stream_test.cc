@@ -43,6 +43,52 @@ TEST_F(ZstdStreamTest, Small) {
   EXPECT_EQ(got, want);
 }
 
+TEST_F(ZstdStreamTest, AutoFlushesAfterTimeout) {
+  const std::string want = "Lorem ipsum gibberisulum foobarberis";
+  cstream_.SetMinCompressPeriod(absl::Milliseconds(10));
+  EXPECT_OK(cstream_.Write(want.data(), want.size()));
+  // Note: No flush! cstream_ will compress and send the data after 10 ms.
+
+  // Only read as much data as we have written, or else dstream_.Read() will
+  // expect more data.
+  Buffer buff(want.size());
+  size_t bytes_read;
+  bool eof = false;
+  EXPECT_OK(dstream_.Read(buff.data(), buff.size(), &bytes_read, &eof));
+  EXPECT_FALSE(eof);
+  std::string got(buff.data(), bytes_read);
+  EXPECT_EQ(got, want);
+}
+
+// Regression test for an issue in UnzstdStream, where the reader tried to read
+// from the socket even though the output data was still available in internal
+// buffers.
+TEST_F(ZstdStreamTest, DeliversOutputBeforeReadingNewData) {
+  const std::string want1 = "I want";
+  const std::string want2 = "to eat cookies";
+  cstream_.SetMinCompressPeriod(absl::Milliseconds(10));
+  EXPECT_OK(cstream_.Write(want1.data(), want1.size()));
+  EXPECT_OK(cstream_.Write(want2.data(), want2.size()));
+  // Note: No flush! cstream_ will compress and send the data after 10 ms.
+
+  Buffer buff1(want1.size());
+  Buffer buff2(want2.size());
+  size_t bytes_read1, bytes_read2;
+  bool eof1 = false, eof2 = false;
+  ;
+  EXPECT_OK(dstream_.Read(buff1.data(), buff1.size(), &bytes_read1, &eof1));
+  // There was a bug in dstream_.Read(), where the method would first try to
+  // read new input before uncompressing data, even though the data was already
+  // present in internal buffers.
+  EXPECT_OK(dstream_.Read(buff2.data(), buff2.size(), &bytes_read2, &eof2));
+  EXPECT_FALSE(eof1);
+  EXPECT_FALSE(eof2);
+  std::string got1(buff1.data(), bytes_read1);
+  std::string got2(buff2.data(), bytes_read2);
+  EXPECT_EQ(got1, want1);
+  EXPECT_EQ(got2, want2);
+}
+
 TEST_F(ZstdStreamTest, Large) {
   Buffer want(1024 * 1024 * 10 + 12345);
   constexpr uint64_t prime = 919393;

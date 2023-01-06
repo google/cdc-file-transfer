@@ -39,6 +39,11 @@ class ZstdStream {
   // Flushes all remaining data and sends the compressed data to the socket.
   absl::Status Flush() ABSL_LOCKS_EXCLUDED(mutex_);
 
+  // Flush internal buffers if no new data is written for longer than this time.
+  // This makes sure that no data is stuck in the pipeline if no new input is
+  // available. Default is 500 ms.
+  void SetMinCompressPeriod(absl::Duration dur) { min_compress_period_ = dur; }
+
  private:
   // Initializes the compressor and related data.
   absl::Status Initialize(int level, uint32_t num_threads)
@@ -58,6 +63,8 @@ class ZstdStream {
   bool last_chunk_sent_ ABSL_GUARDED_BY(mutex_) = false;
   absl::Status status_ ABSL_GUARDED_BY(mutex_);
   std::thread compressor_thread_;
+
+  absl::Duration min_compress_period_;
 };
 
 }  // namespace cdc_ft
