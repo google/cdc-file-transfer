@@ -57,7 +57,7 @@ another development branch, where the delta was much higher. Overall,
 We also ran the experiment with the native Linux `rsync`, i.e syncing Linux to
 Linux, to rule out issues with Cygwin. Linux `rsync` performed on average 35%
 worse than Cygwin `rsync`, which can be attributed to CPU differences. We did
-not include it in the figure because to this, but you can find it
+not include it in the figure because of this, but you can find it
 [here](docs/cdc_rsync_vs_cygwin_rsync_vs_linux_rsync.png).
 
 ### How does it work and why is it faster?
