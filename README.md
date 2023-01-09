@@ -1,6 +1,6 @@
 # CDC File Transfer
 
-Born from the ashes of Stadia, this repository contains tools for synching and
+Born from the ashes of Stadia, this repository contains tools for syncing and
 streaming files from Windows to Linux. They are based on Content Defined
 Chunking (CDC), in particular
 [FastCDC](https://www.usenix.org/conference/atc16/technical-sessions/presentation/xia),
