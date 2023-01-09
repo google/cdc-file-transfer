@@ -135,8 +135,8 @@ class FileWatcherParameterizedTest : public ::testing::TestWithParam<bool> {
     return changed;
   }
 
-  // Polls for a second until the watcher is watching again.
-  bool WaitForWatching() const {
+  // Polls for a second until the watcher is running again.
+  bool WaitForRunning() const {
     for (int n = 0; n < 1000; ++n) {
       if (watcher_.IsWatching()) return true;
       Util::Sleep(1);
@@ -210,7 +210,7 @@ TEST_P(FileWatcherParameterizedTest, DirDoesNotExist) {
   if (legacyReadDirectoryChanges_)
     watcher_.EnforceLegacyReadDirectoryChangesForTesting();
   EXPECT_NOT_OK(watcher.StartWatching([this]() { OnFilesChanged(); }));
-  EXPECT_FALSE(watcher.IsWatching());
+  EXPECT_FALSE(watcher.IsStarted());
   absl::Status status = watcher.GetStatus();
   EXPECT_NOT_OK(status);
   EXPECT_TRUE(absl::IsFailedPrecondition(status));
@@ -549,8 +549,8 @@ TEST_P(FileWatcherParameterizedTest, RecreateWatchedDir) {
   EXPECT_TRUE(watcher_.GetModifiedFiles().empty());
   EXPECT_OK(watcher_.GetStatus());
 
-  // Wait until the watcher is watching again, or else we might miss the file.
-  EXPECT_TRUE(WaitForWatching());
+  // Wait until the watcher is running again, or else we might miss the file.
+  EXPECT_TRUE(WaitForRunning());
 
   // Creation of a new file should be detected.
   EXPECT_OK(path::WriteFile(first_file_path_, kFirstData, kFirstDataSize));
@@ -584,8 +584,8 @@ TEST_P(FileWatcherParameterizedTest, RecreateUpperDir) {
   EXPECT_TRUE(watcher_.GetModifiedFiles().empty());
   EXPECT_OK(watcher_.GetStatus());
 
-  // Wait until the watcher is watching again, or else we might miss the file.
-  EXPECT_TRUE(WaitForWatching());
+  // Wait until the watcher is running again, or else we might miss the file.
+  EXPECT_TRUE(WaitForRunning());
 
   // Creation of a new file should be detected.
   EXPECT_OK(path::WriteFile(first_file_path_, kFirstData, kFirstDataSize));
