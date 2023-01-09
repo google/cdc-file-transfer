@@ -77,7 +77,12 @@ class FileWatcherWin {
   // Stops watching directory changes.
   absl::Status StopWatching() ABSL_LOCKS_EXCLUDED(modified_files_mutex_);
 
-  // Indicates whether a directory is currently watched.
+  // Indicates whether StartWatching() was called, but StopWatching() was not
+  // called yet.
+  bool IsStarted() const;
+
+  // Indicates whether a directory is actively watched for changes. In contrast
+  // to IsStarted(), returns false while the directory does not exist.
   bool IsWatching() const;
 
   // Returns the watching status.
