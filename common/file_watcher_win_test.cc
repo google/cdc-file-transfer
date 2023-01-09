@@ -138,7 +138,7 @@ class FileWatcherParameterizedTest : public ::testing::TestWithParam<bool> {
   // Polls for a second until the watcher is running again.
   bool WaitForRunning() const {
     for (int n = 0; n < 1000; ++n) {
-      if (watcher_.IsRunning()) return true;
+      if (watcher_.IsWatching()) return true;
       Util::Sleep(1);
     }
     return false;
@@ -210,7 +210,7 @@ TEST_P(FileWatcherParameterizedTest, DirDoesNotExist) {
   if (legacyReadDirectoryChanges_)
     watcher_.EnforceLegacyReadDirectoryChangesForTesting();
   EXPECT_NOT_OK(watcher.StartWatching([this]() { OnFilesChanged(); }));
-  EXPECT_FALSE(watcher.IsWatching());
+  EXPECT_FALSE(watcher.IsStarted());
   absl::Status status = watcher.GetStatus();
   EXPECT_NOT_OK(status);
   EXPECT_TRUE(absl::IsFailedPrecondition(status));

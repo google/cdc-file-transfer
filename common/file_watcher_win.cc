@@ -65,7 +65,13 @@ int64_t ToUnixTime(LARGE_INTEGER windows_time) {
 // Background thread to read directory changes.
 class AsyncFileWatcher {
  public:
-  enum class FileWatcherState { kDefault, kFailed, kRunning, kShuttingDown };
+  enum class FileWatcherState {
+    kDefault,      // Not started.
+    kFailed,       // Some error during watching, e.g. directory got deleted.
+                   // Will attempt to recover automatically.
+    kWatching,     // Actively watching directory.
+    kShuttingDown  // Shutdown() was called, winding watcher down.
+  };
 
   using FileAction = FileWatcherWin::FileAction;
   using FileInfo = FileWatcherWin::FileInfo;
@@ -158,15 +164,15 @@ class AsyncFileWatcher {
     return dir_recreate_count_;
   }
 
-  bool IsWatching() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
+  bool IsStarted() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
     absl::MutexLock mutex(&state_mutex_);
     return state_ != FileWatcherState::kDefault &&
            state_ != FileWatcherState::kShuttingDown;
   }
 
-  bool IsRunning() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
+  bool IsWatching() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
     absl::MutexLock mutex(&state_mutex_);
-    return state_ == FileWatcherState::kRunning;
+    return state_ == FileWatcherState::kWatching;
   }
 
   bool IsShuttingDown() const ABSL_LOCKS_EXCLUDED(state_mutex_) {
@@ -327,7 +333,7 @@ class AsyncFileWatcher {
       return;
     }
 
-    MaybeSetState(FileWatcherState::kRunning);
+    MaybeSetState(FileWatcherState::kWatching);
     // Initialize handles to watch: changes in |dir_path_| and shutdown
     // events.
     HANDLE watch_handles[] = {overlapped.hEvent, shutdown_event_.Get()};
@@ -590,7 +596,7 @@ absl::Status FileWatcherWin::StartWatching(FilesChangedCb files_changed_cb,
   async_watcher_ = std::make_unique<AsyncFileWatcher>(
       dir_path_, std::move(files_changed_cb), std::move(dir_recreated_cb),
       timeout_ms, enforceLegacyReadDirectoryChangesForTesting_);
-  while (GetStatus().ok() && !IsWatching()) {
+  while (GetStatus().ok() && !IsStarted()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   return GetStatus();
@@ -615,12 +621,12 @@ absl::Status FileWatcherWin::StopWatching() {
   return async_status;
 }
 
-bool FileWatcherWin::IsWatching() const {
-  return async_watcher_ ? async_watcher_->IsWatching() : false;
+bool FileWatcherWin::IsStarted() const {
+  return async_watcher_ ? async_watcher_->IsStarted() : false;
 }
 
-bool FileWatcherWin::IsRunning() const {
-  return async_watcher_ ? async_watcher_->IsRunning() : false;
+bool FileWatcherWin::IsWatching() const {
+  return async_watcher_ ? async_watcher_->IsWatching() : false;
 }
 
 absl::Status FileWatcherWin::GetStatus() const {
@@ -636,7 +642,7 @@ uint32_t FileWatcherWin::GetDirRecreateEventCountForTesting() const {
 }
 
 void FileWatcherWin::EnforceLegacyReadDirectoryChangesForTesting() {
-  assert(!IsWatching());
+  assert(!IsStarted());
   enforceLegacyReadDirectoryChangesForTesting_ = true;
 }
 

@@ -79,11 +79,11 @@ class FileWatcherWin {
 
   // Indicates whether StartWatching() was called, but StopWatching() was not
   // called yet.
-  bool IsWatching() const;
+  bool IsStarted() const;
 
   // Indicates whether a directory is actively watched for changes. In contrast
-  // to Iswatching(), returns false while the directory does not exist.
-  bool IsRunning() const;
+  // to IsStarted(), returns false while the directory does not exist.
+  bool IsWatching() const;
 
   // Returns the watching status.
   absl::Status GetStatus() const;
