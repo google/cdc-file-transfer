@@ -779,9 +779,9 @@ absl::Status CdcRsyncClient::StopCompressionStream() {
   message_pump_.FlushOutgoingQueue();
   message_pump_.RedirectOutput(nullptr);
 
-  // Flush compression stream and reset.
-  RETURN_IF_ERROR(compression_stream_->Flush(),
-                  "Failed to flush compression stream");
+  // Finish compression stream and reset.
+  RETURN_IF_ERROR(compression_stream_->Finish(),
+                  "Failed to finish compression stream");
   compression_stream_.reset();
 
   // Wait for the server ack. This must be done before sending more data.

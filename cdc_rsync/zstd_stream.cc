@@ -27,14 +27,14 @@ namespace {
 // trigger a flush. This happens when files with no changes are diff'ed (this
 // produces very low volume data). Flushing prevents that the server gets stale
 // and becomes overwhelmed later.
-constexpr absl::Duration kDefaultMinCompressPeriod = absl::Milliseconds(500);
+constexpr absl::Duration kDefaultAutoFlushPeriod = absl::Milliseconds(500);
 
 }  // namespace
 
 ZstdStream::ZstdStream(Socket* socket, int level, uint32_t num_threads)
     : socket_(socket),
       cctx_(nullptr),
-      min_compress_period_(kDefaultMinCompressPeriod) {
+      auto_flush_period_(kDefaultAutoFlushPeriod) {
   status_ = WrapStatus(Initialize(level, num_threads),
                        "Failed to initialize stream compressor");
 }
@@ -81,7 +81,7 @@ absl::Status ZstdStream::Write(const void* data, size_t size) {
   return absl::OkStatus();
 }
 
-absl::Status ZstdStream::Flush() {
+absl::Status ZstdStream::Finish() {
   absl::MutexLock lock(&mutex_);
   if (!status_.ok()) return status_;
 
@@ -136,7 +136,7 @@ void ZstdStream::ThreadCompressorMain() {
              in_buffer_.size() == in_buffer_.capacity();
     };
     bool flush =
-        !mutex_.AwaitWithTimeout(absl::Condition(&cond), min_compress_period_);
+        !mutex_.AwaitWithTimeout(absl::Condition(&cond), auto_flush_period_);
     if (shutdown_) {
       return;
     }
