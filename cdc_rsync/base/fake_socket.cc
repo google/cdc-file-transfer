@@ -39,7 +39,8 @@ absl::Status FakeSocket::Receive(void* buffer, size_t size,
   *bytes_received = 0;
   std::unique_lock<std::mutex> lock(data_mutex_);
   data_cv_.wait(lock, [this, size, allow_partial_read]() {
-    return allow_partial_read || data_.size() >= size || shutdown_;
+    size_t min_size = allow_partial_read ? 1 : size;
+    return data_.size() >= min_size || shutdown_;
   });
   if (shutdown_) {
     return absl::UnavailableError("Pipe is shut down");

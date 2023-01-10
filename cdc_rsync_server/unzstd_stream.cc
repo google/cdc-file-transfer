@@ -41,20 +41,6 @@ absl::Status UnzstdStream::Read(void* out_buffer, size_t out_size,
 
   ZSTD_outBuffer output = {out_buffer, out_size, 0};
   while (output.pos < output.size && !*eof) {
-    if (input_.pos == input_.size) {
-      // Read more compressed input data.
-      // Allow partial reads since the stream could end any time.
-      size_t in_size;
-      absl::Status status =
-          socket_->Receive(in_buffer_.data(), in_buffer_.size(),
-                           /*allow_partial_read=*/true, &in_size);
-      if (!status.ok()) {
-        return WrapStatus(status, "socket_->ReceiveEx() failed");
-      }
-      input_.pos = 0;
-      input_.size = in_size;
-    }
-
     // Decompress.
     size_t ret = ZSTD_decompressStream(dctx_, &output, &input_);
     if (ZSTD_isError(ret)) {
@@ -66,6 +52,20 @@ absl::Status UnzstdStream::Read(void* out_buffer, size_t out_size,
     if (*eof && input_.pos < input_.size) {
       return MakeStatus("EOF with %u bytes input data available",
                         input_.size - input_.pos);
+    }
+
+    if (input_.pos == input_.size && output.pos < output.size && !*eof) {
+      // Read more compressed input data.
+      // Allow partial reads since the stream could end any time.
+      size_t in_size;
+      absl::Status status =
+          socket_->Receive(in_buffer_.data(), in_buffer_.size(),
+                           /*allow_partial_read=*/true, &in_size);
+      if (!status.ok()) {
+        return WrapStatus(status, "socket_->ReceiveEx() failed");
+      }
+      input_.pos = 0;
+      input_.size = in_size;
     }
   }
 
