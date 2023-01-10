@@ -66,20 +66,21 @@
   </ItemDefinitionGroup>
   <!-- Bazel setup -->
   <PropertyGroup>
-    <BazelTargets>//cdc_rsync</BazelTargets>
+    <BazelTargets>//cdc_rsync //cdc_rsync_server</BazelTargets>
     <BazelOutputFile>cdc_rsync.exe</BazelOutputFile>
     <BazelIncludePaths>..\;..\third_party\absl;..\bazel-cdc-file-transfer\external\com_github_blake3\c;..\bazel-stadia-file-transfer\external\com_github_zstd\lib;..\third_party\googletest\googletest\include;..\bazel-cdc-file-transfer\external\com_google_protobuf\src;$(VC_IncludePath);$(WindowsSDK_IncludePath)</BazelIncludePaths>
   </PropertyGroup>
   <Import Project="..\NMakeBazelProject.targets" />
   <!-- For some reason, msbuild doesn't include this file, so copy it explicitly. -->
-  <!-- TODO: Reenable once we can cross-compile these.
+  <!-- TODO: Reenable copying the Linux file once we can cross-compile these. -->
   <PropertyGroup>
-    <CdcRsyncServerFile>$(SolutionDir)bazel-out\k8-$(BazelCompilationMode)\bin\cdc_rsync_server\cdc_rsync_server</CdcRsyncServerFile>
+    <!-- <CdcRsyncLinuxServerFile>$(SolutionDir)bazel-out\k8-$(BazelCompilationMode)\bin\cdc_rsync_server\cdc_rsync_server</CdcRsyncLinuxServerFile> -->
+    <CdcRsyncWindowsServerFile>$(SolutionDir)bazel-out\x64_windows-$(BazelCompilationMode)\bin\cdc_rsync_server\cdc_rsync_server.exe</CdcRsyncWindowsServerFile>
   </PropertyGroup>
-  <Target Name="CopyServer" Inputs="$(CdcRsyncServerFile)" Outputs="$(OutDir)cdc_rsync_server" AfterTargets="Build">
-    <Copy SourceFiles="$(CdcRsyncServerFile)" DestinationFiles="$(OutDir)cdc_rsync_server" />
+  <Target Name="CopyServer" Inputs="$(CdcRsyncLinuxServerFile);$(CdcRsyncWindowsServerFile)" Outputs="$(OutDir)cdc_rsync_server;$(OutDir)cdc_rsync_server.exe" AfterTargets="Build">
+    <!-- <Copy SourceFiles="$(CdcRsyncLinuxServerFile)" DestinationFiles="$(OutDir)cdc_rsync_server" SkipUnchangedFiles="true" /> -->
+    <Copy SourceFiles="$(CdcRsyncWindowsServerFile)" DestinationFiles="$(OutDir)cdc_rsync_server.exe" SkipUnchangedFiles="true" />
   </Target>
-  -->
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

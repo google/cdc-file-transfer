@@ -227,7 +227,7 @@ class CdcStreamTest(unittest.TestCase):
     return False
 
   def _test_dir_content(self, files, dirs, is_exe=False):
-    """Check the streamed directory's content on gamelet.
+    """Check the streamed directory's content on remote instance.
 
     Args:
         files (list of strings): List of relative file paths to check.

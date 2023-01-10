@@ -216,7 +216,7 @@ class ConsistencyTest(test_base.CdcStreamTest):
     return files, dirs
 
   def _recreate_data(self, files, dirs):
-    """Recreate test data and check that it can be read on a gamelet.
+    """Recreate test data and check that it can be read on the remote instance.
 
     Args:
         files (list of strings): List of relative file paths.
@@ -396,7 +396,7 @@ class ConsistencyTest(test_base.CdcStreamTest):
     return sha1sum_local
 
   def sha1sum_remote_batch(self):
-    """Calculate sha1sum of files in the streamed directory on the gamelet.
+    """Calculate sha1sum of files in the remote streamed directory.
 
     Returns:
         string: Concatenated sha1 hashes with relative posix file names.
@@ -413,7 +413,7 @@ class ConsistencyTest(test_base.CdcStreamTest):
     return sha1sum_remote
 
   def _test_random_dir_content(self, files, dirs):
-    """Check the streamed randomly generated directory's content on gamelet.
+    """Check the streamed randomly generated remote directory's content.
 
     Args:
         files (list of strings): List of relative file paths to check.
@@ -460,7 +460,7 @@ class ConsistencyTest(test_base.CdcStreamTest):
     """
     self._mount_with_data(files, dirs)
 
-    # Remove directory on workstation => empty directory on gamelet.
+    # Remove directory on workstation => empty remote directory.
     utils.get_ssh_command_output(self.ls_cmd)
     utils.remove_test_directory(self.local_base_dir)
 

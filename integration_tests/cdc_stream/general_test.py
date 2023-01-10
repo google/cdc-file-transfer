@@ -40,7 +40,7 @@ class GeneralTest(test_base.CdcStreamTest):
     self._assert_cdc_fuse_mounted()
 
   def test_update_file(self):
-    """File updates are visible on gamelet."""
+    """File updates are visible on remote instance."""
     filename = 'file1.txt'
     utils.create_test_file(os.path.join(self.local_base_dir, filename), 1024)
     self._start()
@@ -56,7 +56,7 @@ class GeneralTest(test_base.CdcStreamTest):
     self.assertGreater(self._get_cache_size_in_bytes(), cache_size)
 
   def test_add_file(self):
-    """New file is visible on gamelet."""
+    """New file is visible on remote instance."""
     self._start()
     self._test_dir_content(files=[], dirs=[])
     cache_size = self._get_cache_size_in_bytes()
@@ -71,7 +71,7 @@ class GeneralTest(test_base.CdcStreamTest):
     self.assertGreater(self._get_cache_size_in_bytes(), cache_size)
 
   def test_change_mtime(self):
-    """Change of mtime is visible on gamelet."""
+    """Change of mtime is visible on remote instance."""
     filename = 'file1.txt'
     file_local_path = os.path.join(self.local_base_dir, filename)
     utils.create_test_file(file_local_path, 1024)
@@ -92,7 +92,7 @@ class GeneralTest(test_base.CdcStreamTest):
     self.assertGreater(self._get_cache_size_in_bytes(), cache_size)
 
   def test_remove_file(self):
-    """File removal is visible on gamelet."""
+    """File removal is visible on remote instance."""
     filename = 'file1.txt'
     file_local_path = os.path.join(self.local_base_dir, filename)
     utils.create_test_file(file_local_path, 1024)
@@ -127,7 +127,7 @@ class GeneralTest(test_base.CdcStreamTest):
     self.assertGreater(self._get_cache_size_in_bytes(), cache_size)
 
   def test_add_directory(self):
-    """A new directory is visible on gamelet."""
+    """A new directory is visible on remote instance."""
     self._start()
     self._test_dir_content(files=[], dirs=[])
     cache_size = self._get_cache_size_in_bytes()
@@ -143,7 +143,7 @@ class GeneralTest(test_base.CdcStreamTest):
     self.assertGreater(self._get_cache_size_in_bytes(), cache_size)
 
   def test_remove_directory(self):
-    """A directory removal is visible on gamelet."""
+    """A directory removal is visible on remote instance."""
     directory = 'dir1\\'
     dir_local_path = os.path.join(self.local_base_dir, directory)
 
@@ -162,7 +162,7 @@ class GeneralTest(test_base.CdcStreamTest):
     self.assertGreater(self._get_cache_size_in_bytes(), cache_size)
 
   def test_rename_directory(self):
-    """A renamed directory is visible on gamelet."""
+    """A renamed directory is visible on remote instance."""
     directory = 'dir1\\'
     dir_local_path = os.path.join(self.local_base_dir, directory)
 
@@ -183,7 +183,7 @@ class GeneralTest(test_base.CdcStreamTest):
     self.assertGreater(self._get_cache_size_in_bytes(), cache_size)
 
   def test_detect_executables(self):
-    """Executable bits are propagated to gamelet."""
+    """Executable bits are propagated to remote instance."""
     # Add an .exe, an ELF file and a .sh file to the streamed directory.
     cdc_stream_dir = os.path.dirname(utils.CDC_STREAM_PATH)
     exe_filename = os.path.basename(utils.CDC_STREAM_PATH)

@@ -45,9 +45,9 @@ class DeploymentTest(test_base.CdcRsyncTest):
     utils.get_ssh_command_output('rm  %s' % (REMOTE_FOLDER + file + '.tmp'))
 
   def test_no_server(self):
-    """Checks that cdc_rsync_server is uploaded if not present on the gamelet.
+    """Checks that cdc_rsync_server is uploaded if not present remotely.
 
-      1) Wipes ‘/opt/developer/tools/bin/’ on the gamelet.
+      1) Wipes |REMOTE_FOLDER|.
       2) Uploads a file.
       3) Verifies that cdc_rsync_server exists in that folder.
     """

@@ -57,7 +57,7 @@ class ConnectionTest(test_base.CdcRsyncTest):
     res = utils.run_rsync(self.local_data_path,
                           bad_host + ":" + self.remote_base_dir)
     self.assertEqual(res.returncode, RETURN_CODE_GENERIC_ERROR)
-    self.assertIn('lost connection', str(res.stderr))
+    self.assertIn('Failed to find available ports', str(res.stderr))
 
   def test_contimeout(self):
     """Runs rsync with --contimeout option for an invalid ip.

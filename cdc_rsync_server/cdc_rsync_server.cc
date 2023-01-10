@@ -35,6 +35,12 @@ namespace {
 // Suffix for the patched file created from the basis file and the diff.
 constexpr char kIntermediatePathSuffix[] = ".__cdc_rsync_temp__";
 
+#if PLATFORM_WINDOWS
+constexpr char kServerFilename[] = "cdc_rsync_server.exe";
+#elif PLATFORM_LINUX
+constexpr char kServerFilename[] = "cdc_rsync_server";
+#endif
+
 uint16_t kExecutableBits =
     path::MODE_IXUSR | path::MODE_IXGRP | path::MODE_IXOTH;
 
@@ -160,8 +166,8 @@ bool CdcRsyncServer::CheckComponents(
   }
 
   std::vector<GameletComponent> our_components;
-  status = GameletComponent::Get(
-      {path::Join(component_dir, "cdc_rsync_server")}, &our_components);
+  status = GameletComponent::Get({path::Join(component_dir, kServerFilename)},
+                                 &our_components);
   if (!status.ok() || components != our_components) {
     return false;
   }

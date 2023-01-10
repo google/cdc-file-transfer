@@ -16,6 +16,8 @@
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)absl_helper\jedec_size_flag.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\socket.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\server_arch.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\server_arch_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\asset_stream_config.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\asset_stream_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\background_service_impl.cc" />
@@ -37,6 +39,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\stop_service_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser_test.cc" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\server_arch.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_stream\stop_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\testing_asset_stream_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\asset.cc" />

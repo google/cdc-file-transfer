@@ -31,6 +31,7 @@
 namespace cdc_ft {
 
 class Process;
+class ServerArch;
 class ZstdStream;
 
 class CdcRsyncClient {
@@ -71,9 +72,12 @@ class CdcRsyncClient {
   absl::Status Run();
 
  private:
+  // Finds available local and remote ports for port forwarding.
+  absl::StatusOr<int> FindAvailablePort();
+
   // Starts the server process. If the method returns a status with tag
   // |kTagDeployServer|, Run() calls DeployServer() and tries again.
-  absl::Status StartServer();
+  absl::Status StartServer(int port, const ServerArch& arch);
 
   // Stops the server process.
   absl::Status StopServer();
@@ -85,7 +89,7 @@ class CdcRsyncClient {
   absl::Status Sync();
 
   // Copies all gamelet components to the gamelet.
-  absl::Status DeployServer();
+  absl::Status DeployServer(const ServerArch& arch);
 
   // Sends relevant options to the server.
   absl::Status SendOptions();
