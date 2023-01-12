@@ -719,6 +719,10 @@ absl::Status WinProcess::Start() {
                       Util::GetLastWin32Error());
   }
 
+  std::wstring startup_dir = Util::Utf8ToWideStr(start_info_.startup_dir);
+  const wchar_t* startup_dir_cstr =
+      !startup_dir.empty() ? startup_dir.c_str() : nullptr;
+
   // Start the child process.
   success = CreateProcess(NULL,  // No module name (use command line)
                           command_cstr,
@@ -727,8 +731,7 @@ absl::Status WinProcess::Start() {
                           TRUE,  // Inherit handles
                           ToCreationFlags(start_info_.flags),
                           NULL,  // Use parent's environment block
-                          NULL,  // Use parent's starting directory
-                          &si, &process_info_->pi);
+                          startup_dir_cstr, &si, &process_info_->pi);
 
   if (!success) {
     return MakeStatus("CreateProcess() failed: %s", Util::GetLastWin32Error());

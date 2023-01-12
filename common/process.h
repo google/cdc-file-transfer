@@ -53,6 +53,9 @@ struct ProcessStartInfo {
   // Command line, UTF-8 encoded.
   std::string command;
 
+  // Process startup working directory. If empty, uses parent's working dir.
+  std::string startup_dir;
+
   // If set, the process stdin is redirected to a pipe.
   // It not set, the input is connected to the stdin of the calling process.
   bool redirect_stdin = false;
