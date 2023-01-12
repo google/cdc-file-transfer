@@ -20,6 +20,8 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "common/path.h"
+#include "common/status_macros.h"
+#include "common/util.h"
 
 namespace cdc_ft {
 namespace {
@@ -47,8 +49,27 @@ void RemoteUtil::SetScpCommand(std::string scp_command) {
   scp_command_ = std::move(scp_command);
 }
 
+void RemoteUtil::SetSftpCommand(std::string sftp_command) {
+  sftp_command_ = std::move(sftp_command);
+}
+
 void RemoteUtil::SetSshCommand(std::string ssh_command) {
   ssh_command_ = std::move(ssh_command);
+}
+
+// static
+std::string RemoteUtil::ScpToSftpCommand(std::string scp_command) {
+  // "scp", "winscp.exe", "C:\path\to\scp", "/scppath/scp --foo" etc.
+  size_t pos = 0;
+  while ((pos = scp_command.find("scp", pos)) != std::string::npos) {
+    const char next_ch = scp_command[pos + 3];
+    if ((next_ch == 0 || next_ch == '.' || next_ch == ' ')) {
+      return scp_command.replace(pos, 3, "sftp");
+    }
+    pos++;
+  }
+
+  return std::string();
 }
 
 absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
@@ -75,6 +96,33 @@ absl::Status RemoteUtil::Scp(std::vector<std::string> source_filepaths,
   start_info.forward_output_to_log = forward_output_to_log_;
 
   return process_factory_->Run(start_info);
+}
+
+absl::Status RemoteUtil::Sftp(const std::string& commands,
+                              const std::string& initial_local_dir,
+                              bool compress) {
+  // sftp doesn't take |commands| as argument, so write it to a temp file.
+  std::string cmd_path =
+      path::Join(path::GetTempDir(), "__sftp_cmd__" + Util::GenerateUniqueId());
+  RETURN_IF_ERROR(path::WriteFile(cmd_path, commands),
+                  "Failed to write sftp commands to '%s'", cmd_path);
+
+  // -p preserves timestamps. This enables timestamp-based up-to-date checks.
+  ProcessStartInfo start_info;
+  start_info.flags = ProcessFlags::kNoWindow;
+  start_info.command = absl::StrFormat(
+      "%s %s %s -p -b %s %s", sftp_command_,
+      quiet_ || verbosity_ < 2 ? "-q" : "", compress ? "-C" : "",
+      QuoteForWindows(cmd_path), QuoteForWindows(user_host_));
+  start_info.name = "sftp";
+  start_info.startup_dir = initial_local_dir;
+  start_info.forward_output_to_log = forward_output_to_log_;
+
+  RETURN_IF_ERROR(process_factory_->Run(start_info));
+
+  // Note: Keep |cmd_path| in case of an error for debugging purposes.
+  path::RemoveFile(cmd_path).IgnoreError();
+  return absl::OkStatus();
 }
 
 absl::Status RemoteUtil::Chmod(const std::string& mode,
