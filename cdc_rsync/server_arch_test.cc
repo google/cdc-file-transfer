@@ -60,47 +60,29 @@ TEST(ServerArchTest, CdcServerFilename) {
 }
 
 TEST(ServerArchTest, RemoteToolsBinDir) {
-  const std::string linux_ssh_dir =
-      ServerArch(kLinux).RemoteToolsBinDir(ServerArch::UseCase::kSsh);
-  EXPECT_TRUE(absl::StrContains(linux_ssh_dir, "/"));
+  const std::string linux_dir = ServerArch(kLinux).RemoteToolsBinDir();
+  EXPECT_TRUE(absl::StrContains(linux_dir, ".cache/"));
 
-  const std::string linux_scp_dir =
-      ServerArch(kLinux).RemoteToolsBinDir(ServerArch::UseCase::kScp);
-  EXPECT_EQ(linux_ssh_dir, linux_scp_dir);
-
-  const std::string win_ssh_dir =
-      ServerArch(kWindows).RemoteToolsBinDir(ServerArch::UseCase::kSsh);
-  EXPECT_TRUE(absl::StrContains(win_ssh_dir, "\\"));
-  EXPECT_TRUE(absl::StrContains(win_ssh_dir, "$env:appdata"));
-
-  std::string win_scp_dir =
-      ServerArch(kWindows).RemoteToolsBinDir(ServerArch::UseCase::kScp);
-  EXPECT_TRUE(absl::StrContains(win_scp_dir, "\\"));
-  EXPECT_TRUE(absl::StrContains(win_scp_dir, "AppData\\Roaming"));
+  std::string win_dir = ServerArch(kWindows).RemoteToolsBinDir();
+  EXPECT_TRUE(absl::StrContains(win_dir, "AppData\\Roaming\\"));
 }
 
 TEST(ServerArchTest, GetStartServerCommand) {
   std::string cmd = ServerArch(kWindows).GetStartServerCommand(123, "foo bar");
   EXPECT_TRUE(absl::StrContains(cmd, "123"));
-  EXPECT_TRUE(absl::StrContains(cmd, "foo bar"));
-  EXPECT_TRUE(absl::StrContains(cmd, "New-Item "));
+  EXPECT_TRUE(absl::StrContains(cmd, "cdc_rsync_server.exe foo bar"));
 
   cmd = ServerArch(kLinux).GetStartServerCommand(123, "foo bar");
   EXPECT_TRUE(absl::StrContains(cmd, "123"));
-  EXPECT_TRUE(absl::StrContains(cmd, "foo bar"));
-  EXPECT_TRUE(absl::StrContains(cmd, "mkdir -p"));
+  EXPECT_TRUE(absl::StrContains(cmd, "cdc_rsync_server foo bar"));
 }
 
 TEST(ServerArchTest, GetDeployReplaceCommand) {
-  std::string cmd = ServerArch(kWindows).GetDeployReplaceCommand("aaa", "bbb");
-  EXPECT_TRUE(absl::StrContains(cmd, "aaa"));
-  EXPECT_TRUE(absl::StrContains(cmd, "bbb"));
-  EXPECT_TRUE(absl::StrContains(cmd, "Move-Item "));
+  std::string cmd = ServerArch(kWindows).GetDeploySftpCommands();
+  EXPECT_TRUE(absl::StrContains(cmd, "cdc_rsync_server.exe"));
 
-  cmd = ServerArch(kLinux).GetDeployReplaceCommand("aaa", "bbb");
-  EXPECT_TRUE(absl::StrContains(cmd, "aaa"));
-  EXPECT_TRUE(absl::StrContains(cmd, "bbb"));
-  EXPECT_TRUE(absl::StrContains(cmd, "mv "));
+  cmd = ServerArch(kLinux).GetDeploySftpCommands();
+  EXPECT_TRUE(absl::StrContains(cmd, "cdc_rsync_server"));
 }
 
 }  // namespace

@@ -29,8 +29,6 @@ class ServerArch {
     kWindows = 1,
   };
 
-  enum class UseCase { kSsh = 0, kScp = 1 };
-
   // Detects the architecture type based on the destination path, e.g. path
   // starting with C: indicate Windows.
   static Type Detect(const std::string& destination);
@@ -42,16 +40,10 @@ class ServerArch {
   std::string CdcServerFilename() const;
 
   // Returns the arch-specific directory where cdc_rsync_server is deployed.
-  // On Windows, |use_case| determines what type of env variables to use:
-  // - kSsh uses $env:appdata and works for ssh commands.
-  // - kScp uses AppData\\Roaming and works for scp commands.
-  // On Linux, this flag is ignored.
-  std::string RemoteToolsBinDir(UseCase use_case) const;
+  std::string RemoteToolsBinDir() const;
 
   // Returns an arch-specific SSH shell command that gets invoked in order to
   // start cdc_rsync_server. The command
-  // - creates RemoteToolsBinDir() if it does not exist (so that the server can
-  //   be deployed there subsequently; scp can't create directories),
   // - returns |exit_code_not_found| if cdc_rsync_server does not exist (to
   //   prevent the confusing bash output message
   //     "bash: .../cdc_rsync_server: No such file or directory"), and
@@ -59,13 +51,15 @@ class ServerArch {
   std::string GetStartServerCommand(int exit_code_not_found,
                                     const std::string& args) const;
 
-  // Returns an arch-specific SSH shell command that gets invoked after
-  // cdc_rsync_server has been copied to a temp location. The command
-  // - makes the old cdc_rsync_server writable (if it exists),
-  // - makes the new cdc_rsync_server executable (Linux only) and
-  // - replaces the old cdc_rsync_server by the new one.
-  std::string GetDeployReplaceCommand(const std::string& old_server_path,
-                                      const std::string& new_server_path) const;
+  // Returns an arch-specific SFTP command sequence that deploys the server
+  // component on the target gets invoked after
+  // cdc_rsync_server has been copied to a temp location. The commands
+  // - create the cdc-file-transfer/bin folder if it doesn't exist yet,
+  // - make the old cdc_rsync_server writable if it exists,
+  // - copy cdc_rsync_server to a temp location,
+  // - make the new cdc_rsync_server executable (Linux only) and
+  // - replaces the existing cdc_rsync_server by the temp one.
+  std::string GetDeploySftpCommands() const;
 
  private:
   Type type_;

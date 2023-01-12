@@ -16,6 +16,7 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_split.h"
 #include "cdc_fuse_fs/constants.h"
 #include "common/gamelet_component.h"
 #include "common/log.h"
@@ -30,7 +31,7 @@ constexpr char kExeFilename[] = "cdc_stream.exe";
 constexpr char kFuseFilename[] = "cdc_fuse_fs";
 constexpr char kLibFuseFilename[] = "libfuse.so";
 constexpr char kFuseStdoutPrefix[] = "cdc_fuse_fs_stdout";
-constexpr char kRemoteToolsBinDir[] = "~/.cache/cdc-file-transfer/bin/";
+constexpr char kRemoteToolsBinDir[] = ".cache/cdc-file-transfer/bin/";
 
 // Cache directory on the gamelet to store data chunks.
 constexpr char kCacheDir[] = "~/.cache/cdc-file-transfer/chunks";
@@ -54,23 +55,25 @@ absl::Status CdcFuseManager::Deploy() {
   std::string exe_dir;
   RETURN_IF_ERROR(path::GetExeDir(&exe_dir), "Failed to get exe directory");
 
-  // Set the cwd to the exe dir and pass the filenames to scp. Otherwise, some
-  // scp implementations can get confused and create the wrong remote filenames.
-  path::SetCwd(exe_dir);
+  // Create the remote tools bin dir if it doesn't exist yet.
+  // This assumes that sftp's remote startup directory is the home directory.
+  std::vector<std::string> dir_parts =
+      absl::StrSplit(kRemoteToolsBinDir, '/', absl::SkipEmpty());
+  std::string sftp_commands;
+  for (const std::string& dir : dir_parts) {
+    // Use -mkdir to ignore errors if the directory already exists.
+    sftp_commands += absl::StrFormat("-mkdir %s\ncd %s\n", dir, dir);
+  }
 
-  // Copy FUSE to the gamelet.
-  LOG_DEBUG("Copying FUSE");
-  RETURN_IF_ERROR(remote_util_->Scp({kFuseFilename, kLibFuseFilename},
-                                    kRemoteToolsBinDir, /*compress=*/false),
-                  "Failed to copy FUSE to gamelet");
-  LOG_DEBUG("Copying FUSE succeeded");
+  sftp_commands += absl::StrFormat("put %s\n", kFuseFilename);
+  sftp_commands += absl::StrFormat("put %s\n", kLibFuseFilename);
+  sftp_commands += absl::StrFormat("chmod 755 %s\n", kFuseFilename);
 
-  // Make FUSE executable. Note that sync does it automatically.
-  LOG_DEBUG("Making FUSE executable");
-  std::string remotePath = path::JoinUnix(kRemoteToolsBinDir, kFuseFilename);
-  RETURN_IF_ERROR(remote_util_->Chmod("a+x", remotePath),
-                  "Failed to set executable flag on FUSE");
-  LOG_DEBUG("Making FUSE succeeded");
+  LOG_DEBUG("Deploying FUSE");
+  RETURN_IF_ERROR(
+      remote_util_->Sftp(sftp_commands, exe_dir, /*compress=*/false),
+      "Failed to deploy FUSE");
+  LOG_DEBUG("Deploying FUSE succeeded");
 
   return absl::OkStatus();
 }
@@ -104,14 +107,13 @@ absl::Status CdcFuseManager::Start(const std::string& mount_dir,
   // Build the remote command.
   std::string remotePath = path::JoinUnix(kRemoteToolsBinDir, kFuseFilename);
   std::string remote_command = absl::StrFormat(
-      "mkdir -p %s; LD_LIBRARY_PATH=%s %s "
+      "LD_LIBRARY_PATH=%s %s "
       "--instance=%s "
       "--components=%s --port=%i --cache_dir=%s "
       "--verbosity=%i --cleanup_timeout=%i --access_idle_timeout=%i --stats=%i "
       "--check=%i --cache_capacity=%u -- -o allow_root -o ro -o nonempty -o "
       "auto_unmount %s%s%s",
-      kRemoteToolsBinDir, kRemoteToolsBinDir, remotePath,
-      RemoteUtil::QuoteForSsh(instance_),
+      kRemoteToolsBinDir, remotePath, RemoteUtil::QuoteForSsh(instance_),
       RemoteUtil::QuoteForSsh(component_args), remote_port, kCacheDir,
       verbosity, cleanup_timeout_sec, access_idle_timeout_sec, enable_stats,
       check, cache_capacity, debug ? "-d " : "", singlethreaded ? "-s " : "",

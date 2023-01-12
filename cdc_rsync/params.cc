@@ -21,6 +21,7 @@
 #include "absl/strings/str_split.h"
 #include "common/path.h"
 #include "common/port_range_parser.h"
+#include "common/remote_util.h"
 #include "lib/zstd.h"
 
 namespace cdc_ft {
@@ -75,9 +76,9 @@ Options:
     --ssh-command <cmd>     Path and arguments of ssh command to use, e.g.
                             "C:\path\to\ssh.exe -p 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
                             Can also be specified by the CDC_SSH_COMMAND environment variable.
-    --scp-command <cmd>     Path and arguments of scp command to use, e.g.
-                            "C:\path\to\scp.exe -P 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
-                            Can also be specified by the CDC_SCP_COMMAND environment variable.
+    --sftp-command <cmd>    Path and arguments of sftp command to use, e.g.
+                            "C:\path\to\sftp.exe -P 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
+                            Can also be specified by the CDC_SFTP_COMMAND environment variable.
     --forward-port <port>   TCP port or range used for SSH port forwarding (default: 44450-44459).
                             If a range is specified, searches for available ports (slower).
 -h  --help                  Help for cdc_rsync
@@ -85,12 +86,15 @@ Options:
 
 constexpr char kSshCommandEnvVar[] = "CDC_SSH_COMMAND";
 constexpr char kScpCommandEnvVar[] = "CDC_SCP_COMMAND";
+constexpr char kSftpCommandEnvVar[] = "CDC_SFTP_COMMAND";
 
 // Populates some parameters from environment variables.
 void PopulateFromEnvVars(Parameters* parameters) {
   path::GetEnv(kSshCommandEnvVar, &parameters->options.ssh_command)
       .IgnoreError();
-  path::GetEnv(kScpCommandEnvVar, &parameters->options.scp_command)
+  path::GetEnv(kScpCommandEnvVar, &parameters->options.deprecated_scp_command)
+      .IgnoreError();
+  path::GetEnv(kSftpCommandEnvVar, &parameters->options.sftp_command)
       .IgnoreError();
 }
 
@@ -287,8 +291,15 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "scp-command") {
+    // Backwards compatibility. Note that this flag is hidden from the help.
     if (!ValidateValue(key, value)) return OptionResult::kError;
-    params->options.scp_command = value;
+    params->options.deprecated_scp_command = value;
+    return OptionResult::kConsumedKeyValue;
+  }
+
+  if (key == "sftp-command") {
+    if (!ValidateValue(key, value)) return OptionResult::kError;
+    params->options.sftp_command = value;
     return OptionResult::kConsumedKeyValue;
   }
 
@@ -490,6 +501,27 @@ bool Parse(int argc, const char* const* argv, Parameters* parameters) {
   }
 
   PopUserHost(&parameters->destination, &parameters->user_host);
+
+  // Backwards compabitility after switching to sftp. Convert scp to sftp
+  // command Note that this flag is hidden from the help.
+  if (parameters->options.sftp_command.empty() &&
+      !parameters->options.deprecated_scp_command.empty()) {
+    LOG_WARNING(
+        "The CDC_SCP_COMMAND environment variable and the --scp-command flag "
+        "are deprecated. Please set CDC_SFTP_COMMAND or --sftp-command "
+        "instead.");
+
+    parameters->options.sftp_command = RemoteUtil::ScpToSftpCommand(
+        parameters->options.deprecated_scp_command);
+    if (!parameters->options.sftp_command.empty()) {
+      LOG_WARNING("Converted scp command '%s' to sftp command '%s'.",
+                  parameters->options.deprecated_scp_command,
+                  parameters->options.sftp_command);
+    } else {
+      LOG_WARNING("Failed to convert scp command '%s' to sftp command.",
+                  parameters->options.deprecated_scp_command);
+    }
+  }
 
   if (!ValidateParameters(*parameters, help)) {
     return false;

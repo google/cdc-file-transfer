@@ -109,8 +109,8 @@ CdcRsyncClient::CdcRsyncClient(const Options& options,
   if (!options_.ssh_command.empty()) {
     remote_util_.SetSshCommand(options_.ssh_command);
   }
-  if (!options_.scp_command.empty()) {
-    remote_util_.SetScpCommand(options_.scp_command);
+  if (!options_.sftp_command.empty()) {
+    remote_util_.SetSftpCommand(options_.sftp_command);
   }
 }
 
@@ -413,26 +413,10 @@ absl::Status CdcRsyncClient::DeployServer(const ServerArch& arch) {
   }
   printer_.Print(deploy_msg, true, Util::GetConsoleWidth());
 
-  // scp cdc_rsync_server to a temp location on the gamelet.
-  std::string remoteServerPath =
-      arch.RemoteToolsBinDir(ServerArch::UseCase::kScp) +
-      arch.CdcServerFilename();
-  std::string remoteServerTmpPath = remoteServerPath + Util::GenerateUniqueId();
-  std::string localServerPath = path::Join(exe_dir, arch.CdcServerFilename());
-  status = remote_util_.Scp({localServerPath}, remoteServerTmpPath,
-                            /*compress=*/true);
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to copy cdc_rsync_server to instance");
-  }
-
-  // Replace cdc_rsync_server file by the temp file.
-  std::string replace_cmd =
-      arch.GetDeployReplaceCommand(remoteServerPath, remoteServerTmpPath);
-  status = remote_util_.Run(replace_cmd, "replace");
-  if (!status.ok()) {
-    return WrapStatus(status,
-                      "Failed to replace old cdc_rsync_server by new one");
-  }
+  // sftp cdc_rsync_server to the target.
+  std::string commands = arch.GetDeploySftpCommands();
+  RETURN_IF_ERROR(remote_util_.Sftp(commands, exe_dir, /*compress=*/false),
+                  "Failed to deploy cdc_rsync_server");
 
   return absl::OkStatus();
 }

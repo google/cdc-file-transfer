@@ -18,8 +18,10 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/str_split.h"
 #include "common/path.h"
 #include "common/remote_util.h"
+#include "common/util.h"
 
 namespace cdc_ft {
 
@@ -72,19 +74,13 @@ std::string ServerArch::CdcServerFilename() const {
   }
 }
 
-std::string ServerArch::RemoteToolsBinDir(UseCase use_case) const {
+std::string ServerArch::RemoteToolsBinDir() const {
   switch (type_) {
     case Type::kWindows: {
-      // TODO(ljusten): Unfortunately, scp doesn't seem to support shell var
-      // expansion, so %AppData% can't be used. This relies on scp copying
-      // files relative to %UserProfile% and %AppData% mapping to
-      // "AppData\\Roaming" relative to that.
-      std::string app_data =
-          use_case == UseCase::kScp ? "AppData\\Roaming" : "$env:appdata";
-      return app_data + "\\cdc-file-transfer\\bin\\";
+      return "AppData\\Roaming\\cdc-file-transfer\\bin\\";
     }
     case Type::kLinux:
-      return "~/.cache/cdc-file-transfer/bin/";
+      return ".cache/cdc-file-transfer/bin/";
     default:
       assert(!kErrorArchTypeUnhandled);
       return std::string();
@@ -93,11 +89,7 @@ std::string ServerArch::RemoteToolsBinDir(UseCase use_case) const {
 
 std::string ServerArch::GetStartServerCommand(int exit_code_not_found,
                                               const std::string& args) const {
-  std::string server_dir = RemoteToolsBinDir(UseCase::kSsh);
-  std::string server_path =
-      RemoteUtil::QuoteForSsh(server_dir + CdcServerFilename());
-  path::EnsureDoesNotEndWithPathSeparator(&server_dir);
-  server_dir = RemoteUtil::QuoteForSsh(server_dir);
+  std::string server_path = RemoteToolsBinDir() + CdcServerFilename();
 
   switch (type_) {
     case Type::kWindows:
@@ -106,53 +98,50 @@ std::string ServerArch::GetStartServerCommand(int exit_code_not_found,
       // a minor issue and means we display "Deploying server..." instead of
       // "Server not deployed. Deploying...";
       return RemoteUtil::QuoteForWindows(
-          absl::StrFormat("Set-StrictMode -Version 2; "
+          absl::StrFormat("powershell -Command \" "
+                          "Set-StrictMode -Version 2; "
                           "$ErrorActionPreference = 'Stop'; "
-                          "$server_dir = %s; "
-                          "$server_path = %s; "
-                          "$u=New-Item $server_dir -ItemType Directory -Force; "
-                          "if (-not (Test-Path -Path $server_path)) { "
+                          "if (-not (Test-Path -Path '%s')) { "
                           "  exit %i; "
                           "} "
-                          "& $server_path %s",
-                          server_dir, server_path, exit_code_not_found, args));
+                          "%s %s "
+                          "\"",
+                          server_path, exit_code_not_found, server_path, args));
     case Type::kLinux:
-      return absl::StrFormat(
-          "mkdir -p %s; if [ ! -f %s ]; then exit %i; fi; %s %s", server_dir,
-          server_path, exit_code_not_found, server_path, args);
+      return absl::StrFormat("if [ ! -f %s ]; then exit %i; fi; %s %s",
+                             server_path, exit_code_not_found, server_path,
+                             args);
     default:
       assert(!kErrorArchTypeUnhandled);
       return std::string();
   }
 }
 
-std::string ServerArch::GetDeployReplaceCommand(
-    const std::string& old_server_path,
-    const std::string& new_server_path) const {
-  const std::string old_path = RemoteUtil::QuoteForSsh(old_server_path);
-  const std::string new_path = RemoteUtil::QuoteForSsh(new_server_path);
+std::string ServerArch::GetDeploySftpCommands() const {
+  std::string commands;
 
-  switch (type_) {
-    case Type::kWindows:
-      return RemoteUtil::QuoteForWindows(absl::StrFormat(
-          "Set-StrictMode -Version 2; "
-          "$ErrorActionPreference = 'Stop'; "
-          "$old_path = %s; "
-          "$new_path = %s; "
-          "if (Test-Path -Path $old_path) { "
-          "  Get-Item -Path $old_path | "
-          "    Set-ItemProperty -Name IsReadOnly -Value $false; "
-          "} "
-          "Move-Item -Path $new_path -Destination $old_path -Force",
-          old_path, new_path));
-    case Type::kLinux:
-      return absl::StrFormat(
-          "([ ! -f %s ] || chmod u+w %s) && chmod a+x %s && mv %s %s", old_path,
-          old_path, new_path, new_path, old_path);
-    default:
-      assert(!kErrorArchTypeUnhandled);
-      return std::string();
+  // Create the remote tools bin dir if it doesn't exist yet.
+  // This assumes that sftp's remote startup directory is the home directory.
+  const std::string server_dir = path::ToUnix(RemoteToolsBinDir());
+  std::vector<std::string> dir_parts =
+      absl::StrSplit(server_dir, '/', absl::SkipEmpty());
+  for (const std::string& dir : dir_parts) {
+    // Use -mkdir to ignore errors if the directory already exists.
+    commands += absl::StrFormat("-mkdir %s\ncd %s\n", dir, dir);
   }
+
+  // Copy the server binary to a temp location. This assumes that sftp's local
+  // startup directory is cdc_rsync's exe dir.
+  const std::string server_file = CdcServerFilename();
+  const std::string server_temp_file = server_file + Util::GenerateUniqueId();
+  commands += absl::StrFormat("put %s %s\n", server_file, server_temp_file);
+
+  // Restore permissions in case they changed and propagate temp file.
+  commands += absl::StrFormat("-chmod 755 %s\n", server_file);
+  commands += absl::StrFormat("chmod 755 %s\n", server_temp_file);
+  commands += absl::StrFormat("rename %s %s\n", server_temp_file, server_file);
+
+  return commands;
 }
 
 }  // namespace cdc_ft

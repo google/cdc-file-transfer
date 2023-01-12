@@ -208,7 +208,7 @@ LocalAssetsStreamManagerServiceImpl::GetTargetForStadia(
   SessionTarget target;
   target.mount_dir = request.mount_dir();
   target.ssh_command = request.ssh_command();
-  target.scp_command = request.scp_command();
+  target.sftp_command = request.sftp_command();
 
   // Parse instance/project/org id.
   if (!ParseInstanceName(request.gamelet_name(), instance_id, project_id,
@@ -223,7 +223,7 @@ LocalAssetsStreamManagerServiceImpl::GetTargetForStadia(
                    InitSsh(*instance_id, *project_id, *organization_id));
 
   target.user_host = "cloudcast@" + instance_ip;
-  // Note: Port must be set with ssh_command (-p) and scp_command (-P).
+  // Note: Port must be set with ssh_command (-p) and sftp_command (-P).
   return target;
 }
 
@@ -233,7 +233,7 @@ SessionTarget LocalAssetsStreamManagerServiceImpl::GetTarget(
   target.user_host = request.user_host();
   target.mount_dir = request.mount_dir();
   target.ssh_command = request.ssh_command();
-  target.scp_command = request.scp_command();
+  target.sftp_command = request.sftp_command();
 
   *instance_id = absl::StrCat(target.user_host, ":", target.mount_dir);
   return target;

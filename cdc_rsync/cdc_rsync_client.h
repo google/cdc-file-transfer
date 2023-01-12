@@ -54,9 +54,13 @@ class CdcRsyncClient {
     int forward_port_first = 44450;
     int forward_port_last = 44459;
     std::string ssh_command;
-    std::string scp_command;
+    std::string sftp_command;
     std::string sources_dir;  // Base dir for files loaded for --files-from.
     PathFilter filter;
+
+    // Backwards compatibility for switching from scp to sftp.
+    // Used internally, do not use.
+    std::string deprecated_scp_command;
 
     // Compression level 0 is invalid.
     static constexpr int kMinCompressLevel = -5;

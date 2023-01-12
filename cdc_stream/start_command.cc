@@ -22,6 +22,7 @@
 #include "common/log.h"
 #include "common/path.h"
 #include "common/process.h"
+#include "common/remote_util.h"
 #include "common/status_macros.h"
 #include "common/stopwatch.h"
 #include "common/util.h"
@@ -73,17 +74,28 @@ void StartCommand::RegisterCommandLineFlags(lyra::command& cmd) {
 
   path::GetEnv("CDC_SSH_COMMAND", &ssh_command_).IgnoreError();
   cmd.add_argument(
-      lyra::opt(ssh_command_, "ssh_command")
+      lyra::opt(ssh_command_, "cmd")
           .name("--ssh-command")
           .help("Path and arguments of ssh command to use, e.g. "
                 "\"C:\\path\\to\\ssh.exe -F config_file -p 1234\". Can also be "
                 "specified by the CDC_SSH_COMMAND environment variable."));
 
-  path::GetEnv("CDC_SCP_COMMAND", &scp_command_).IgnoreError();
+  path::GetEnv("CDC_SFTP_COMMAND", &sftp_command_).IgnoreError();
   cmd.add_argument(
-      lyra::opt(scp_command_, "scp_command")
+      lyra::opt(sftp_command_, "cmd")
+          .name("--sftp-command")
+          .help(
+              "Path and arguments of sftp command to use, e.g. "
+              "\"C:\\path\\to\\sftp.exe -F config_file -P 1234\". Can also be "
+              "specified by the CDC_SFTP_COMMAND environment variable."));
+
+  path::GetEnv("CDC_SCP_COMMAND", &deprecated_scp_command_).IgnoreError();
+  cmd.add_argument(
+      lyra::opt(deprecated_scp_command_, "cmd")
           .name("--scp-command")
-          .help("Path and arguments of scp command to use, e.g. "
+          .help("[Deprecated, use --sftp-command] Path and arguments of scp "
+                "command to "
+                "use, e.g. "
                 "\"C:\\path\\to\\scp.exe -F config_file -P 1234\". Can also be "
                 "specified by the CDC_SCP_COMMAND environment variable."));
 
@@ -106,9 +118,26 @@ absl::Status StartCommand::Run() {
   RETURN_IF_ERROR(LocalAssetsStreamManagerClient::ParseUserHostDir(
       user_host_dir_, &user_host, &mount_dir));
 
+  // Backwards compatibility after switching from scp to sftp.
+  if (sftp_command_.empty() && !deprecated_scp_command_.empty()) {
+    LOG_WARNING(
+        "The CDC_SCP_COMMAND environment variable and the --scp-command flag "
+        "are deprecated. Please set CDC_SFTP_COMMAND or --sftp-command "
+        "instead.");
+
+    sftp_command_ = RemoteUtil::ScpToSftpCommand(deprecated_scp_command_);
+    if (!sftp_command_.empty()) {
+      LOG_WARNING("Converted scp command '%s' to sftp command '%s'.",
+                  deprecated_scp_command_, sftp_command_);
+    } else {
+      LOG_WARNING("Failed to convert scp command '%s' to sftp command.",
+                  deprecated_scp_command_);
+    }
+  }
+
   LocalAssetsStreamManagerClient client(CreateChannel(service_port_));
   absl::Status status = client.StartSession(full_src_dir, user_host, mount_dir,
-                                            ssh_command_, scp_command_);
+                                            ssh_command_, sftp_command_);
 
   if (absl::IsUnavailable(status)) {
     LOG_DEBUG("StartSession status: %s", status.ToString());
@@ -122,7 +151,7 @@ absl::Status StartCommand::Run() {
       // state.
       LocalAssetsStreamManagerClient new_client(CreateChannel(service_port_));
       status = new_client.StartSession(full_src_dir, user_host, mount_dir,
-                                       ssh_command_, scp_command_);
+                                       ssh_command_, sftp_command_);
     }
   }
 

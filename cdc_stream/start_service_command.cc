@@ -141,7 +141,7 @@ absl::Status StartServiceCommand::RunService() {
     request.set_user_host(cfg_.dev_target().user_host);
     request.set_mount_dir(cfg_.dev_target().mount_dir);
     request.set_ssh_command(cfg_.dev_target().ssh_command);
-    request.set_scp_command(cfg_.dev_target().scp_command);
+    request.set_sftp_command(cfg_.dev_target().sftp_command);
     localassetsstreammanager::StartSessionResponse response;
     RETURN_ABSL_IF_ERROR(
         session_service.StartSession(nullptr, &request, &response));

@@ -38,8 +38,8 @@ struct SessionTarget {
   std::string user_host;
   // Ssh command to use to connect to the remote target.
   std::string ssh_command;
-  // Scp command to use to copy files to the remote target.
-  std::string scp_command;
+  // Sftp command to use to copy files to the remote target.
+  std::string sftp_command;
   // Directory on the remote target where to mount the streamed directory.
   std::string mount_dir;
 };
