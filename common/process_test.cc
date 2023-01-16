@@ -343,8 +343,6 @@ TEST_F(ProcessTest, TerminateAlreadyExited) {
 }
 
 TEST_F(ProcessTest, StartupDir) {
-  // Use ping to simulate a sleep instead of timeout since timeout fails with
-  // "Input redirection is not supported".
   ProcessStartInfo start_info;
   start_info.command = "cmd /C cd";
   start_info.startup_dir = "C:\\";
