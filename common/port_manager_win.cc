@@ -20,6 +20,7 @@
 #include <map>
 
 #include "absl/strings/str_split.h"
+#include "common/arch_type.h"
 #include "common/log.h"
 #include "common/process.h"
 #include "common/remote_util.h"
@@ -29,6 +30,42 @@
 #include "common/util.h"
 
 namespace cdc_ft {
+
+constexpr char kErrorArchTypeUnhandled[] = "arch_type_unhandled";
+
+// Returns the arch-specific netstat command.
+const char* GetNetstatCommand(ArchType arch_type) {
+  if (IsWindowsArchType(arch_type)) {
+    // -a to get the connection and ports the computer is listening on.
+    // -n to get numerical addresses to avoid the overhead of getting names.
+    // -p tcp to limit the output to TCPv4 connections.
+    return "netstat -a -n -p tcp";
+  }
+
+  if (IsLinuxArchType(arch_type)) {
+    // --numeric to get numerical addresses.
+    // --listening to get only listening sockets.
+    // --tcp to get only TCP connections.
+    return "netstat --numeric --listening --tcp";
+  }
+
+  assert(!kErrorArchTypeUnhandled);
+  return "";
+}
+
+// Returns the arch-specific IP address to filter netstat results by.
+const char* GetNetstatFilterIp(ArchType arch_type) {
+  if (IsWindowsArchType(arch_type)) {
+    return "127.0.0.1";
+  }
+
+  if (IsLinuxArchType(arch_type)) {
+    return "0.0.0.0";
+  }
+
+  assert(!kErrorArchTypeUnhandled);
+  return "";
+}
 
 class SharedMemory {
  public:
@@ -121,22 +158,25 @@ PortManager::~PortManager() {
   }
 }
 
-absl::StatusOr<int> PortManager::ReservePort(int remote_timeout_sec) {
+absl::StatusOr<int> PortManager::ReservePort(int remote_timeout_sec,
+                                             ArchType remote_arch_type) {
   // Find available port on workstation.
   std::unordered_set<int> local_ports;
-  ASSIGN_OR_RETURN(local_ports,
-                   FindAvailableLocalPorts(first_port_, last_port_, "127.0.0.1",
-                                           process_factory_),
-                   "Failed to find available ports on workstation");
+  ASSIGN_OR_RETURN(
+      local_ports,
+      FindAvailableLocalPorts(first_port_, last_port_,
+                              ArchType::kWindows_x86_64, process_factory_),
+      "Failed to find available ports on workstation");
 
   // Find available port on remote instance.
   std::unordered_set<int> remote_ports = local_ports;
   if (remote_util_ != nullptr) {
-    ASSIGN_OR_RETURN(remote_ports,
-                     FindAvailableRemotePorts(
-                         first_port_, last_port_, "0.0.0.0", process_factory_,
-                         remote_util_, remote_timeout_sec, steady_clock_),
-                     "Failed to find available ports on instance");
+    ASSIGN_OR_RETURN(
+        remote_ports,
+        FindAvailableRemotePorts(first_port_, last_port_, remote_arch_type,
+                                 process_factory_, remote_util_,
+                                 remote_timeout_sec, steady_clock_),
+        "Failed to find available ports on instance");
   }
 
   // Fetch shared memory.
@@ -203,14 +243,11 @@ absl::Status PortManager::ReleasePort(int port) {
 
 // static
 absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableLocalPorts(
-    int first_port, int last_port, const char* ip,
+    int first_port, int last_port, ArchType arch_type,
     ProcessFactory* process_factory) {
-  // -a to get the connection and ports the computer is listening on.
-  // -n to get numerical addresses to avoid the overhead of determining names.
-  // -p tcp to limit the output to TCPv4 connections.
-  // TODO: Use Windows API instead of netstat.
+  // TODO: Use local APIs instead of netstat.
   ProcessStartInfo start_info;
-  start_info.command = "netstat -a -n -p tcp";
+  start_info.command = GetNetstatCommand(arch_type);
   start_info.name = "netstat";
   start_info.flags = ProcessFlags::kNoWindow;
 
@@ -231,18 +268,15 @@ absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableLocalPorts(
   }
 
   LOG_DEBUG("netstat (workstation) output:\n%s", output);
-  return FindAvailablePorts(first_port, last_port, output, ip);
+  return FindAvailablePorts(first_port, last_port, output, arch_type);
 }
 
 // static
 absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableRemotePorts(
-    int first_port, int last_port, const char* ip,
+    int first_port, int last_port, ArchType arch_type,
     ProcessFactory* process_factory, RemoteUtil* remote_util, int timeout_sec,
     SteadyClock* steady_clock) {
-  // --numeric to get numerical addresses.
-  // --listening to get only listening sockets.
-  // --tcp to get only TCP connections.
-  std::string remote_command = "netstat --numeric --listening --tcp";
+  std::string remote_command = GetNetstatCommand(arch_type);
   ProcessStartInfo start_info =
       remote_util->BuildProcessStartInfoForSsh(remote_command);
   start_info.name = "netstat";
@@ -281,24 +315,25 @@ absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableRemotePorts(
   }
 
   LOG_DEBUG("netstat (instance) output:\n%s", output);
-  return FindAvailablePorts(first_port, last_port, output, ip);
+  return FindAvailablePorts(first_port, last_port, output, arch_type);
 }
 
 // static
 absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailablePorts(
     int first_port, int last_port, const std::string& netstat_output,
-    const char* ip) {
+    ArchType arch_type) {
   std::unordered_set<int> available_ports;
   std::vector<std::string> lines;
+  const char* filter_ip = GetNetstatFilterIp(arch_type);
   for (const auto& line : absl::StrSplit(netstat_output, '\n')) {
-    if (absl::StrContains(line, ip)) {
+    if (absl::StrContains(line, filter_ip)) {
       lines.push_back(std::string(line));
     }
   }
 
   for (int port = first_port; port <= last_port; ++port) {
     bool port_occupied = false;
-    std::string portToken = absl::StrFormat("%s:%i", ip, port);
+    std::string portToken = absl::StrFormat("%s:%i", filter_ip, port);
     for (const std::string& line : lines) {
       // Ports in the TIME_WAIT state can be reused. It is common that ports
       // stay in this state for O(minutes).
