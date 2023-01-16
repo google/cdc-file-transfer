@@ -59,14 +59,19 @@ void RemoteUtil::SetSshCommand(std::string ssh_command) {
 
 // static
 std::string RemoteUtil::ScpToSftpCommand(std::string scp_command) {
-  // "scp", "winscp.exe", "C:\path\to\scp", "/scppath/scp --foo" etc.
+  // "scp", "SCP", "winscp.exe", "C:\path\to\scp", "/scppath/scp --foo" etc.
+  std::string lower_scp_command = scp_command;
+  std::transform(lower_scp_command.begin(), lower_scp_command.end(),
+                 lower_scp_command.begin(), ::tolower);
   size_t pos = 0;
-  while ((pos = scp_command.find("scp", pos)) != std::string::npos) {
-    const char next_ch = scp_command[pos + 3];
+  while ((pos = lower_scp_command.find("scp", pos)) != std::string::npos) {
+    // This may access the string at scp_command.size(), but that's well defined
+    // in C++11 and returns 0.
+    const char next_ch = lower_scp_command[pos + 3];
     if ((next_ch == 0 || next_ch == '.' || next_ch == ' ')) {
       return scp_command.replace(pos, 3, "sftp");
     }
-    pos++;
+    ++pos;
   }
 
   return std::string();

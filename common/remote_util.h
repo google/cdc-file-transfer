@@ -55,9 +55,10 @@ class RemoteUtil {
   void SetSshCommand(std::string ssh_command);
 
   // Converts an scp command into an sftp command by simply replacing the first
-  // occurrance of scp by sftp. This adds backwards compatibility after a switch
-  // from scp to sftp in case users still set CDC_SCP_COMMAND. Luckily, all
-  // relevant parameters of sftp and scp match.
+  // occurrance of "scp.", "scp " or "scp\0" by sftp (case insensitive). This
+  // adds backwards compatibility after a switch from scp to sftp in case users
+  // still set CDC_SCP_COMMAND or --scp-command. Luckily, all relevant
+  // parameters of sftp and scp match.
   // Returns an empty string if |scp_command| does not contain "scp".
   // Returns bad results for tricky strings like "C:\scp.path\scp.exe".
   static std::string ScpToSftpCommand(std::string scp_command);

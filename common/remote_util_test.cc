@@ -132,6 +132,7 @@ TEST_F(RemoteUtilTest, ScpToSftpCommand) {
   EXPECT_EQ(RemoteUtil::ScpToSftpCommand("scp"), "sftp");
   EXPECT_EQ(RemoteUtil::ScpToSftpCommand("scp.exe"), "sftp.exe");
   EXPECT_EQ(RemoteUtil::ScpToSftpCommand("scp --arg"), "sftp --arg");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("ScP --aRg"), "sftp --aRg");
   EXPECT_EQ(RemoteUtil::ScpToSftpCommand("winscp"), "winsftp");
   EXPECT_EQ(RemoteUtil::ScpToSftpCommand("winscp.exe"), "winsftp.exe");
   EXPECT_EQ(RemoteUtil::ScpToSftpCommand("winscp --arg"), "winsftp --arg");
