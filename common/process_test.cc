@@ -342,5 +342,20 @@ TEST_F(ProcessTest, TerminateAlreadyExited) {
   EXPECT_OK(process->Terminate());
 }
 
+TEST_F(ProcessTest, StartupDir) {
+  ProcessStartInfo start_info;
+  start_info.command = "cmd /C cd";
+  start_info.startup_dir = "C:\\";
+
+  std::string std_out;
+  start_info.stdout_handler = [&std_out](const char* data, size_t) {
+    std_out += data;
+    return absl::OkStatus();
+  };
+
+  EXPECT_OK(process_factory_.Run(start_info));
+  EXPECT_EQ(std_out, "C:\\\r\n");
+}
+
 }  // namespace
 }  // namespace cdc_ft
