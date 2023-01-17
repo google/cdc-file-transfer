@@ -3,6 +3,22 @@ load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
+    name = "ansi_filter",
+    srcs = ["ansi_filter.cc"],
+    hdrs = ["ansi_filter.h"],
+)
+
+cc_test(
+    name = "ansi_filter_test",
+    srcs = ["ansi_filter_test.cc"],
+    deps = [
+        ":ansi_filter",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "buffer",
     srcs = ["buffer.cc"],
     hdrs = ["buffer.h"],

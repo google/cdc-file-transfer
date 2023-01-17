@@ -39,6 +39,8 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\start_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\start_service_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\stop_service_command.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\ansi_filter.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\ansi_filter_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)fastcdc\fastcdc_test.cc" />
@@ -156,6 +158,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)metrics\messages_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)metrics\metrics.cc" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_stream\stop_service_command.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)common\ansi_filter.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\port_range_parser.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)fastcdc\fastcdc.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)manifest\pending_assets_queue.h" />
