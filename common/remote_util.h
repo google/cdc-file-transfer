@@ -39,19 +39,52 @@ class RemoteUtil {
              ProcessFactory* process_factory, bool forward_output_to_log);
 
   // Sets the SCP command binary path and additional arguments, e.g.
-  //   C:\path\to\scp.exe -p 1234 -i <key_file> -oUserKnownHostsFile=known_hosts
-  // By default, searches scp.exe on the path environment variables.
+  //   C:\path\to\scp.exe -P 1234 -i <key_file> -oUserKnownHostsFile=known_hosts
+  // By default, searches scp on the path environment variables.
   void SetScpCommand(std::string scp_command);
 
+  // Sets the SFTP command binary path and additional arguments, e.g.
+  //   C:\path\to\sftp.exe -P 1234 -i <key_file>
+  //   -oUserKnownHostsFile=known_hosts
+  // By default, searches sftp on the path environment variables.
+  void SetSftpCommand(std::string sftp_command);
+
   // Sets the SSH command binary path and additional arguments, e.g.
-  //   C:\path\to\ssh.exe -P 1234 -i <key_file> -oUserKnownHostsFile=known_hosts
-  // By default, searches ssh.exe on the path environment variables.
+  //   C:\path\to\ssh.exe -p 1234 -i <key_file> -oUserKnownHostsFile=known_hosts
+  // By default, searches ssh on the path environment variables.
   void SetSshCommand(std::string ssh_command);
+
+  // Converts an scp command into an sftp command by simply replacing the first
+  // occurrance of "scp.", "scp " or "scp\0" by sftp (case insensitive). This
+  // adds backwards compatibility after a switch from scp to sftp in case users
+  // still set CDC_SCP_COMMAND or --scp-command. Luckily, all relevant
+  // parameters of sftp and scp match.
+  // Returns an empty string if |scp_command| does not contain "scp".
+  // Returns bad results for tricky strings like "C:\scp.path\scp.exe".
+  static std::string ScpToSftpCommand(std::string scp_command);
 
   // Copies |source_filepaths| to the remote folder |dest| on the gamelet using
   // scp. If |compress| is true, compressed upload is used.
   absl::Status Scp(std::vector<std::string> source_filepaths,
                    const std::string& dest, bool compress);
+
+  // Creates an sftp connection to the remote instance and executes the
+  // newline-separated SFTP |commands|. See
+  //   https://man7.org/linux/man-pages/man1/sftp.1.html
+  // for a list of available commands.
+  // |initial_local_dir| sets the initial local directory in sftp. This is
+  // useful since some sftp clients don't work with standard Windows paths and
+  // require for instance /cygdrive paths.
+  // If |compress| is true, compressed upload is used.
+  // Example: Create nested directories and copying an executable file.
+  //   -mkdir a
+  //   cd a
+  //   -mkdir b
+  //   cd b
+  //   put foo_executable
+  //   chmod 755 foo_executable
+  absl::Status Sftp(const std::string& commands,
+                    const std::string& initial_local_dir, bool compress);
 
   // Calls 'chmod |mode| |remote_path|' on the gamelet.
   absl::Status Chmod(const std::string& mode, const std::string& remote_path,
@@ -115,6 +148,7 @@ class RemoteUtil {
   const bool forward_output_to_log_;
 
   std::string scp_command_ = "scp";
+  std::string sftp_command_ = "sftp";
   std::string ssh_command_ = "ssh";
   std::string user_host_;
 };

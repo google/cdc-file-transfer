@@ -127,5 +127,27 @@ TEST_F(RemoteUtilTest, QuoteForSsh) {
             "\"~user-name69/\\\"foo\\\"\"");  // Nice!
 }
 
+TEST_F(RemoteUtilTest, ScpToSftpCommand) {
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand(""), "");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("scp"), "sftp");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("scp.exe"), "sftp.exe");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("scp --arg"), "sftp --arg");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("ScP --aRg"), "sftp --aRg");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("winscp"), "winsftp");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("winscp.exe"), "winsftp.exe");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("winscp --arg"), "winsftp --arg");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("C:\\path\\to\\scp"),
+            "C:\\path\\to\\sftp");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("C:\\path\\to\\scp.exe"),
+            "C:\\path\\to\\sftp.exe");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("C:\\path\\to\\scp.exe --arg"),
+            "C:\\path\\to\\sftp.exe --arg");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("C:\\scp.exe --argwithscp"),
+            "C:\\sftp.exe --argwithscp");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("C:\\path_with_scp\\scp"),
+            "C:\\path_with_scp\\sftp");
+  EXPECT_EQ(RemoteUtil::ScpToSftpCommand("C:\\path\\to\\somethingelse"), "");
+}
+
 }  // namespace
 }  // namespace cdc_ft
