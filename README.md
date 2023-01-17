@@ -192,15 +192,17 @@ remote syncs is being added, see
 # Getting Started
 
 Download the precompiled binaries from the
-[latest release](https://github.com/google/cdc-file-transfer/releases).
-We currently provide Linux binaries compiled on
+[latest release](https://github.com/google/cdc-file-transfer/releases) to a
+Windows device and unzip them. The Linux binaries are automatically deployed
+to `~/.cache/cdc-file-transfer` by the Windows tools. There is no need to manually
+deploy them. We currently provide Linux binaries compiled on
 [Github's latest Ubuntu](https://github.com/actions/runner-images) version.
 If the binaries work for you, you can skip the following two sections.
 
 Alternatively, the project can be built from source. Some binaries have to be
 built on Windows, some on Linux.
 
-## Prerequisites
+## Prerequisites for Building
 
 To build the tools from source, the following steps have to be executed on
 **both Windows and Linux**.
@@ -223,35 +225,33 @@ The file transfer tools require `ssh.exe` and `sftp.exe`.
 
 ## Building
 
-The two tools can be built and used independently.
+The two tools CDC RSync and CDC Stream can be built and used independently.
 
 ### CDC RSync
 
-* Build Linux components
+* On a Linux device, build the Linux components
   ```
   bazel build --config linux --compilation_mode=opt --linkopt=-Wl,--strip-all --copt=-fdata-sections --copt=-ffunction-sections --linkopt=-Wl,--gc-sections //cdc_rsync_server
   ```
-* Build Windows components
+* On a Windows device, build the Windows components
   ```
   bazel build --config windows --compilation_mode=opt --copt=/GL //cdc_rsync
   ```
 * Copy the Linux build output file `cdc_rsync_server` from 
-  `bazel-bin/cdc_rsync_server` on the Linux system to `bazel-bin\cdc_rsync`
-  on the Windows machine.
+  `bazel-bin/cdc_rsync_server` to `bazel-bin\cdc_rsync` on the Windows machine.
 
 ### CDC Stream
 
-* Build Linux components
+* On a Linux device, build the Linux components
   ```
   bazel build --config linux --compilation_mode=opt --linkopt=-Wl,--strip-all --copt=-fdata-sections --copt=-ffunction-sections --linkopt=-Wl,--gc-sections //cdc_fuse_fs
   ```
-* Build Windows components
+* On a Windows device, build the Windows components
   ```
   bazel build --config windows --compilation_mode=opt --copt=/GL //cdc_stream
   ```
 * Copy the Linux build output files `cdc_fuse_fs` and `libfuse.so` from 
-  `bazel-bin/cdc_fuse_fs` on the Linux system to `bazel-bin\cdc_stream`
-  on the Windows machine.
+  `bazel-bin/cdc_fuse_fs` to `bazel-bin\cdc_stream` on the Windows machine.
 
 ## Usage
 

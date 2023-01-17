@@ -98,10 +98,13 @@ jobs:
       - name: Copy artifacts
         run: |
           mkdir artifacts
+          mkdir artifacts\docs
           cp bazel-bin/cdc_rsync/cdc_rsync.exe artifacts
+          cp bazel-bin/cdc_rsync_server/cdc_rsync_server.exe artifacts
           cp bazel-bin/cdc_stream/cdc_stream.exe artifacts
           cp LICENSE artifacts
           cp README.md artifacts
+          cp docs\* artifacts\docs
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
@@ -119,7 +122,10 @@ jobs:
       - name: Zip binaries
         run: |
           # The ref resolves to "main" for latest and e.g. "v0.1.0" for tagged.
-          BINARIES_ZIP_NAME=cdc-file-transfer-binaries-${GITHUB_REF#refs/*/}-x64.zip
+          REF=${GITHUB_REF#refs/*/}
+          # For pull requests, this is e.g. '70/merge', so replace / with -.
+          REF=${REF/\//-}
+          BINARIES_ZIP_NAME=cdc-file-transfer-binaries-$REF-x64.zip
           echo "BINARIES_ZIP_NAME=$BINARIES_ZIP_NAME" >> $GITHUB_ENV
           zip -j $BINARIES_ZIP_NAME Windows-Artifacts/* Linux-Artifacts/*
 
