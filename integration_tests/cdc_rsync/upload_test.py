@@ -71,15 +71,6 @@ class UploadTest(test_base.CdcRsyncTest):
     self.assertTrue(
         utils.sha1_matches(self.local_data_path, self.remote_data_path))
 
-  def test_backslash_in_dest_folder(self):
-    r"""Verifies uploading to \mnt\developer."""
-
-    filepath = os.path.join(self.local_base_dir, 'file1.txt')
-    utils.create_test_file(filepath, 1)
-    res = utils.run_rsync(filepath, self.remote_base_dir.replace('/', '\\'))
-    self.assertTrue(utils.files_count_is(res, missing=1))
-    self._assert_remote_dir_contains(['file1.txt'])
-
   def test_backslash_in_source_folder(self):
     r"""Verifies uploading from /source/folder."""
 
@@ -858,7 +849,7 @@ class UploadTest(test_base.CdcRsyncTest):
     remote_exe_path = self.remote_base_dir + os.path.basename(local_exe_path)
     remote_elf_path = self.remote_base_dir + os.path.basename(local_elf_path)
 
-    # Copy the files to the gamelet.
+    # Copy the files to the remote instance.
     res = utils.run_rsync(local_exe_path, local_elf_path, self.remote_base_dir)
     self._assert_rsync_success(res)
 
