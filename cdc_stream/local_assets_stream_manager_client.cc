@@ -38,13 +38,13 @@ LocalAssetsStreamManagerClient::~LocalAssetsStreamManagerClient() = default;
 absl::Status LocalAssetsStreamManagerClient::StartSession(
     const std::string& src_dir, const std::string& user_host,
     const std::string& mount_dir, const std::string& ssh_command,
-    const std::string& scp_command) {
+    const std::string& sftp_command) {
   StartSessionRequest request;
   request.set_workstation_directory(src_dir);
   request.set_user_host(user_host);
   request.set_mount_dir(mount_dir);
   request.set_ssh_command(ssh_command);
-  request.set_scp_command(scp_command);
+  request.set_sftp_command(sftp_command);
 
   grpc::ClientContext context;
   StartSessionResponse response;

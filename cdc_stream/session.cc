@@ -55,8 +55,8 @@ Session::Session(std::string instance_id, const SessionTarget& target,
   if (!target.ssh_command.empty()) {
     remote_util_.SetSshCommand(target.ssh_command);
   }
-  if (!target.scp_command.empty()) {
-    remote_util_.SetScpCommand(target.scp_command);
+  if (!target.sftp_command.empty()) {
+    remote_util_.SetSftpCommand(target.sftp_command);
   }
 }
 

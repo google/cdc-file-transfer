@@ -44,9 +44,11 @@ class StartCommand : public BaseCommand {
   int verbosity_ = 0;
   uint16_t service_port_ = 0;
   std::string ssh_command_;
-  std::string scp_command_;
+  std::string sftp_command_;
   std::string src_dir_;
   std::string user_host_dir_;
+
+  std::string deprecated_scp_command_;
 };
 
 }  // namespace cdc_ft

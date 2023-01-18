@@ -191,7 +191,7 @@ To build the tools from source, the following steps have to be executed on
   ```
 
 Finally, install an SSH client on the Windows device if not present.
-The file transfer tools require `ssh.exe` and `scp.exe`.
+The file transfer tools require `ssh.exe` and `sftp.exe`.
 
 ## Building
 
@@ -227,24 +227,24 @@ The two tools can be built and used independently.
 
 ## Usage
 
-The tools require a setup where you can use SSH and SCP from the Windows machine
-to the Linux device without entering a password, e.g. by using key-based
+The tools require a setup where you can use SSH and SFTP from the Windows
+machine to the Linux device without entering a password, e.g. by using key-based
 authentication.
 
-### Configuring SSH and SCP
+### Configuring SSH and SFTP
 
-By default, the tools search `ssh.exe` and `scp.exe` from the path environment
+By default, the tools search `ssh.exe` and `sftp.exe` from the path environment
 variable. If you can run the following commands in a Windows cmd without
 entering your password, you are all set:
 ```
 ssh user@linux.device.com
-scp somefile.txt user@linux.device.com:
+sftp user@linux.device.com
 ```
 Here, `user` is the Linux user and `linux.device.com` is the Linux host to
 SSH into or copy the file to.
 
 If additional arguments are required, it is recommended to provide an SSH config
-file. By default, both `ssh.exe` and `scp.exe` use the file at
+file. By default, both `ssh.exe` and `sftp.exe` use the file at
 `%USERPROFILE%\.ssh\config` on Windows, if it exists. A possible config file
 that sets a username, a port, an identity file and a known host file could look
 as follows:
@@ -256,21 +256,21 @@ Host linux_device
 	IdentityFile C:\path\to\id_rsa
 	UserKnownHostsFile C:\path\to\known_hosts
 ```
-If `ssh.exe` or `scp.exe` cannot be found, you can specify the full paths via
-the command line arguments `--ssh-command` and `--scp-command` for `cdc_rsync`
+If `ssh.exe` or `sftp.exe` cannot be found, you can specify the full paths via
+the command line arguments `--ssh-command` and `--sftp-command` for `cdc_rsync`
 and `cdc_stream start` (see below), or set the environment variables
-`CDC_SSH_COMMAND` and `CDC_SCP_COMMAND`, e.g.
+`CDC_SSH_COMMAND` and `CDC_SFTP_COMMAND`, e.g.
 ```
 set CDC_SSH_COMMAND="C:\path with space\to\ssh.exe"
-set CDC_SCP_COMMAND="C:\path with space\to\scp.exe"
+set CDC_SFTP_COMMAND="C:\path with space\to\sftp.exe"
 ```
 Note that you can also specify SSH configuration via the environment variables
 instead of using a config file:
 ```
 set CDC_SSH_COMMAND=C:\path\to\ssh.exe -p 12345 -i C:\path\to\id_rsa -oUserKnownHostsFile=C:\path\to\known_hosts
-set CDC_SCP_COMMAND=C:\path\to\scp.exe -P 12345 -i C:\path\to\id_rsa -oUserKnownHostsFile=C:\path\to\known_hosts
+set CDC_SFTP_COMMAND=C:\path\to\sftp.exe -P 12345 -i C:\path\to\id_rsa -oUserKnownHostsFile=C:\path\to\known_hosts
 ```
-Note the small `-p` for `ssh.exe` and the capital `-P` for `scp.exe`.
+Note the small `-p` for `ssh.exe` and the capital `-P` for `sftp.exe`.
 
 #### Google Specific
 
@@ -278,7 +278,7 @@ For Google internal usage, set the following environment variables to enable SSH
 authentication using a Google security key:
 ```
 set CDC_SSH_COMMAND=C:\gnubby\bin\ssh.exe
-set CDC_SCP_COMMAND=C:\gnubby\bin\scp.exe
+set CDC_SFTP_COMMAND=C:\gnubby\bin\sftp.exe
 ```
 Note that you will have to touch the security key multiple times during the
 first run. Subsequent runs only require a single touch.
@@ -352,7 +352,7 @@ instead of to the file.
 `cdc_rsync` always logs to the console. To increase log verbosity, pass `-vvv`
 for debug logs or `-vvvv` for verbose logs.
 
-For both sync and stream, the debug logs contain all SSH and SCP commands that
+For both sync and stream, the debug logs contain all SSH and SFTP commands that
 are attempted to run, which is very useful for troubleshooting. If a command
 fails unexpectedly, copy it and run it in isolation. Pass `-vv` or `-vvv` for
 additional debug output.

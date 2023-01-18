@@ -48,9 +48,9 @@ message StartSessionRequest {
   // SSH command to connect to the remote instance.
   // Optional, falls back to searching ssh.
   string ssh_command = 10;
-  // SCP command to copy files to the remote instance.
-  // Optional, falls back to searching scp.
-  string scp_command = 11;
+  // SFTP command to copy files to the remote instance.
+  // Optional, falls back to searching sftp.
+  string sftp_command = 11;
 
   reserved 1, 3, 4, 9;
 }

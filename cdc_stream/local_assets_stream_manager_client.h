@@ -43,12 +43,12 @@ class LocalAssetsStreamManagerClient {
   // |user_host| is the Linux host, formatted as [user@:host].
   // |mount_dir| is the Linux target directory to stream to.
   // |ssh_command| is the ssh command and extra arguments to use.
-  // |scp_command| is the scp command and extra arguments to use.
+  // |sftp_command| is the sftp command and extra arguments to use.
   absl::Status StartSession(const std::string& src_dir,
                             const std::string& user_host,
                             const std::string& mount_dir,
                             const std::string& ssh_command,
-                            const std::string& scp_command);
+                            const std::string& sftp_command);
 
   // Stops the streaming session to the Linux target |user_host|:|mount_dir|.
   // |user_host| is the Linux host, formatted as [user@:host].

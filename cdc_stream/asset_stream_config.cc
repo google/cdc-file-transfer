@@ -157,9 +157,9 @@ void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd,
                 "connection to the host. See also --dev-src-dir."));
 
   cmd.add_argument(
-      lyra::opt(dev_target_.scp_command, "cmd")
-          .name("--dev-scp-command")
-          .help("Scp command and extra flags to use for the "
+      lyra::opt(dev_target_.sftp_command, "cmd")
+          .name("--dev-sftp-command")
+          .help("Sftp command and extra flags to use for the "
                 "connection to the host. See also --dev-src-dir."));
 
   cmd.add_argument(
@@ -258,7 +258,7 @@ std::string AssetStreamConfig::ToString() {
   ss << "dev-user-host                = " << dev_target_.user_host << std::endl;
   ss << "dev-ssh-command              = " << dev_target_.ssh_command
      << std::endl;
-  ss << "dev-scp-command              = " << dev_target_.scp_command
+  ss << "dev-sftp-command             = " << dev_target_.sftp_command
      << std::endl;
   ss << "dev-mount-dir                = " << dev_target_.mount_dir << std::endl;
   return ss.str();
