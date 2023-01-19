@@ -195,7 +195,7 @@ TEST_F(ChunkerTest, MinChunkSize) {
 
 // Tests that maximum chunk size is not exceeded.
 TEST_F(ChunkerTest, MaxChunkSize) {
-  Config cfg(32, 64, 128);
+  Config cfg(0, 64, 128);
   std::vector<size_t> chunk_sizes;
   TestChunker<> chunker(cfg, [&](const uint8_t* /* data */, size_t len) {
     chunk_sizes.push_back(len);
