@@ -250,10 +250,10 @@ class ChunkerTmpl {
       uint64_t mask = stages_[stg].mask;
       size_t barrier = std::min(len, stages_[stg].barrier);
       for (/*empty*/; i < barrier; ++i) {
-        hash = (hash << 1) + gear[data[i]];
         if (!(hash & mask)) {
           return i;
         }
+        hash = (hash << 1) + gear[data[i]];
       }
     }
     return i;
