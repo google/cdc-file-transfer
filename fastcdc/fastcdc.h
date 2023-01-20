@@ -38,9 +38,12 @@ struct Config {
   // that this size can still be undercut for the last chunk after processing
   // the input data.
   size_t min_size;
-  // The average chunk size is the target size for chunks. Sizes will show an
+  // The average chunk size is the target size for chunks, not including the
+  // effects of max_size regression. Before regression, sizes will show an
   // offset exponential distribution decaying after min_size with the desired
-  // average size.
+  // average size. Regression will "reflect-back" the exponential
+  // distribution past max_size, which reduces the actual average size and
+  // gives a very flat distribution when max_size is small.
   size_t avg_size;
   // The maximum size is the upper bound for generating chunks. This limit is
   // never exceeded. If a chunk boundary was not detected based on the content
@@ -63,6 +66,12 @@ using ChunkFoundHandler = std::function<void(const uint8_t* data, size_t len)>;
 // deduplication, and a 'hash<=threshold' "hash criteria" works better for
 // the gear rollsum and can support arbitrary non-power-of-two sizes.
 //
+// For limiting block sizes it uses a modified version of "Regression
+// Chunking"[3] with an arbitrary number of regressions using power-of-2
+// target block lengths (not multiples of the target block length, which
+// doesn't have to be a power-of-2). This means we can use a bitmask for the
+// most significant bits for the regression hash criteria.
+//
 // The Config struct passed in during construction defines the minimum, average,
 // and maximum allowed chunk sizes. Those are runtime parameters.
 //
@@ -81,6 +90,7 @@ using ChunkFoundHandler = std::function<void(const uint8_t* data, size_t len)>;
 //
 // [1] https://www.usenix.org/system/files/conference/atc16/atc16-paper-xia.pdf.
 // [2] https://github.com/dbaarda/rollsum-chunking/blob/master/RESULTS.rst
+// [3] https://www.usenix.org/system/files/conference/atc12/atc12-final293.pdf
 //
 // TODO: Remove template parameters.
 template <typename T, const T gear[256]>
@@ -150,6 +160,11 @@ class ChunkerTmpl {
       len = cfg_.max_size;
     }
 
+    // Initialize the regression length to max_size and the regression mask
+    // to an empty bitmask (match any hash).
+    size_t rc_len = cfg_.max_size;
+    T rc_mask = 0;
+
     // Init hash to all 1's to avoid zero-length chunks with min_size=0.
     T hash = (T)-1;
     // Skip the first min_size bytes, but "warm up" the rolling hash for enough
@@ -159,12 +174,22 @@ class ChunkerTmpl {
       hash = (hash << 1) + gear[data[i]];
     }
     for (/*empty*/; i < len; ++i) {
-      if (hash <= kthreshold_) {
-        return i;
+      if (!(hash & rc_mask)) {
+        if (hash <= kthreshold_) {
+          // This hash matches the target length hash criteria, return it.
+          return i;
+        } else {
+          // This is a better regression point. Set it as the new rc_len and
+          // update rc_mask to check as many MSBits as this hash would pass.
+          rc_len = i;
+          for (rc_mask = (T)-1; hash & rc_mask; rc_mask <<= 1)
+            ;
+        }
       }
       hash = (hash << 1) + gear[data[i]];
     }
-    return i;
+    // Return the best regression point we found.
+    return rc_len;
   }
 
   static constexpr size_t khashbits_ = sizeof(T) * 8;
