@@ -14,7 +14,7 @@ experimentation. See the file `indexer.h` for preprocessor macros that can be
 enabled, for example:
 
 ```
-bazel build -c opt --copt=-DCDC_GEAR_TABLE=1 //cdc_indexer
+bazel build -c opt --copt=-DCDC_GEAR_BITS=32 //cdc_indexer
 ```
 
 At the end of the operation, the indexer outputs a summary of the results such
@@ -25,7 +25,7 @@ as the following:
 Operation succeeded.
 
 Chunk size (min/avg/max): 128 KB / 256 KB / 1024 KB  |  Threads: 12
-gear_table: 64 bit  |  mask_s: 0x49249249249249  |  mask_l: 0x1249249249
+gear_table: 64 bit  |  threshold: 0x7fffc0001fff
            Duration:           00:03
         Total files:               2
        Total chunks:           39203

@@ -64,9 +64,9 @@ namespace {
 
 const char* GearTable() {
   // The following macros are defined in indexer.h.
-#if CDC_GEAR_TABLE == CDC_GEAR_32BIT
+#if CDC_GEAR_BITS == CDC_GEAR_32BIT
   return "32 bit";
-#elif CDC_GEAR_TABLE == CDC_GEAR_64BIT
+#elif CDC_GEAR_BITS == CDC_GEAR_64BIT
   return "64 bit";
 #else
 #error "Unknown gear table"
@@ -165,9 +165,8 @@ void ShowSummary(const IndexerConfig& cfg, const Indexer::OpStats& stats,
             << HumanBytes(cfg.max_chunk_size)
             << "  |  Hash: " << HashTypeToString(cfg.hash_type)
             << "  |  Threads: " << cfg.num_threads << std::endl;
-  std::cout << "gear_table: " << GearTable() << "  |  mask_s: 0x" << std::hex
-            << cfg.mask_s << "  |  mask_l: 0x" << cfg.mask_l << std::dec
-            << std::endl;
+  std::cout << "gear_table: " << GearTable() << "  |  threshold: 0x" << std::hex
+            << cfg.threshold << std::dec << std::endl;
   std::cout << std::setw(title_w) << "Duration:" << std::setw(num_w)
             << HumanDuration(elapsed) << std::endl;
   std::cout << std::setw(title_w) << "Total files:" << std::setw(num_w)
@@ -279,11 +278,10 @@ absl::Status WriteResultsFile(const std::string& filepath,
 
   path::FileCloser closer(fout);
 
-  static constexpr int num_columns = 15;
+  static constexpr int num_columns = 14;
   static const char* columns[num_columns] = {
       "gear_table",
-      "mask_s",
-      "mask_l",
+      "threshold",
       "Min chunk size [KiB]",
       "Avg chunk size [KiB]",
       "Max chunk size [KiB]",
@@ -332,7 +330,7 @@ absl::Status WriteResultsFile(const std::string& filepath,
   // Write user-supplied description
   if (!description.empty()) std::fprintf(fout, "%s,", description.c_str());
   // Write chunking params.
-  std::fprintf(fout, "%s,0x%zx,0x%zx,", GearTable(), cfg.mask_s, cfg.mask_l);
+  std::fprintf(fout, "%s,0x%zx,", GearTable(), cfg.threshold);
   std::fprintf(fout, "%zu,%zu,%zu,", cfg.min_chunk_size >> 10,
                cfg.avg_chunk_size >> 10, cfg.max_chunk_size >> 10);
   // Write speed, files, chunks.
