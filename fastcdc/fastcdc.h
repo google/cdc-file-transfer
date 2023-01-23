@@ -239,7 +239,8 @@ class ChunkerTmpl {
       len = cfg_.max_size;
     }
 
-    uint64_t hash = 0;
+    // Init hash to all 1's to avoid zero-length chunks with min_size=0.
+    uint64_t hash = (uint64_t)-1;
     // Skip the first min_size bytes, but "warm up" the rolling hash for 64
     // rounds to make sure the 64-bit hash has gathered full "content history".
     size_t i = cfg_.min_size > 64 ? cfg_.min_size - 64 : 0;
@@ -250,10 +251,10 @@ class ChunkerTmpl {
       uint64_t mask = stages_[stg].mask;
       size_t barrier = std::min(len, stages_[stg].barrier);
       for (/*empty*/; i < barrier; ++i) {
-        hash = (hash << 1) + gear[data[i]];
         if (!(hash & mask)) {
           return i;
         }
+        hash = (hash << 1) + gear[data[i]];
       }
     }
     return i;
