@@ -29,9 +29,9 @@
 namespace cdc_ft {
 namespace fastcdc {
 
-// These are recommended and widely used multipliers for LCGs from
-// http://citeseer.ist.psu.edu/132363.html. They replace the gear lookup
-// tables in the rolling hash.
+// These multipliers replace the gear lookup tables in the rolling hash. They
+// are recommended and widely used multipliers for LCGs from;
+// https://www.ams.org/journals/mcom/1999-68-225/S0025-5718-99-00996-5/S0025-5718-99-00996-5.pdf
 static constexpr uint32_t default_kmult32 = 2891336453;
 static constexpr uint64_t default_kmult64 = 2862933555777941757;
 
@@ -178,7 +178,7 @@ class ChunkerTmpl {
     return i;
   }
 
-  static constexpr int khashbits_ = sizeof(T) * 8;
+  static constexpr size_t khashbits_ = sizeof(T) * 8;
   const Config cfg_;
   const ChunkFoundHandler handler_;
   T kthreshold_;
