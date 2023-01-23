@@ -302,6 +302,7 @@ TEST_F(PathTest, GetDrivePrefix) {
   EXPECT_EQ(path::GetDrivePrefix("C:\\"), "C:");
   EXPECT_EQ(path::GetDrivePrefix("C:\\dir"), "C:");
   EXPECT_EQ(path::GetDrivePrefix("C:\\dir\\file"), "C:");
+  EXPECT_EQ(path::GetDrivePrefix("host:C:\\dir\\file"), "");
 }
 #endif
 

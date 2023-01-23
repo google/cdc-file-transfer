@@ -29,7 +29,7 @@ class ServerArch {
     kWindows = 1,
   };
 
-  // Detects the architecture type based on the destination path, e.g. path
+  // Detects the arch type based on the destination path, e.g. path
   // starting with C: indicate Windows.
   static Type Detect(const std::string& destination);
 

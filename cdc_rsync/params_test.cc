@@ -233,9 +233,19 @@ TEST_F(ParamsTest, ParseSucceedsOnNoUserHost) {
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
 }
 
-TEST_F(ParamsTest, ParseDoesNotThinkCIsAHost) {
+TEST_F(ParamsTest, ParseDoesNotThinkDriveIsAHost) {
   const char* argv[] = {"cdc_rsync.exe", kSrc, "C:\\foo", NULL};
   EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
+  EXPECT_TRUE(parameters_.user_host.empty());
+
+  const char* argv2[] = {"cdc_rsync.exe", kSrc, "\\\\.\\C:\\foo", NULL};
+  EXPECT_TRUE(
+      Parse(static_cast<int>(std::size(argv2)) - 1, argv, &parameters_));
+  EXPECT_TRUE(parameters_.user_host.empty());
+
+  const char* argv3[] = {"cdc_rsync.exe", kSrc, "\\\\?\\C:\\foo", NULL};
+  EXPECT_TRUE(
+      Parse(static_cast<int>(std::size(argv3)) - 1, argv, &parameters_));
   EXPECT_TRUE(parameters_.user_host.empty());
 }
 

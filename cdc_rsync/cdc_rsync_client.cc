@@ -229,10 +229,7 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
   } else {
     // Run cdc_rsync_server locally.
     std::string exe_dir;
-    absl::Status status = path::GetExeDir(&exe_dir);
-    if (!status.ok()) {
-      return WrapStatus(status, "Failed to get exe directory");
-    }
+    RETURN_IF_ERROR(path::GetExeDir(&exe_dir), "Failed to get exe directory");
 
     std::string server_path = path::Join(exe_dir, arch.CdcServerFilename());
     start_info.command =

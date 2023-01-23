@@ -402,15 +402,13 @@ bool CheckOptionResult(OptionResult result, const std::string& name,
 // e.g. C:\foo.
 void PopUserHost(std::string* destination, std::string* user_host) {
   user_host->clear();
+
+  // Don't mistake the C part of C:\foo or \\share\C:\foo as user/host.
+  if (!path::GetDrivePrefix(*destination).empty()) return;
+
   std::vector<std::string> parts =
       absl::StrSplit(*destination, absl::MaxSplits(':', 1));
   if (parts.size() < 2) return;
-
-  // Don't mistake the C part of C:\foo as user/host.
-  if (parts[0].size() == 1 && toupper(parts[0][0]) >= 'A' &&
-      toupper(parts[0][0]) <= 'Z') {
-    return;
-  }
 
   *user_host = parts[0];
   *destination = parts[1];
