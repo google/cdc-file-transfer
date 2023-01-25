@@ -140,8 +140,7 @@ Indexer::Impl::Impl(const IndexerConfig& cfg,
   fastcdc::Config ccfg(cfg_.min_chunk_size, cfg_.avg_chunk_size,
                        cfg_.max_chunk_size);
   Indexer::Chunker chunker(ccfg, nullptr);
-  cfg_.mask_s = chunker.Stage(0).mask;
-  cfg_.mask_l = chunker.Stage(chunker.StagesCount() - 1).mask;
+  cfg_.threshold = chunker.Threshold();
   // Collect inputs.
   for (auto it = inputs.begin(); it != inputs.end(); ++it) {
     inputs_.push(*it);
@@ -368,8 +367,7 @@ IndexerConfig::IndexerConfig()
       max_chunk_size(0),
       max_chunk_size_step(0),
       num_threads(0),
-      mask_s(0),
-      mask_l(0) {}
+      threshold(0) {}
 
 Indexer::Indexer() : impl_(nullptr) {}
 
