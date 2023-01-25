@@ -95,7 +95,6 @@ using ChunkFoundHandler = std::function<void(const uint8_t* data, size_t len)>;
 template <typename T, const T kmult>
 class ChunkerTmpl {
  public:
-
   // Constructor.
   ChunkerTmpl(const Config& cfg, ChunkFoundHandler handler)
       : cfg_(cfg), handler_(handler) {
@@ -152,7 +151,6 @@ class ChunkerTmpl {
   T Threshold() { return kthreshold_; }
 
  private:
-
   size_t FindChunkBoundary(const uint8_t* data, size_t len) {
     if (len <= cfg_.min_size) {
       return len;
@@ -187,13 +185,11 @@ class ChunkerTmpl {
 
 // Chunker template with a 32-bit gear table.
 template <uint32_t kmult = default_kmult32>
-using Chunker32 =
-    ChunkerTmpl<uint32_t, kmult>;
+using Chunker32 = ChunkerTmpl<uint32_t, kmult>;
 
 // Chunker template with a 64-bit gear table.
 template <uint64_t kmult = default_kmult64>
-using Chunker64 =
-    ChunkerTmpl<uint64_t, kmult>;
+using Chunker64 = ChunkerTmpl<uint64_t, kmult>;
 
 // Default chunker class using params that are known to work well.
 using Chunker = Chunker64<>;

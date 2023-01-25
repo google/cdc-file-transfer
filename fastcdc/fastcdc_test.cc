@@ -34,7 +34,6 @@ class ChunkerTest : public ::testing::Test {
   ChunkerTest() {}
 };
 
-
 // Tests that the threshold for hash comparison is set correctly.
 TEST_F(ChunkerTest, ValidateThreshold) {
   // Sizes: 128/256/512 bytes
