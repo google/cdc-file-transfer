@@ -28,11 +28,13 @@ namespace cdc_ft {
 // The components are considered fresh if both the timestamp and the file size
 // match.
 struct GameletComponent {
+  std::string build_version;
   std::string filename;
   uint64_t size;
   int64_t modified_time;
 
-  GameletComponent(std::string filename, uint64_t size, time_t modified_time);
+  GameletComponent(std::string build_version, std::string filename,
+                   uint64_t size, time_t modified_time);
   ~GameletComponent();
 
   bool operator==(const GameletComponent& other) const;

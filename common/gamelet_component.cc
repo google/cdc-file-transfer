@@ -18,20 +18,36 @@
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
+#include "common/build_version.h"
 #include "common/path.h"
 #include "common/status.h"
 
 namespace cdc_ft {
 
-GameletComponent::GameletComponent(std::string filename, uint64_t size,
+GameletComponent::GameletComponent(std::string build_version,
+                                   std::string filename, uint64_t size,
                                    time_t modified_time)
-    : filename(filename), size(size), modified_time(modified_time) {}
+    : build_version(build_version),
+      filename(filename),
+      size(size),
+      modified_time(modified_time) {}
 
 GameletComponent::~GameletComponent() = default;
 
 bool GameletComponent::operator==(const GameletComponent& other) const {
-  return filename == other.filename && size == other.size &&
-         modified_time == other.modified_time;
+  if (filename != other.filename) {
+    return false;
+  }
+
+  // If either build version is the dev version, it means that the component was
+  // built locally, so that we can't compare build versions. Fall back to
+  // comparing file_size and  modified_time.
+  if (build_version != DEV_BUILD_VERSION &&
+      build_version != DEV_BUILD_VERSION) {
+    return build_version == other.build_version;
+  }
+
+  return size == other.size && modified_time == other.modified_time;
 }
 
 bool GameletComponent::operator!=(const GameletComponent& other) const {
@@ -49,7 +65,7 @@ absl::Status GameletComponent::Get(
     absl::Status status = path::GetStats(path, &stats);
     if (!status.ok())
       return WrapStatus(status, "GetStats() failed for '%s'", path);
-    components->emplace_back(path::BaseName(path), stats.size,
+    components->emplace_back(BUILD_VERSION, path::BaseName(path), stats.size,
                              stats.modified_time);
   }
 
@@ -61,9 +77,9 @@ std::string GameletComponent::ToCommandLineArgs(
     const std::vector<GameletComponent>& components) {
   std::string args;
   for (const GameletComponent& comp : components) {
-    args +=
-        absl::StrFormat("%s%s %u %d", args.empty() ? "" : " ",
-                        comp.filename.c_str(), comp.size, comp.modified_time);
+    args += absl::StrFormat("%s%s %s %u %d", args.empty() ? "" : " ",
+                            comp.build_version.c_str(), comp.filename.c_str(),
+                            comp.size, comp.modified_time);
   }
   return args;
 }
@@ -72,9 +88,9 @@ std::string GameletComponent::ToCommandLineArgs(
 std::vector<GameletComponent> GameletComponent::FromCommandLineArgs(
     int argc, const char** argv) {
   std::vector<GameletComponent> components;
-  for (int n = 0; n + 2 < argc; n += 3) {
-    components.emplace_back(argv[n], std::stol(argv[n + 1]),
-                            std::stol(argv[n + 2]));
+  for (int n = 0; n + 3 < argc; n += 4) {
+    components.emplace_back(argv[n], argv[n + 1], std::stol(argv[n + 2]),
+                            std::stol(argv[n + 3]));
   }
   return components;
 }

@@ -131,6 +131,7 @@ cc_library(
     hdrs = ["params.h"],
     deps = [
         ":cdc_rsync_client",
+        "//common:build_version",
         "//common:port_range_parser",
         "@com_github_zstd//:zstd",
         "@com_google_absl//absl/status",

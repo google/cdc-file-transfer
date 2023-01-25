@@ -19,6 +19,7 @@
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
+#include "common/build_version.h"
 #include "common/path.h"
 #include "common/port_range_parser.h"
 #include "common/remote_util.h"
@@ -38,8 +39,7 @@ void PrintError(const absl::FormatSpec<Args...>& format, Args... args) {
 enum class OptionResult { kConsumedKey, kConsumedKeyValue, kError };
 
 const char kHelpText[] =
-    R"(Synchronize files and directories
-
+    R"(
 Matching files are skipped based on file size and modified time. For partially
 matching files only the differences are transferred. The destination directory
 can be the same Windows machine or a remote Windows or Linux device.
@@ -323,6 +323,8 @@ OptionResult HandleParameter(const std::string& key, const char* value,
 
 bool ValidateParameters(const Parameters& params, bool help) {
   if (help) {
+    std::cout << "cdc_rsync - Synchronize files and directories. Version: "
+              << BUILD_VERSION << "\n";
     std::cout << kHelpText;
     return false;
   }

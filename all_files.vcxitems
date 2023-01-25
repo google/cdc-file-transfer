@@ -159,6 +159,7 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)metrics\metrics.cc" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_stream\stop_service_command.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\ansi_filter.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)common\build_version.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\port_range_parser.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)fastcdc\fastcdc.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)manifest\pending_assets_queue.h" />

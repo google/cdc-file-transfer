@@ -100,6 +100,7 @@ cc_binary(
         "//cdc_rsync/base:cdc_interface",
         "//cdc_rsync/base:message_pump",
         "//cdc_rsync/base:server_exit_code",
+        "//common:build_version",
         "//common:clock",
         "//common:gamelet_component",
         "//common:log",
