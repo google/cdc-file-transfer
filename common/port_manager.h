@@ -40,8 +40,8 @@ class PortManager {
   // synchronize port reservation. The range of possible ports managed by this
   // instance is [|first_port|, |last_port|]. |process_factory| is a valid
   // pointer to a ProcessFactory instance to run processes locally.
-  // |remote_util| is a valid pointer to a RemoteUtil instance to run processes
-  // remotely.
+  // |remote_util| is the RemoteUtil instance to run processes remotely. If it
+  //   is nullptr, no remote ports are reserved.
   PortManager(std::string unique_name, int first_port, int last_port,
               ProcessFactory* process_factory, RemoteUtil* remote_util,
               SystemClock* system_clock = DefaultSystemClock::GetInstance(),

@@ -29,9 +29,15 @@ class ServerArch {
     kWindows = 1,
   };
 
-  // Detects the architecture type based on the destination path, e.g. path
+  // Detects the arch type based on the destination path, e.g. path
   // starting with C: indicate Windows.
   static Type Detect(const std::string& destination);
+
+  // Returns the arch type that matches the current process's type.
+  static Type LocalType();
+
+  // Returns the (local!) arch specific filename of cdc_rsync[.exe].
+  static std::string CdcRsyncFilename();
 
   ServerArch(Type type);
   ~ServerArch();

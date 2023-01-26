@@ -291,8 +291,8 @@ std::string GetDrivePrefix(const std::string& path) {
 
   if (path[0] != '\\') {
     size_t pos = path.find(":");
-    if (pos == std::string::npos) {
-      // E.g. "\path\to\file" or "path\to\file".
+    if (pos != 1) {
+      // E.g. "\path\to\file", "path\to\file" or "user@host:file".
       return std::string();
     }
 

@@ -21,16 +21,18 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "cdc_rsync/base/message_pump.h"
 #include "cdc_rsync/client_socket.h"
 #include "cdc_rsync/progress_tracker.h"
 #include "common/path_filter.h"
-#include "common/port_manager.h"
-#include "common/remote_util.h"
+#include "common/process.h"
 
 namespace cdc_ft {
 
+class PortManager;
 class Process;
+class RemoteUtil;
 class ServerArch;
 class ZstdStream;
 
@@ -129,8 +131,8 @@ class CdcRsyncClient {
   std::vector<std::string> sources_;
   const std::string destination_;
   WinProcessFactory process_factory_;
-  RemoteUtil remote_util_;
-  PortManager port_manager_;
+  std::unique_ptr<RemoteUtil> remote_util_;
+  std::unique_ptr<PortManager> port_manager_;
   std::unique_ptr<SocketFinalizer> socket_finalizer_;
   ClientSocket socket_;
   MessagePump message_pump_{&socket_, MessagePump::PacketReceivedDelegate()};

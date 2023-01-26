@@ -131,11 +131,13 @@ absl::StatusOr<int> PortManager::ReservePort(int remote_timeout_sec) {
 
   // Find available port on remote instance.
   std::unordered_set<int> remote_ports = local_ports;
-  ASSIGN_OR_RETURN(remote_ports,
-                   FindAvailableRemotePorts(first_port_, last_port_, "0.0.0.0",
-                                            process_factory_, remote_util_,
-                                            remote_timeout_sec, steady_clock_),
-                   "Failed to find available ports on instance");
+  if (remote_util_ != nullptr) {
+    ASSIGN_OR_RETURN(remote_ports,
+                     FindAvailableRemotePorts(
+                         first_port_, last_port_, "0.0.0.0", process_factory_,
+                         remote_util_, remote_timeout_sec, steady_clock_),
+                     "Failed to find available ports on instance");
+  }
 
   // Fetch shared memory.
   void* mem;
