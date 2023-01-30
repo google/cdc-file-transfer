@@ -185,14 +185,15 @@ class ChunkerTmpl {
     for (/*empty*/; i < len; ++i) {
       if (!(hash & rc_mask)) {
         if (hash <= kthreshold_) {
-	  // This hash matches the target length hash criteria, return it.
+          // This hash matches the target length hash criteria, return it.
           return i;
         } else {
-	  // This is a better regression point. Set it as the new rc_len and
-	  // update rc_mask to check as many MSBits as this hash would pass.
-	  rc_len = i;
-	  for (rc_mask = (T)-1; hash & rc_mask; rc_mask <<= 1);
-	}
+          // This is a better regression point. Set it as the new rc_len and
+          // update rc_mask to check as many MSBits as this hash would pass.
+          rc_len = i;
+          for (rc_mask = (T)-1; hash & rc_mask; rc_mask <<= 1)
+            ;
+        }
       }
       hash = ((hash << 1) + data[i]) * kmult;
     }
