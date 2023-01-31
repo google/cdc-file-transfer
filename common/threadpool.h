@@ -88,8 +88,13 @@ class Threadpool {
     return outstanding_task_count_;
   }
 
-  // Block until the number of queued tasks drops below |count|.
-  void WaitForQueuedTasksAtMost(size_t count) const ABSL_LOCKS_EXCLUDED(mutex_);
+  // Block until the number of queued tasks drops below or equal to |count|, or
+  // until the timeout is exceeded, or until Shutdown() is called, whatever
+  // comes sooner. Returns true if less than or equal to |count| tasks are
+  // queued.
+  bool WaitForQueuedTasksAtMost(
+      size_t count, absl::Duration timeout = absl::InfiniteDuration()) const
+      ABSL_LOCKS_EXCLUDED(mutex_);
 
  private:
   // Background thread worker method. Picks tasks and runs them.

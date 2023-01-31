@@ -169,14 +169,18 @@ TEST_F(ThreadpoolTest, SetTaskCompletedCallback) {
 }
 
 TEST_F(ThreadpoolTest, WaitForQueuedTasksAtMost) {
-  auto task_func = [](Task::IsCancelledPredicate) { Util::Sleep(10); };
-
-  Semaphore task_finished(0);
+  Semaphore task_signal(0);
+  auto task_func = [&task_signal](Task::IsCancelledPredicate) {
+    task_signal.Wait();
+  };
   Threadpool pool(1);
   pool.QueueTask(std::make_unique<TestTask>(task_func));
   pool.QueueTask(std::make_unique<TestTask>(task_func));
-  pool.WaitForQueuedTasksAtMost(1);
+  EXPECT_FALSE(pool.WaitForQueuedTasksAtMost(1, absl::Milliseconds(10)));
+  task_signal.Signal();
+  EXPECT_TRUE(pool.WaitForQueuedTasksAtMost(1, absl::Milliseconds(5000)));
   EXPECT_EQ(pool.NumQueuedTasks(), 1);
+  task_signal.Signal();
 }
 
 }  // namespace

@@ -75,6 +75,9 @@ class PatchTask : public Task {
 
   virtual ~PatchTask() = default;
 
+  PatchTask(const PatchTask& other) = delete;
+  PatchTask& operator=(const PatchTask& other) = delete;
+
   const ChangedFileInfo& File() const { return file_; }
 
   const absl::Status& Status() const { return status_; }
@@ -196,6 +199,10 @@ class FinalizeCopiedFileTask : public Task {
         status_(status) {}
   virtual ~FinalizeCopiedFileTask() = default;
 
+  FinalizeCopiedFileTask(const FinalizeCopiedFileTask& other) = delete;
+  FinalizeCopiedFileTask& operator=(const FinalizeCopiedFileTask& other) =
+      delete;
+
   const absl::Status& Status() const { return status_; }
 
   // Task:
@@ -257,7 +264,7 @@ PathFilter::Rule::Type ToInternalType(
 
 }  // namespace
 
-CdcRsyncServer::CdcRsyncServer() {}
+CdcRsyncServer::CdcRsyncServer() = default;
 
 CdcRsyncServer::~CdcRsyncServer() = default;
 
@@ -736,13 +743,13 @@ absl::Status CdcRsyncServer::HandleSendMissingFileData() {
     }
 
     // Check the results of completed tasks.
-    std::unique_ptr<Task> task;
-    while ((task = finalize_pool.TryGetCompletedTask()) != nullptr) {
+    for (std::unique_ptr<Task> task = finalize_pool.TryGetCompletedTask();
+         task != nullptr; task = finalize_pool.TryGetCompletedTask()) {
       const FinalizeCopiedFileTask* finalize_task =
           static_cast<FinalizeCopiedFileTask*>(task.get());
       if (!finalize_task->Status().ok()) {
         // Close and finish files that have already been copied, so we don't
-        // several already copied files because one failed.
+        // discard several already copied files because one failed.
         finalize_pool.Wait();
         return finalize_task->Status();
       }
@@ -834,13 +841,13 @@ absl::Status CdcRsyncServer::SyncChangedFiles() {
     }
 
     // Check the results of completed tasks.
-    std::unique_ptr<Task> task;
-    while ((task = finalize_pool.TryGetCompletedTask()) != nullptr) {
+    for (std::unique_ptr<Task> task = finalize_pool.TryGetCompletedTask();
+         task != nullptr; task = finalize_pool.TryGetCompletedTask()) {
       const PatchTask* patch_task = static_cast<PatchTask*>(task.get());
       const std::string& task_path = patch_task->File().filepath;
       if (!patch_task->Status().ok()) {
         // Close and finish files that have already been synced, so we don't
-        // several already synced files because one failed.
+        // discard several already synced files because one failed.
         finalize_pool.Wait();
         return WrapStatus(patch_task->Status(), "Failed to patch file '%s'",
                           task_path);

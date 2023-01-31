@@ -87,12 +87,14 @@ void Threadpool::SetTaskCompletedCallback(TaskCompletedCallback cb) {
   on_task_completed_ = std::move(cb);
 }
 
-void Threadpool::WaitForQueuedTasksAtMost(size_t count) const {
+bool Threadpool::WaitForQueuedTasksAtMost(size_t count,
+                                          absl::Duration timeout) const {
   absl::MutexLock lock(&task_queue_mutex_);
   auto cond = [this, count]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(task_queue_mutex_) {
     return shutdown_ || outstanding_task_count_ <= count;
   };
-  task_queue_mutex_.Await(absl::Condition(&cond));
+  return task_queue_mutex_.AwaitWithTimeout(absl::Condition(&cond), timeout) &&
+         outstanding_task_count_ <= count;
 }
 
 void Threadpool::ThreadWorkerMain() {
