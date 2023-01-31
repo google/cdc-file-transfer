@@ -22,8 +22,14 @@
 namespace cdc_ft {
 namespace ansi_filter {
 
-// Removes ANSI escape sequences from |str|.
-std::string RemoveEscapeSequences(std::string str);
+// Removes ANSI escape sequences from a string.
+// |input| is a string that can contain ANSI escape sequences.
+// Returns the filtered string with ANSI escape sequences removed.
+// Example: The most common escape sequence sets a color, e.g.
+//            "This \x1b[1;32merror\x1b[0m is red."
+//          The filtered output is
+//            "This error is red."
+std::string RemoveEscapeSequences(const std::string& input);
 
 }  // namespace ansi_filter
 }  // namespace cdc_ft

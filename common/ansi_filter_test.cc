@@ -88,5 +88,11 @@ TEST(AnsiFilterTest, RemovesSequencesFromActualSshOutput) {
   EXPECT_EQ(res, "foo");
 }
 
+TEST(AnsiFilterTest, WorksForExampleFromDocumentation) {
+  std::string str = "This \x1b[1;32merror\x1b[0m is red.";
+  std::string res = std::string(ansi_filter::RemoveEscapeSequences(str));
+  EXPECT_EQ(res, "This error is red.");
+}
+
 }  // namespace
 }  // namespace cdc_ft

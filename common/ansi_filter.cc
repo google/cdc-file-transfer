@@ -33,46 +33,46 @@ constexpr uint8_t kOSCI = 0x9D;  // Operating System Command Introducer
 
 }  // namespace
 
-std::string RemoveEscapeSequences(std::string str) {
-  size_t write_idx = 0;
+std::string RemoveEscapeSequences(const std::string& input) {
   State state = State::kNotInSequence;
+  std::string result;
 
-  for (size_t read_idx = 0; read_idx < str.size(); ++read_idx) {
-    uint8_t ch = static_cast<uint8_t>(str[read_idx]);
+  for (size_t n = 0; n < input.size(); ++n) {
+    uint8_t ch = static_cast<uint8_t>(input[n]);
     uint8_t next_ch =
-        static_cast<uint8_t>(read_idx + 1 < str.size() ? str[read_idx + 1] : 0);
+        static_cast<uint8_t>(n + 1 < input.size() ? input[n + 1] : 0);
 
     switch (state) {
       case State::kNotInSequence:
         // Device Control String.
         if ((ch == kESC && next_ch == 'P') || ch == kDCSI) {
-          read_idx += ch == kESC ? 1 : 0;
+          n += ch == kESC ? 1 : 0;
           state = State::kDCS;
           break;
         }
 
         // Control Sequence.
         if ((ch == kESC && next_ch == '[') || ch == kCSI) {
-          read_idx += ch == kESC ? 1 : 0;
+          n += ch == kESC ? 1 : 0;
           state = State::kCS;
           break;
         }
 
         // Operating System Command.
         if ((ch == kESC && next_ch == ']') || ch == kOSCI) {
-          read_idx += ch == kESC ? 1 : 0;
+          n += ch == kESC ? 1 : 0;
           state = State::kOSC;
           break;
         }
 
         // Char does not belong to control sequence.
-        str[write_idx++] = ch;
+        result.push_back(ch);
         break;
 
       case State::kDCS:
         // Device control strings are ended by kST or ESC + \.
         if (ch == kST || (ch == kESC && next_ch == '\\')) {
-          read_idx += ch == kESC ? 1 : 0;
+          n += ch == kESC ? 1 : 0;
           state = State::kNotInSequence;
         }
         break;
@@ -89,15 +89,14 @@ std::string RemoveEscapeSequences(std::string str) {
         // Operating system commands are ended by kBEL, kST or ESC + \.
         // https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Operating-System-Commands
         if (ch == kBEL || ch == kST || (ch == kESC && next_ch == '\\')) {
-          read_idx += ch == kESC ? 1 : 0;
+          n += ch == kESC ? 1 : 0;
           state = State::kNotInSequence;
         }
         break;
     }
   }
 
-  str.resize(write_idx);
-  return str;
+  return result;
 }
 
 }  // namespace ansi_filter
