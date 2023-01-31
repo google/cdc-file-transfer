@@ -280,7 +280,7 @@ absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableRemotePorts(
     SteadyClock* steady_clock) {
   std::string remote_command = GetNetstatCommand(arch_type);
   ProcessStartInfo start_info =
-      remote_util->BuildProcessStartInfoForSsh(remote_command);
+      remote_util->BuildProcessStartInfoForSsh(remote_command, arch_type);
   start_info.name = "netstat";
   start_info.flags = ProcessFlags::kNoWindow;
 

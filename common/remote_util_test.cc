@@ -59,7 +59,8 @@ class RemoteUtilTest : public ::testing::Test {
 };
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSsh) {
-  ProcessStartInfo si = util_.BuildProcessStartInfoForSsh(kCommand);
+  ProcessStartInfo si =
+      util_.BuildProcessStartInfoForSsh(kCommand, ArchType::kLinux_x86_64);
   ExpectContains(si.command, {"ssh", kUserHostArg, kCommand});
 }
 
@@ -75,19 +76,20 @@ TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForward) {
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForwardAndCommand) {
   ProcessStartInfo si = util_.BuildProcessStartInfoForSshPortForwardAndCommand(
-      kLocalPort, kRemotePort, kRegular, kCommand);
+      kLocalPort, kRemotePort, kRegular, kCommand, ArchType::kLinux_x86_64);
   ExpectContains(si.command,
                  {"ssh", kUserHostArg, kPortForwardingArg, kCommand});
 
   si = util_.BuildProcessStartInfoForSshPortForwardAndCommand(
-      kLocalPort, kRemotePort, kReverse, kCommand);
+      kLocalPort, kRemotePort, kReverse, kCommand, ArchType::kLinux_x86_64);
   ExpectContains(si.command,
                  {"ssh", kUserHostArg, kReversePortForwardingArg, kCommand});
 }
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshWithCustomCommand) {
   constexpr char kCustomSshCmd[] = "C:\\path\\to\\ssh.exe --fooarg --bararg=42";
   util_.SetSshCommand(kCustomSshCmd);
-  ProcessStartInfo si = util_.BuildProcessStartInfoForSsh(kCommand);
+  ProcessStartInfo si =
+      util_.BuildProcessStartInfoForSsh(kCommand, ArchType::kLinux_x86_64);
   ExpectContains(si.command, {kCustomSshCmd});
 }
 

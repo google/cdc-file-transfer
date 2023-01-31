@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "absl/status/status.h"
+#include "common/arch_type.h"
 #include "common/process.h"
 
 namespace cdc_ft {
@@ -92,15 +93,18 @@ class RemoteUtil {
 
   // Runs |remote_command| on the remote device. The command must be properly
   // escaped. |name| is the name of the command displayed in the logs.
-  absl::Status Run(std::string remote_command, std::string name);
+  absl::Status Run(std::string remote_command, std::string name,
+                   ArchType arch_type);
 
   // Same as Run(), but captures both stdout and stderr.
   // If |std_out| or |std_err| are nullptr, the output is not captured.
   absl::Status RunWithCapture(std::string remote_command, std::string name,
-                              std::string* std_out, std::string* std_err);
+                              std::string* std_out, std::string* std_err,
+                              ArchType arch_type);
 
   // Builds an SSH command that executes |remote_command| on the remote device.
-  ProcessStartInfo BuildProcessStartInfoForSsh(std::string remote_command);
+  ProcessStartInfo BuildProcessStartInfoForSsh(std::string remote_command,
+                                               ArchType arch_type);
 
   // Builds an SSH command that runs SSH port forwarding to the remote device,
   // using the given |local_port| and |remote_port|. If |reverse| is true, sets
@@ -113,8 +117,8 @@ class RemoteUtil {
   // using port forwarding with given |local_port| and |remote_port|. If
   // |reverse| is true, sets up reverse port forwarding.
   ProcessStartInfo BuildProcessStartInfoForSshPortForwardAndCommand(
-      int local_port, int remote_port, bool reverse,
-      std::string remote_command);
+      int local_port, int remote_port, bool reverse, std::string remote_command,
+      ArchType arch_type);
 
   // Returns whether output is suppressed.
   bool Quiet() const { return quiet_; }
@@ -145,7 +149,7 @@ class RemoteUtil {
  private:
   // Common code for BuildProcessStartInfoForSsh*.
   ProcessStartInfo BuildProcessStartInfoForSshInternal(
-      std::string forward_arg, std::string remote_command);
+      std::string forward_arg, std::string remote_command, ArchType arch_type);
 
   const int verbosity_;
   const bool quiet_;

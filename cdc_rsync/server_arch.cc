@@ -19,6 +19,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
+#include "common/ansi_filter.h"
 #include "common/path.h"
 #include "common/remote_util.h"
 #include "common/status_macros.h"
@@ -119,9 +120,15 @@ absl::StatusOr<ServerArch> ServerArch::DetectFromRemoteDevice(
   // Run uname, assuming it's a Linux machine.
   std::string uname_out;
   std::string linux_cmd = "uname -sm";
-  absl::Status status =
-      remote_util->RunWithCapture(linux_cmd, "uname", &uname_out, nullptr);
+  absl::Status status = remote_util->RunWithCapture(
+      linux_cmd, "uname", &uname_out, nullptr, ArchType::kLinux_x86_64);
   if (status.ok()) {
+    // Running uname on Windows, assuming it's Linux, leads to tons of ANSI
+    // escape sequences in the output. Remove them to at least get some readable
+    // output.
+    uname_out = absl::StripAsciiWhitespace(
+        ansi_filter::RemoveEscapeSequences(uname_out));
+
     LOG_DEBUG("Uname returned '%s'", uname_out);
     absl::StatusOr<ArchType> type = GetArchTypeFromUname(uname_out);
     if (type.ok()) {
@@ -142,8 +149,9 @@ absl::StatusOr<ServerArch> ServerArch::DetectFromRemoteDevice(
   std::string arch_out;
   std::string windows_cmd =
       RemoteUtil::QuoteForSsh("cmd /C set PROCESSOR_ARCHITECTURE ");
-  status = remote_util->RunWithCapture(
-      windows_cmd, "set PROCESSOR_ARCHITECTURE", &arch_out, nullptr);
+  status = remote_util->RunWithCapture(windows_cmd,
+                                       "set PROCESSOR_ARCHITECTURE", &arch_out,
+                                       nullptr, ArchType::kWindows_x86_64);
   if (status.ok()) {
     LOG_DEBUG("PROCESSOR_ARCHITECTURE is '%s'", arch_out);
     absl::StatusOr<ArchType> type = GetArchTypeFromWinProcArch(arch_out);

@@ -267,7 +267,7 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
     std::string remote_command = arch.GetStartServerCommand(
         kExitCodeNotFound, absl::StrFormat("%i %s", port, component_args));
     start_info = remote_util_->BuildProcessStartInfoForSshPortForwardAndCommand(
-        port, port, /*reverse=*/false, remote_command);
+        port, port, /*reverse=*/false, remote_command, arch.GetType());
   } else {
     // Run cdc_rsync_server locally.
     std::string exe_dir;
