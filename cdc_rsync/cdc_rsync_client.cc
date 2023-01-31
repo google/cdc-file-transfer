@@ -146,6 +146,9 @@ absl::Status CdcRsyncClient::Run() {
     // Check whether we guessed the arch type wrong and try again.
     // Note that in case of a local sync, or if the server actively reported
     // that it's out-dated, there's no need to detect the arch.
+    LOG_DEBUG(
+        "Failed to start server, retrying after detecting remote arch: %s",
+        status.ToString());
     const ArchType old_type = server_arch.GetType();
     ASSIGN_OR_RETURN(server_arch,
                      ServerArch::DetectFromRemoteDevice(remote_util_.get()));
@@ -219,6 +222,9 @@ absl::StatusOr<int> CdcRsyncClient::FindAvailablePort(ServerArch* server_arch) {
   // the arch was wrong. Properly detect it and try again if it changed.
   if (!port.ok() && server_arch->IsGuess()) {
     const ArchType old_type = server_arch->GetType();
+    LOG_DEBUG(
+        "Failed to reserve port, retrying after detecting remote arch: %s",
+        port.status().ToString());
     ASSIGN_OR_RETURN(*server_arch,
                      ServerArch::DetectFromRemoteDevice(remote_util_.get()));
     assert(!server_arch->IsGuess());
