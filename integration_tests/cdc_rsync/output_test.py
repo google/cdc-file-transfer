@@ -115,7 +115,7 @@ class OutputTest(test_base.CdcRsyncTest):
 
     # server-side output
     self._assert_regex(
-        r'DEBUG   server_socket\.cc\([0-9]+\): Receive\(\): EOF\(\) detected',
+        r'DEBUG   \d+\.\d{3} server_socket\.cc\([0-9]+\): Receive\(\): EOF\(\) detected',
         output)
 
     # TODO: Add a check here, as currently the output is misleading
@@ -139,7 +139,7 @@ class OutputTest(test_base.CdcRsyncTest):
 
     # server-side output
     self._assert_regex(
-        r'VERBOSE message_pump\.cc\([0-9]+\): ThreadDoReceivePacket\(\): Received packet of size',
+        r'VERBOSE \d+\.\d{3} message_pump\.cc\([0-9]+\): ThreadDoReceivePacket\(\): Received packet of size',
         output)
 
   def test_quiet(self):

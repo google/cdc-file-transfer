@@ -22,6 +22,7 @@
 #include "absl/strings/str_format.h"
 #include "absl/synchronization/mutex.h"
 #include "common/clock.h"
+#include "common/stopwatch.h"
 
 namespace cdc_ft {
 
@@ -120,6 +121,7 @@ class ConsoleLog : public Log {
       ABSL_LOCKS_EXCLUDED(mutex_);
 
  private:
+  Stopwatch stopwatch_;
   absl::Mutex mutex_;
 };
 
