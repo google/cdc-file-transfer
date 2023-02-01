@@ -25,7 +25,7 @@
 
 namespace cdc_ft {
 
-// Utilities for executing remote commands on a gamelet through SSH.
+// Utilities for executing remote commands on a remote device through SSH.
 // Windows-only.
 class RemoteUtil {
  public:
@@ -63,8 +63,8 @@ class RemoteUtil {
   // Returns bad results for tricky strings like "C:\scp.path\scp.exe".
   static std::string ScpToSftpCommand(std::string scp_command);
 
-  // Copies |source_filepaths| to the remote folder |dest| on the gamelet using
-  // scp. If |compress| is true, compressed upload is used.
+  // Copies |source_filepaths| to the remote folder |dest| on the remove device
+  // using scp. If |compress| is true, compressed upload is used.
   absl::Status Scp(std::vector<std::string> source_filepaths,
                    const std::string& dest, bool compress);
 
@@ -86,27 +86,32 @@ class RemoteUtil {
   absl::Status Sftp(const std::string& commands,
                     const std::string& initial_local_dir, bool compress);
 
-  // Calls 'chmod |mode| |remote_path|' on the gamelet.
+  // Calls 'chmod |mode| |remote_path|' on the remote device.
   absl::Status Chmod(const std::string& mode, const std::string& remote_path,
                      bool quiet = false);
 
-  // Runs |remote_command| on the gamelet. The command must be properly escaped.
-  // |name| is the name of the command displayed in the logs.
+  // Runs |remote_command| on the remote device. The command must be properly
+  // escaped. |name| is the name of the command displayed in the logs.
   absl::Status Run(std::string remote_command, std::string name);
 
-  // Builds an SSH command that executes |remote_command| on the gamelet.
+  // Same as Run(), but captures both stdout and stderr.
+  // If |std_out| or |std_err| are nullptr, the output is not captured.
+  absl::Status RunWithCapture(std::string remote_command, std::string name,
+                              std::string* std_out, std::string* std_err);
+
+  // Builds an SSH command that executes |remote_command| on the remote device.
   ProcessStartInfo BuildProcessStartInfoForSsh(std::string remote_command);
 
-  // Builds an SSH command that runs SSH port forwarding to the gamelet, using
-  // the given |local_port| and |remote_port|.
-  // If |reverse| is true, sets up reverse port forwarding.
+  // Builds an SSH command that runs SSH port forwarding to the remote device,
+  // using the given |local_port| and |remote_port|. If |reverse| is true, sets
+  // up reverse port forwarding.
   ProcessStartInfo BuildProcessStartInfoForSshPortForward(int local_port,
                                                           int remote_port,
                                                           bool reverse);
 
-  // Builds an SSH command that executes |remote_command| on the gamelet, using
-  // port forwarding with given |local_port| and |remote_port|.
-  // If |reverse| is true, sets up reverse port forwarding.
+  // Builds an SSH command that executes |remote_command| on the remote device,
+  // using port forwarding with given |local_port| and |remote_port|. If
+  // |reverse| is true, sets up reverse port forwarding.
   ProcessStartInfo BuildProcessStartInfoForSshPortForwardAndCommand(
       int local_port, int remote_port, bool reverse,
       std::string remote_command);

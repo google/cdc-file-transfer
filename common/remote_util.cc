@@ -148,6 +148,31 @@ absl::Status RemoteUtil::Run(std::string remote_command, std::string name) {
   return process_factory_->Run(start_info);
 }
 
+absl::Status RemoteUtil::RunWithCapture(std::string remote_command,
+                                        std::string name, std::string* std_out,
+                                        std::string* std_err) {
+  ProcessStartInfo start_info =
+      BuildProcessStartInfoForSsh(std::move(remote_command));
+  start_info.name = std::move(name);
+  start_info.forward_output_to_log = forward_output_to_log_;
+
+  if (std_out) {
+    start_info.stdout_handler = [std_out](const char* data, size_t size) {
+      std_out->append(data, size);
+      return absl::OkStatus();
+    };
+  }
+
+  if (std_err) {
+    start_info.stderr_handler = [std_err](const char* data, size_t size) {
+      std_err->append(data, size);
+      return absl::OkStatus();
+    };
+  }
+
+  return process_factory_->Run(start_info);
+}
+
 ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSsh(
     std::string remote_command) {
   return BuildProcessStartInfoForSshInternal("", "-- " + remote_command);

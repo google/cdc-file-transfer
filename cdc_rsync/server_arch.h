@@ -19,28 +19,48 @@
 
 #include <string>
 
+#include "absl/status/statusor.h"
+#include "common/arch_type.h"
+
 namespace cdc_ft {
 
+class RemoteUtil;
+
 // Abstracts all architecture specifics of cdc_rsync_server deployment.
+// Comes in two flavors, "guessed" and "detected". Guesses are used as an
+// optimization. For instance, if one syncs to C:\some\path, it's clearly a
+// Windows machine and we can skip detection.
 class ServerArch {
  public:
-  enum class Type {
-    kLinux = 0,
-    kWindows = 1,
-  };
-
-  // Detects the arch type based on the destination path, e.g. path
-  // starting with C: indicate Windows.
-  static Type Detect(const std::string& destination);
+  // Guesses the arch type based on the destination path, e.g. path starting
+  // with C: indicate Windows. This is a guessed type. It may be wrong. For
+  // instance, if destination is just a single folder like "foo", the method
+  // defaults to Type::kLinux.
+  static ServerArch GuessFromDestination(const std::string& destination);
 
   // Returns the arch type that matches the current process's type.
-  static Type LocalType();
+  // This is not a guessed type, it is reliable.
+  static ServerArch DetectFromLocalDevice();
+
+  // Creates an  by properly detecting it on the remote device.
+  // This is more costly than guessing, but it is reliable.
+  static absl::StatusOr<ServerArch> DetectFromRemoteDevice(
+      RemoteUtil* remote_util);
 
   // Returns the (local!) arch specific filename of cdc_rsync[.exe].
   static std::string CdcRsyncFilename();
 
-  ServerArch(Type type);
+  ServerArch(ArchType type, bool is_guess);
   ~ServerArch();
+
+  // Accessor for the arch type.
+  ArchType GetType() const { return type_; }
+
+  // Returns the type as a human readable string.
+  const char* GetTypeStr() const;
+
+  // Returns true if the type was guessed and not detected.
+  bool IsGuess() const { return is_guess_; }
 
   // Returns the arch-specific filename of cdc_rsync_server[.exe].
   std::string CdcServerFilename() const;
@@ -68,7 +88,8 @@ class ServerArch {
   std::string GetDeploySftpCommands() const;
 
  private:
-  Type type_;
+  ArchType type_;
+  bool is_guess_ = false;
 };
 
 }  // namespace cdc_ft

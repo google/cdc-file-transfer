@@ -441,9 +441,9 @@ absl::Status MultiSession::Initialize() {
     std::unordered_set<int> ports;
     ASSIGN_OR_RETURN(
         ports,
-        PortManager::FindAvailableLocalPorts(cfg_.forward_port_first,
-                                             cfg_.forward_port_last,
-                                             "127.0.0.1", process_factory_),
+        PortManager::FindAvailableLocalPorts(
+            cfg_.forward_port_first, cfg_.forward_port_last,
+            ArchType::kWindows_x86_64, process_factory_),
         "Failed to find an available local port in the range [%d, %d]",
         cfg_.forward_port_first, cfg_.forward_port_last);
     assert(!ports.empty());

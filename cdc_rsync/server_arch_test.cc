@@ -20,68 +20,83 @@
 namespace cdc_ft {
 namespace {
 
-constexpr auto kLinux = ServerArch::Type::kLinux;
-constexpr auto kWindows = ServerArch::Type::kWindows;
+constexpr auto kLinux = ArchType::kLinux_x86_64;
+constexpr auto kWindows = ArchType::kWindows_x86_64;
 
-TEST(ServerArchTest, DetectsLinuxIfPathStartsWithSlashOrTilde) {
-  EXPECT_EQ(ServerArch::Detect("/linux/path"), kLinux);
-  EXPECT_EQ(ServerArch::Detect("/linux\\path"), kLinux);
-  EXPECT_EQ(ServerArch::Detect("~/linux/path"), kLinux);
-  EXPECT_EQ(ServerArch::Detect("~/linux\\path"), kLinux);
-  EXPECT_EQ(ServerArch::Detect("~\\linux\\path"), kLinux);
+constexpr bool kNoGuess = false;
+
+TEST(ServerArchTest, GuessesLinuxIfPathStartsWithSlashOrTilde) {
+  EXPECT_EQ(ServerArch::GuessFromDestination("/linux/path").GetType(), kLinux);
+  EXPECT_EQ(ServerArch::GuessFromDestination("/linux\\path").GetType(), kLinux);
+  EXPECT_EQ(ServerArch::GuessFromDestination("~/linux/path").GetType(), kLinux);
+  EXPECT_EQ(ServerArch::GuessFromDestination("~/linux\\path").GetType(),
+            kLinux);
+  EXPECT_EQ(ServerArch::GuessFromDestination("~\\linux\\path").GetType(),
+            kLinux);
 }
 
-TEST(ServerArchTest, DetectsWindowsIfPathStartsWithDrive) {
-  EXPECT_EQ(ServerArch::Detect("C:\\win\\path"), kWindows);
-  EXPECT_EQ(ServerArch::Detect("D:win"), kWindows);
-  EXPECT_EQ(ServerArch::Detect("Z:\\win/path"), kWindows);
+TEST(ServerArchTest, GuessesWindowsIfPathStartsWithDrive) {
+  EXPECT_EQ(ServerArch::GuessFromDestination("C:\\win\\path").GetType(),
+            kWindows);
+  EXPECT_EQ(ServerArch::GuessFromDestination("D:win").GetType(), kWindows);
+  EXPECT_EQ(ServerArch::GuessFromDestination("Z:\\win/path").GetType(),
+            kWindows);
 }
 
-TEST(ServerArchTest, DetectsLinuxIfPathOnlyHasForwardSlashes) {
-  EXPECT_EQ(ServerArch::Detect("linux/path"), kLinux);
+TEST(ServerArchTest, GuessesLinuxIfPathOnlyHasForwardSlashes) {
+  EXPECT_EQ(ServerArch::GuessFromDestination("linux/path").GetType(), kLinux);
 }
 
-TEST(ServerArchTest, DetectsWindowsIfPathOnlyHasBackSlashes) {
-  EXPECT_EQ(ServerArch::Detect("\\win\\path"), kWindows);
+TEST(ServerArchTest, GuessesWindowsIfPathOnlyHasBackSlashes) {
+  EXPECT_EQ(ServerArch::GuessFromDestination("\\win\\path").GetType(),
+            kWindows);
 }
 
-TEST(ServerArchTest, DetectsLinuxByDefault) {
-  EXPECT_EQ(ServerArch::Detect("/mixed\\path"), kLinux);
-  EXPECT_EQ(ServerArch::Detect("/mixed\\path"), kLinux);
-  EXPECT_EQ(ServerArch::Detect("C\\linux/path"), kLinux);
-  EXPECT_EQ(ServerArch::Detect(""), kLinux);
+TEST(ServerArchTest, GuessesLinuxByDefault) {
+  EXPECT_EQ(ServerArch::GuessFromDestination("/mixed\\path").GetType(), kLinux);
+  EXPECT_EQ(ServerArch::GuessFromDestination("/mixed\\path").GetType(), kLinux);
+  EXPECT_EQ(ServerArch::GuessFromDestination("C\\linux/path").GetType(),
+            kLinux);
+  EXPECT_EQ(ServerArch::GuessFromDestination("").GetType(), kLinux);
+}
+
+TEST(ServerArchTest, IsGuess) {
+  EXPECT_TRUE(ServerArch::GuessFromDestination("foo").IsGuess());
+  EXPECT_FALSE(ServerArch::DetectFromLocalDevice().IsGuess());
 }
 
 TEST(ServerArchTest, CdcServerFilename) {
-  EXPECT_FALSE(
-      absl::StrContains(ServerArch(kLinux).CdcServerFilename(), "exe"));
-  EXPECT_TRUE(
-      absl::StrContains(ServerArch(kWindows).CdcServerFilename(), "exe"));
+  EXPECT_FALSE(absl::StrContains(
+      ServerArch(kLinux, kNoGuess).CdcServerFilename(), "exe"));
+  EXPECT_TRUE(absl::StrContains(
+      ServerArch(kWindows, kNoGuess).CdcServerFilename(), "exe"));
 }
 
 TEST(ServerArchTest, RemoteToolsBinDir) {
-  const std::string linux_dir = ServerArch(kLinux).RemoteToolsBinDir();
+  const std::string linux_dir =
+      ServerArch(kLinux, kNoGuess).RemoteToolsBinDir();
   EXPECT_TRUE(absl::StrContains(linux_dir, ".cache/"));
 
-  std::string win_dir = ServerArch(kWindows).RemoteToolsBinDir();
+  std::string win_dir = ServerArch(kWindows, kNoGuess).RemoteToolsBinDir();
   EXPECT_TRUE(absl::StrContains(win_dir, "AppData\\Roaming\\"));
 }
 
 TEST(ServerArchTest, GetStartServerCommand) {
-  std::string cmd = ServerArch(kWindows).GetStartServerCommand(123, "foo bar");
+  std::string cmd =
+      ServerArch(kWindows, kNoGuess).GetStartServerCommand(123, "foo bar");
   EXPECT_TRUE(absl::StrContains(cmd, "123"));
   EXPECT_TRUE(absl::StrContains(cmd, "cdc_rsync_server.exe foo bar"));
 
-  cmd = ServerArch(kLinux).GetStartServerCommand(123, "foo bar");
+  cmd = ServerArch(kLinux, kNoGuess).GetStartServerCommand(123, "foo bar");
   EXPECT_TRUE(absl::StrContains(cmd, "123"));
   EXPECT_TRUE(absl::StrContains(cmd, "cdc_rsync_server foo bar"));
 }
 
 TEST(ServerArchTest, GetDeployReplaceCommand) {
-  std::string cmd = ServerArch(kWindows).GetDeploySftpCommands();
+  std::string cmd = ServerArch(kWindows, kNoGuess).GetDeploySftpCommands();
   EXPECT_TRUE(absl::StrContains(cmd, "cdc_rsync_server.exe"));
 
-  cmd = ServerArch(kLinux).GetDeploySftpCommands();
+  cmd = ServerArch(kLinux, kNoGuess).GetDeploySftpCommands();
   EXPECT_TRUE(absl::StrContains(cmd, "cdc_rsync_server"));
 }
 

@@ -79,7 +79,9 @@ class CdcRsyncClient {
 
  private:
   // Finds available local and remote ports for port forwarding.
-  absl::StatusOr<int> FindAvailablePort();
+  // May update |server_arch| by properly detecting the architecture and retry
+  // if the architecture was guessed, i.e. if |server_arch|->IsGuess() is true.
+  absl::StatusOr<int> FindAvailablePort(ServerArch* server_arch);
 
   // Starts the server process. If the method returns a status with tag
   // |kTagDeployServer|, Run() calls DeployServer() and tries again.
