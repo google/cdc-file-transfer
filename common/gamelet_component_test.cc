@@ -15,6 +15,7 @@
 #include "common/gamelet_component.h"
 
 #include "absl/strings/str_split.h"
+#include "common/build_version.h"
 #include "common/log.h"
 #include "common/path.h"
 #include "common/status_test_macros.h"
@@ -43,14 +44,14 @@ class GameletComponentTest : public ::testing::Test {
       path::Join(base_dir_, "other", "cdc_rsync_server");
 };
 
-TEST_F(GameletComponentTest, EqualityOperators) {
+TEST_F(GameletComponentTest, EqualityOperators_DevelopmentVersion) {
   constexpr uint64_t size1 = 1001;
   constexpr uint64_t size2 = 1002;
 
   constexpr int64_t modified_time1 = 5001;
   constexpr int64_t modified_time2 = 5002;
 
-  GameletComponent a("file1", size1, modified_time1);
+  GameletComponent a(DEV_BUILD_VERSION, "file1", size1, modified_time1);
 
   GameletComponent b = a;
   EXPECT_TRUE(a == b && !(a != b));
@@ -65,6 +66,38 @@ TEST_F(GameletComponentTest, EqualityOperators) {
   b = a;
   b.modified_time = modified_time2;
   EXPECT_TRUE(!(a == b) && a != b);
+
+  b = a;
+  b.size = size2;
+  b.build_version = "Specified";
+  EXPECT_TRUE(!(a == b) && a != b);
+
+  a.build_version = "Specified";
+  EXPECT_TRUE(a == b && !(a != b));
+}
+
+TEST_F(GameletComponentTest, EqualityOperators_SpecifiedVersion) {
+  constexpr uint64_t size1 = 1001;
+  constexpr uint64_t size2 = 1002;
+
+  constexpr int64_t modified_time1 = 5001;
+  constexpr int64_t modified_time2 = 5002;
+
+  GameletComponent a("Specified", "file1", size1, modified_time1);
+
+  GameletComponent b = a;
+  EXPECT_TRUE(a == b && !(a != b));
+
+  b.filename = "file2";
+  EXPECT_TRUE(!(a == b) && a != b);
+
+  b = a;
+  b.size = size2;
+  EXPECT_TRUE(a == b && !(a != b));
+
+  b = a;
+  b.modified_time = modified_time2;
+  EXPECT_TRUE(a == b && !(a != b));
 }
 
 TEST_F(GameletComponentTest, GetValidComponents) {

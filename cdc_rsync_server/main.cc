@@ -14,6 +14,7 @@
 
 #include "cdc_rsync/base/server_exit_code.h"
 #include "cdc_rsync_server/cdc_rsync_server.h"
+#include "common/build_version.h"
 #include "common/gamelet_component.h"
 #include "common/log.h"
 #include "common/status.h"
@@ -60,10 +61,16 @@ ServerExitCode GetExitCode(const absl::Status& status) {
 }  // namespace cdc_ft
 
 int main(int argc, const char** argv) {
-  if (argc < 2) {
-    printf("Usage: cdc_rsync_server <port> cdc_rsync_server <size> <time> \n");
-    printf("       where <size> and <time> are the file size and modified\n");
-    printf("       timestamp (Unix epoch) of the corresponding component.\n");
+  if (argc < 5) {
+    printf("cdc_rsync_server - Remote component of cdc_rsync. Version: %s\n\n",
+           BUILD_VERSION);
+    printf(
+        "Usage: cdc_rsync_server <port> <build_version> cdc_rsync_server "
+        "<size> <time> \n");
+    printf("       where <size> is the file size, <time> is the  modified\n");
+    printf(
+        "       timestamp (Unix epoch) and <build_version> is the build "
+        "version of the server.\n");
     return cdc_ft::kServerExitCodeGenericStartup;
   }
 
@@ -82,6 +89,7 @@ int main(int argc, const char** argv) {
   cdc_ft::Log::Initialize(
       std::make_unique<cdc_ft::ConsoleLog>(cdc_ft::LogLevel::kWarning));
   cdc_ft::CdcRsyncServer server;
+
   if (!server.CheckComponents(components)) {
     return cdc_ft::kServerExitCodeOutOfDate;
   }

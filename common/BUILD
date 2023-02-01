@@ -45,6 +45,11 @@ cc_library(
 )
 
 cc_library(
+    name = "build_version",
+    hdrs = ["build_version.h"],
+)
+
+cc_library(
     name = "dir_iter",
     srcs = ["dir_iter.cc"],
     hdrs = ["dir_iter.h"],
@@ -396,6 +401,7 @@ cc_library(
         ":path",
         ":platform",
         ":status",
+        "//common:build_version",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
     ],

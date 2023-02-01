@@ -1,0 +1,10 @@
+#ifndef BUILD_VERSION
+#define DEV_BUILD_VERSION "DEV"
+#ifdef CDC_BUILD_VERSION
+#define TO_STR(arg) #arg
+#define TO_STR_VALUE(arg) TO_STR(arg)
+#define BUILD_VERSION TO_STR_VALUE(CDC_BUILD_VERSION)
+#else
+#define BUILD_VERSION DEV_BUILD_VERSION
+#endif
+#endif
