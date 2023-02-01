@@ -58,9 +58,9 @@ bool IsLinuxArchType(ArchType arch_type) {
 const char* GetArchTypeStr(ArchType arch_type) {
   switch (arch_type) {
     case ArchType::kWindows_x86_64:
-      return "Windows x86_64";
+      return "Windows_x86_64";
     case ArchType::kLinux_x86_64:
-      return "Linux x86_64";
+      return "Linux_x86_64";
     default:
       assert(!kUnhandledArchType);
       return "Unknown";

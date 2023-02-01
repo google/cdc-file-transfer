@@ -125,34 +125,36 @@ absl::StatusOr<ServerArch> ServerArch::DetectFromRemoteDevice(
     LOG_DEBUG("Uname returned '%s'", uname_out);
     absl::StatusOr<ArchType> type = GetArchTypeFromUname(uname_out);
     if (type.ok()) {
-      LOG_DEBUG("Detected server arch type %s from uname",
+      LOG_DEBUG("Detected server arch type '%s' from uname",
                 GetArchTypeStr(*type));
       return ServerArch(*type, /*is_guess=*/false);
     }
     status = type.status();
   }
-  LOG_DEBUG("Failed to detect arch type from uname: %s", status.ToString());
+  LOG_DEBUG(
+      "Failed to detect arch type from uname; this is expected if the remote "
+      "machine is not Linux; will try Windows next: %s",
+      status.ToString());
 
-  // Run echo %PROCESSOR_ARCHITECTURE%, assuming it's a Windows machine.
+  // Check %PROCESSOR_ARCHITECTURE%, assuming it's a Windows machine.
   // Note: That space after PROCESSOR_ARCHITECTURE is important or else Windows
   //       command magic interprets quotes as part of the string.
   std::string arch_out;
   std::string windows_cmd =
       RemoteUtil::QuoteForSsh("cmd /C set PROCESSOR_ARCHITECTURE ");
-  status = remote_util->RunWithCapture(windows_cmd,
-                                       "set PROCESSOR_ARCHITECTURE", &arch_out,
-                                       nullptr, ArchType::kWindows_x86_64);
+  status = remote_util->RunWithCapture(
+      windows_cmd, "set PROCESSOR_ARCHITECTURE", &arch_out, nullptr);
   if (status.ok()) {
-    LOG_DEBUG("%PROCESSOR_ARCHITECTURE% is '%s'", arch_out);
+    LOG_DEBUG("PROCESSOR_ARCHITECTURE is '%s'", arch_out);
     absl::StatusOr<ArchType> type = GetArchTypeFromWinProcArch(arch_out);
     if (type.ok()) {
-      LOG_DEBUG("Detected server arch type %s from %%PROCESSOR_ARCHITECTURE%%",
+      LOG_DEBUG("Detected server arch type '%s' from PROCESSOR_ARCHITECTURE",
                 GetArchTypeStr(*type));
       return ServerArch(*type, /*is_guess=*/false);
     }
     status = type.status();
   }
-  LOG_DEBUG("Failed to detect arch type from %%PROCESSOR_ARCHITECTURE%%: %s",
+  LOG_DEBUG("Failed to detect arch type from PROCESSOR_ARCHITECTURE: %s",
             status.ToString());
 
   return absl::InternalError("Failed to detect remote architecture");
