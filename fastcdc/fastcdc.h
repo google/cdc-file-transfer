@@ -160,9 +160,9 @@ class ChunkerTmpl {
       len = cfg_.max_size;
     }
 
-    // Initialize the regression length to max_size and the regression mask
-    // to an empty bitmask (match any hash).
-    size_t rc_len = cfg_.max_size;
+    // Initialize the regression length to len (the end) and the regression
+    // mask to an empty bitmask (match any hash).
+    size_t rc_len = len;
     T rc_mask = 0;
 
     // Init hash to all 1's to avoid zero-length chunks with min_size=0.
