@@ -197,8 +197,8 @@ class ChunkerTmpl {
       }
       hash = ((hash << 1) + data[i]) * kmult;
     }
-    // Return the best regression point we found.
-    return rc_len;
+    // Return best regression point we found or the end if it's better.
+    return (hash & rc_mask) ? rc_len : i;
   }
 
   static constexpr size_t khashbits_ = sizeof(T) * 8;
