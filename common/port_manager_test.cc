@@ -35,12 +35,17 @@ constexpr int kNumPorts = kLastPort - kFirstPort + 1;
 constexpr int kTimeoutSec = 1;
 
 constexpr char kWindowsNetstat[] = "netstat -a -n -p tcp";
-constexpr char kLinuxNetstat[] = "netstat --numeric --listening --tcp";
+constexpr char kLinuxNetstatOrSS[] =
+    "which ss2 && ss --numeric --listening --tcp || netstat --numeric "
+    "--listening --tcp";
 
 constexpr char kWindowsNetstatOutFmt[] =
     "TCP    127.0.0.1:50000        127.0.0.1:%i        ESTABLISHED";
 constexpr char kLinuxNetstatOutFmt[] =
     "tcp        0      0 0.0.0.0:%i           0.0.0.0:*               LISTEN";
+constexpr char kLinuxSSOutFmt[] =
+    "LISTEN              0                    128                              "
+    "             0.0.0.0:%i                                     0.0.0.0:*  ";
 
 class PortManagerTest : public ::testing::Test {
  public:
@@ -67,7 +72,7 @@ class PortManagerTest : public ::testing::Test {
 
 TEST_F(PortManagerTest, ReservePortSuccess) {
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 0);
-  process_factory_.SetProcessOutput(kLinuxNetstat, "", "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, "", "", 0);
 
   absl::StatusOr<int> port =
       port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64);
@@ -81,7 +86,7 @@ TEST_F(PortManagerTest, ReservePortAllLocalPortsTaken) {
     local_netstat_out += absl::StrFormat(kWindowsNetstatOutFmt, port);
   }
   process_factory_.SetProcessOutput(kWindowsNetstat, local_netstat_out, "", 0);
-  process_factory_.SetProcessOutput(kLinuxNetstat, "", "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, "", "", 0);
 
   absl::StatusOr<int> port =
       port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64);
@@ -96,7 +101,8 @@ TEST_F(PortManagerTest, ReservePortAllRemotePortsTaken) {
     remote_netstat_out += absl::StrFormat(kLinuxNetstatOutFmt, port);
   }
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 0);
-  process_factory_.SetProcessOutput(kLinuxNetstat, remote_netstat_out, "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, remote_netstat_out, "",
+                                    0);
 
   absl::StatusOr<int> port =
       port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64);
@@ -107,7 +113,7 @@ TEST_F(PortManagerTest, ReservePortAllRemotePortsTaken) {
 
 TEST_F(PortManagerTest, ReservePortLocalNetstatFails) {
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 1);
-  process_factory_.SetProcessOutput(kLinuxNetstat, "", "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, "", "", 0);
 
   absl::StatusOr<int> port =
       port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64);
@@ -119,7 +125,7 @@ TEST_F(PortManagerTest, ReservePortLocalNetstatFails) {
 
 TEST_F(PortManagerTest, ReservePortRemoteNetstatFails) {
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 0);
-  process_factory_.SetProcessOutput(kLinuxNetstat, "", "", 1);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, "", "", 1);
 
   absl::StatusOr<int> port =
       port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64);
@@ -130,7 +136,7 @@ TEST_F(PortManagerTest, ReservePortRemoteNetstatFails) {
 
 TEST_F(PortManagerTest, ReservePortRemoteNetstatTimesOut) {
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 0);
-  process_factory_.SetProcessNeverExits(kLinuxNetstat);
+  process_factory_.SetProcessNeverExits(kLinuxNetstatOrSS);
   steady_clock_.AutoAdvance(kTimeoutSec * 2 * 1000);
 
   absl::StatusOr<int> port =
@@ -143,7 +149,7 @@ TEST_F(PortManagerTest, ReservePortRemoteNetstatTimesOut) {
 
 TEST_F(PortManagerTest, ReservePortMultipleInstances) {
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 0);
-  process_factory_.SetProcessOutput(kLinuxNetstat, "", "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, "", "", 0);
 
   PortManager port_manager2(kGuid, kFirstPort, kLastPort, &process_factory_,
                             &remote_util_);
@@ -163,7 +169,7 @@ TEST_F(PortManagerTest, ReservePortMultipleInstances) {
 
 TEST_F(PortManagerTest, ReservePortReusesPortsInLRUOrder) {
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 0);
-  process_factory_.SetProcessOutput(kLinuxNetstat, "", "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, "", "", 0);
 
   for (int n = 0; n < kNumPorts * 2; ++n) {
     EXPECT_EQ(*port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64),
@@ -174,7 +180,7 @@ TEST_F(PortManagerTest, ReservePortReusesPortsInLRUOrder) {
 
 TEST_F(PortManagerTest, ReleasePort) {
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 0);
-  process_factory_.SetProcessOutput(kLinuxNetstat, "", "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, "", "", 0);
 
   absl::StatusOr<int> port =
       port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64);
@@ -186,7 +192,7 @@ TEST_F(PortManagerTest, ReleasePort) {
 
 TEST_F(PortManagerTest, ReleasePortOnDestruction) {
   process_factory_.SetProcessOutput(kWindowsNetstat, "", "", 0);
-  process_factory_.SetProcessOutput(kLinuxNetstat, "", "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, "", "", 0);
 
   auto port_manager2 = std::make_unique<PortManager>(
       kGuid, kFirstPort, kLastPort, &process_factory_, &remote_util_);
@@ -219,7 +225,8 @@ TEST_F(PortManagerTest, FindAvailableLocalPortsSuccessLinux) {
   // First port is in use.
   std::string local_netstat_out =
       absl::StrFormat(kLinuxNetstatOutFmt, kFirstPort);
-  process_factory_.SetProcessOutput(kLinuxNetstat, local_netstat_out, "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, local_netstat_out, "",
+                                    0);
 
   absl::StatusOr<std::unordered_set<int>> ports =
       PortManager::FindAvailableLocalPorts(
@@ -251,7 +258,25 @@ TEST_F(PortManagerTest, FindAvailableRemotePortsSuccessLinux) {
   // First port is in use.
   std::string remote_netstat_out =
       absl::StrFormat(kLinuxNetstatOutFmt, kFirstPort);
-  process_factory_.SetProcessOutput(kLinuxNetstat, remote_netstat_out, "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, remote_netstat_out, "",
+                                    0);
+
+  absl::StatusOr<std::unordered_set<int>> ports =
+      PortManager::FindAvailableRemotePorts(
+          kFirstPort, kLastPort, ArchType::kLinux_x86_64, &process_factory_,
+          &remote_util_, kTimeoutSec);
+  ASSERT_OK(ports);
+  EXPECT_EQ(ports->size(), kNumPorts - 1);
+  for (int port = kFirstPort + 1; port <= kLastPort; ++port) {
+    EXPECT_TRUE(ports->find(port) != ports->end());
+  }
+}
+
+TEST_F(PortManagerTest, FindAvailableRemotePortsSuccessLinuxSS) {
+  // First port is in use, but reporting is done by SS, not netsta.
+  std::string remote_netstat_out = absl::StrFormat(kLinuxSSOutFmt, kFirstPort);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, remote_netstat_out, "",
+                                    0);
 
   absl::StatusOr<std::unordered_set<int>> ports =
       PortManager::FindAvailableRemotePorts(
@@ -287,7 +312,8 @@ TEST_F(PortManagerTest, FindAvailableRemotePortsFailsNoPorts) {
   for (int port = kFirstPort; port <= kLastPort; ++port) {
     remote_netstat_out += absl::StrFormat(kLinuxNetstatOutFmt, port);
   }
-  process_factory_.SetProcessOutput(kLinuxNetstat, remote_netstat_out, "", 0);
+  process_factory_.SetProcessOutput(kLinuxNetstatOrSS, remote_netstat_out, "",
+                                    0);
 
   absl::StatusOr<std::unordered_set<int>> ports =
       PortManager::FindAvailableRemotePorts(

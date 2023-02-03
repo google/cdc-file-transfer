@@ -146,10 +146,10 @@ void ZstdStream::ThreadCompressorMain() {
     const ZSTD_EndDirective mode = last_chunk_ ? ZSTD_e_end
                                    : flush     ? ZSTD_e_flush
                                                : ZSTD_e_continue;
-    LOG_DEBUG("Compressing %u bytes (mode=%s)", in_buffer_.size(),
-              mode == ZSTD_e_end     ? "end"
-              : mode == ZSTD_e_flush ? "flush"
-                                     : "continue");
+    LOG_VERBOSE("Compressing %u bytes (mode=%s)", in_buffer_.size(),
+                mode == ZSTD_e_end     ? "end"
+                : mode == ZSTD_e_flush ? "flush"
+                                       : "continue");
     ZSTD_inBuffer input = {in_buffer_.data(), in_buffer_.size(), 0};
     bool finished = false;
     do {
