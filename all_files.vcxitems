@@ -301,6 +301,7 @@
     <None Include="$(MSBuildThisFileDirectory)WORKSPACE" />
   </ItemGroup>
   <ItemGroup>
+    <Natvis Include="$(MSBuildThisFileDirectory)absl.natvis" />
     <Natvis Include="$(MSBuildThisFileDirectory)manifest.natvis" />
     <Natvis Include="$(MSBuildThisFileDirectory)protobuf.natvis" />
   </ItemGroup>

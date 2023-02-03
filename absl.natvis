@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="absl::flat_hash_map&lt;*&gt;">
+    <DisplayString Condition="size_ == 0">empty</DisplayString>
+    <DisplayString>{{ size={size_} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]" ExcludeView="simple">size_</Item>
+      <Item Name="[capacity]" ExcludeView="simple">capacity_</Item>
+      <CustomListItems MaxItemsPerView="5000">
+        <Variable Name="iSlot" InitialValue="0" />
+        <Size>size_</Size>
+        <Loop>
+          <!-- bool IsFull(ctrl_t c) { return c >= 0; } -->
+          <If Condition="ctrl_[iSlot] &gt;= 0">
+            <Item>slots_[iSlot]</Item>
+          </If>
+          <Exec>iSlot++</Exec>
+          <Break Condition="iSlot == capacity_" />
+        </Loop>
+      </CustomListItems>
+    </Expand>
+  </Type>
+  <Type Name="absl::container_internal::map_slot_type&lt;*&gt;">
+    <DisplayString>{value.first}:{value.second}</DisplayString>
+    <Expand>
+      <Item Name="[key]" ExcludeView="simple">value.first</Item>
+      <Item Name="[value]" ExcludeView="simple">value.second</Item>
+    </Expand>
+  </Type>
+</AutoVisualizer>
