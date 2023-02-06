@@ -179,6 +179,7 @@ cc_library(
     srcs = ["server_arch.cc"],
     hdrs = ["server_arch.h"],
     deps = [
+        "//common:ansi_filter",
         "//common:arch_type",
         "//common:path",
         "//common:remote_util",

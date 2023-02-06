@@ -143,7 +143,8 @@ absl::Status CdcFuseManager::RunFuseProcess(uint16_t local_port,
   LOG_DEBUG("Running FUSE process");
   ProcessStartInfo start_info =
       remote_util_->BuildProcessStartInfoForSshPortForwardAndCommand(
-          local_port, remote_port, true, remote_command);
+          local_port, remote_port, true, remote_command,
+          ArchType::kLinux_x86_64);
   start_info.name = kFuseFilename;
 
   // Capture stdout to determine whether a deploy is required.
