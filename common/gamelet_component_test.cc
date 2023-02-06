@@ -124,9 +124,30 @@ TEST_F(GameletComponentTest, GetChangedComponents) {
 
   // Force equal timestamps, so that we don't depend on when the files were
   // actually written to everyone's drives.
+  // Also force set build_version to developer since otherwise we would skip
+  // component size check.
   ASSERT_EQ(components.size(), other_components.size());
   for (size_t n = 0; n < components.size(); ++n) {
     other_components[n].modified_time = components[n].modified_time;
+    other_components[n].build_version = DEV_BUILD_VERSION;
+
+    EXPECT_NE(components, other_components);
+  }
+}
+
+TEST_F(GameletComponentTest, GetChangedComponents_BuildVersionChanged) {
+  std::vector<GameletComponent> components;
+  EXPECT_OK(GameletComponent::Get({valid_component_path_}, &components));
+
+  std::vector<GameletComponent> other_components;
+  EXPECT_OK(GameletComponent::Get({other_component_path_}, &other_components));
+
+  ASSERT_EQ(components.size(), other_components.size());
+  for (size_t n = 0; n < components.size(); ++n) {
+    other_components[n].modified_time = components[n].modified_time;
+    other_components[n].size = components[n].size;
+    components[n].build_version = "build_version";
+    other_components[n].build_version = "other_build_version";
 
     EXPECT_NE(components, other_components);
   }
