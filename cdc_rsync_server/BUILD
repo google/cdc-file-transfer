@@ -140,6 +140,7 @@ cc_library(
         "//common:status",
         "//common:util",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 

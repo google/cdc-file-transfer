@@ -18,7 +18,10 @@
 #define CDC_RSYNC_SERVER_SERVER_SOCKET_H_
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "cdc_rsync/base/socket.h"
+
+struct addrinfo;
 
 namespace cdc_ft {
 
@@ -28,7 +31,9 @@ class ServerSocket : public Socket {
   ~ServerSocket();
 
   // Starts listening for connections on |port|.
-  absl::Status StartListening(int port);
+  // Passing 0 as port will bind to any available port.
+  // Returns the port that was bound to.
+  absl::StatusOr<int> StartListening(int port);
 
   // Stops listening for connections. No-op if already stopped/never started.
   void StopListening();
@@ -50,6 +55,11 @@ class ServerSocket : public Socket {
                        size_t* bytes_received) override;
 
  private:
+  // Called by StartListening() for a specific IPV4 or IPV6 |addr_info|.
+  // Passing 0 as port will bind to any available port.
+  // Returns the port that was bound to.
+  absl::StatusOr<int> StartListeningInternal(int port, addrinfo* addr);
+
   std::unique_ptr<struct ServerSocketInfo> socket_info_;
 };
 
