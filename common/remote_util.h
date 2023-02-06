@@ -93,18 +93,24 @@ class RemoteUtil {
 
   // Runs |remote_command| on the remote device. The command must be properly
   // escaped. |name| is the name of the command displayed in the logs.
+  // |remote_arch_type| is the arch type of the remote device. It determines
+  // which type of pseudo console is used (-T on Windows, -tt on Linux). If the
+  // wrong arch type is passed, output might be corrupted, but otherwise the
+  // command will work.
   absl::Status Run(std::string remote_command, std::string name,
-                   ArchType arch_type);
+                   ArchType remote_arch_type);
 
   // Same as Run(), but captures both stdout and stderr.
   // If |std_out| or |std_err| are nullptr, the output is not captured.
+  // |remote_arch_type| is the arch type of the remote device, see Run().
   absl::Status RunWithCapture(std::string remote_command, std::string name,
                               std::string* std_out, std::string* std_err,
-                              ArchType arch_type);
+                              ArchType remote_arch_type);
 
   // Builds an SSH command that executes |remote_command| on the remote device.
+  // |remote_arch_type| is the arch type of the remote device, see Run().
   ProcessStartInfo BuildProcessStartInfoForSsh(std::string remote_command,
-                                               ArchType arch_type);
+                                               ArchType remote_arch_type);
 
   // Builds an SSH command that runs SSH port forwarding to the remote device,
   // using the given |local_port| and |remote_port|. If |reverse| is true, sets
@@ -116,9 +122,10 @@ class RemoteUtil {
   // Builds an SSH command that executes |remote_command| on the remote device,
   // using port forwarding with given |local_port| and |remote_port|. If
   // |reverse| is true, sets up reverse port forwarding.
+  // |remote_arch_type| is the arch type of the remote device, see Run().
   ProcessStartInfo BuildProcessStartInfoForSshPortForwardAndCommand(
       int local_port, int remote_port, bool reverse, std::string remote_command,
-      ArchType arch_type);
+      ArchType remote_arch_type);
 
   // Returns whether output is suppressed.
   bool Quiet() const { return quiet_; }
@@ -149,7 +156,8 @@ class RemoteUtil {
  private:
   // Common code for BuildProcessStartInfoForSsh*.
   ProcessStartInfo BuildProcessStartInfoForSshInternal(
-      std::string forward_arg, std::string remote_command, ArchType arch_type);
+      std::string forward_arg, std::string remote_command,
+      ArchType remote_arch_type);
 
   const int verbosity_;
   const bool quiet_;

@@ -34,14 +34,14 @@ std::string GetPortForwardingArg(int local_port, int remote_port,
   return absl::StrFormat("-L%i:localhost:%i ", local_port, remote_port);
 }
 
-const char* GetFlagsForArch(ArchType arch_type) {
-  if (IsWindowsArchType(arch_type)) {
+const char* GetFlagsForArch(ArchType remote_arch_type) {
+  if (IsWindowsArchType(remote_arch_type)) {
     // Disable pseudo-TTY. Otherwise, the output is riddled by Ansi control
     // sequences and almost impossible to parse without handling them.
     return "-T";
   }
 
-  if (IsLinuxArchType(arch_type)) {
+  if (IsLinuxArchType(remote_arch_type)) {
     // Force pseudo-TTY.
     return "-tt";
   }
@@ -156,9 +156,9 @@ absl::Status RemoteUtil::Chmod(const std::string& mode,
 }
 
 absl::Status RemoteUtil::Run(std::string remote_command, std::string name,
-                             ArchType arch_type) {
+                             ArchType remote_arch_type) {
   ProcessStartInfo start_info =
-      BuildProcessStartInfoForSsh(std::move(remote_command), arch_type);
+      BuildProcessStartInfoForSsh(std::move(remote_command), remote_arch_type);
   start_info.name = std::move(name);
   start_info.forward_output_to_log = forward_output_to_log_;
 
@@ -168,9 +168,9 @@ absl::Status RemoteUtil::Run(std::string remote_command, std::string name,
 absl::Status RemoteUtil::RunWithCapture(std::string remote_command,
                                         std::string name, std::string* std_out,
                                         std::string* std_err,
-                                        ArchType arch_type) {
+                                        ArchType remote_arch_type) {
   ProcessStartInfo start_info =
-      BuildProcessStartInfoForSsh(std::move(remote_command), arch_type);
+      BuildProcessStartInfoForSsh(std::move(remote_command), remote_arch_type);
   start_info.name = std::move(name);
   start_info.forward_output_to_log = forward_output_to_log_;
 
@@ -192,9 +192,9 @@ absl::Status RemoteUtil::RunWithCapture(std::string remote_command,
 }
 
 ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSsh(
-    std::string remote_command, ArchType arch_type) {
+    std::string remote_command, ArchType remote_arch_type) {
   return BuildProcessStartInfoForSshInternal("", "-- " + remote_command,
-                                             arch_type);
+                                             remote_arch_type);
 }
 
 ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshPortForward(
@@ -213,22 +213,22 @@ ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshPortForward(
 
 ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshPortForwardAndCommand(
     int local_port, int remote_port, bool reverse, std::string remote_command,
-    ArchType arch_type) {
+    ArchType remote_arch_type) {
   return BuildProcessStartInfoForSshInternal(
       GetPortForwardingArg(local_port, remote_port, reverse),
-      "-- " + remote_command, arch_type);
+      "-- " + remote_command, remote_arch_type);
 }
 
 ProcessStartInfo RemoteUtil::BuildProcessStartInfoForSshInternal(
     std::string forward_arg, std::string remote_command_arg,
-    ArchType arch_type) {
+    ArchType remote_arch_type) {
   ProcessStartInfo start_info;
   start_info.command = absl::StrFormat(
       "%s %s %s %s "
       "-oServerAliveCountMax=6 "  // Number of lost msgs before ssh terminates
       "-oServerAliveInterval=5 "  // Time interval between alive msgs
       "%s %s",
-      ssh_command_, GetFlagsForArch(arch_type),
+      ssh_command_, GetFlagsForArch(remote_arch_type),
       quiet_ || verbosity_ < 2 ? "-q" : "", forward_arg,
       QuoteForWindows(user_host_), remote_command_arg);
   start_info.forward_output_to_log = forward_output_to_log_;

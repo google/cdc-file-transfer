@@ -61,7 +61,10 @@ class RemoteUtilTest : public ::testing::Test {
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSsh) {
   ProcessStartInfo si =
       util_.BuildProcessStartInfoForSsh(kCommand, ArchType::kLinux_x86_64);
-  ExpectContains(si.command, {"ssh", kUserHostArg, kCommand});
+  ExpectContains(si.command, {"ssh", "-tt", kUserHostArg, kCommand});
+
+  si = util_.BuildProcessStartInfoForSsh(kCommand, ArchType::kWindows_x86_64);
+  ExpectContains(si.command, {"ssh", "-T", kUserHostArg, kCommand});
 }
 
 TEST_F(RemoteUtilTest, BuildProcessStartInfoForSshPortForward) {
