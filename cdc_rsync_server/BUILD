@@ -22,7 +22,7 @@ cc_test(
     srcs = ["file_deleter_and_sender_test.cc"],
     deps = [
         ":file_deleter_and_sender",
-        "//cdc_rsync/base:fake_socket",
+        "//common:fake_socket",
         "//common:status_test_macros",
         "//common:test_main",
         "@com_google_googletest//:gtest",
@@ -95,7 +95,6 @@ cc_binary(
         ":file_diff_generator",
         ":file_finder",
         ":file_info",
-        ":server_socket",
         ":unzstd_stream",
         "//cdc_rsync/base:cdc_interface",
         "//cdc_rsync/base:message_pump",
@@ -105,6 +104,7 @@ cc_binary(
         "//common:gamelet_component",
         "//common:log",
         "//common:path_filter",
+        "//common:server_socket",
         "//common:status",
         "//common:stopwatch",
         "//common:threadpool",
@@ -125,32 +125,12 @@ cc_library(
 )
 
 cc_library(
-    name = "server_socket",
-    srcs = ["server_socket.cc"],
-    hdrs = ["server_socket.h"],
-    linkopts = select({
-        "//tools:windows": [
-            "/DEFAULTLIB:Ws2_32.lib",  # Sockets, e.g. recv, send, WSA*.
-        ],
-        "//conditions:default": [],
-    }),
-    deps = [
-        "//cdc_rsync/base:socket",
-        "//common:log",
-        "//common:status",
-        "//common:util",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
-    ],
-)
-
-cc_library(
     name = "unzstd_stream",
     srcs = ["unzstd_stream.cc"],
     hdrs = ["unzstd_stream.h"],
     deps = [
         "//cdc_rsync/base:message_pump",
-        "//cdc_rsync/base:socket",
+        "//common:socket",
         "//common:status",
         "@com_github_zstd//:zstd",
         "@com_google_absl//absl/status",

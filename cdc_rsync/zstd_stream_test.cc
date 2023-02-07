@@ -14,8 +14,8 @@
 
 #include "cdc_rsync/zstd_stream.h"
 
-#include "cdc_rsync/base/fake_socket.h"
 #include "cdc_rsync_server/unzstd_stream.h"
+#include "common/fake_socket.h"
 #include "common/status_test_macros.h"
 #include "gtest/gtest.h"
 

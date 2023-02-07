@@ -23,8 +23,8 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "cdc_rsync/base/message_pump.h"
-#include "cdc_rsync/client_socket.h"
 #include "cdc_rsync/progress_tracker.h"
+#include "common/client_socket.h"
 #include "common/path_filter.h"
 #include "common/process.h"
 

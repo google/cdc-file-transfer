@@ -16,9 +16,9 @@
 
 #include "absl/status/status.h"
 #include "absl/strings/str_format.h"
-#include "cdc_rsync/base/socket.h"
 #include "common/buffer.h"
 #include "common/log.h"
+#include "common/socket.h"
 #include "common/status.h"
 #include "google/protobuf/message_lite.h"
 

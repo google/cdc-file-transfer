@@ -53,6 +53,33 @@ cc_test(
 )
 
 cc_library(
+    name = "build_version",
+    srcs = ["build_version.cc"],
+    hdrs = ["build_version.h"],
+    # This definition should be replaced by release flow.
+    copts = ["-DCDC_BUILD_VERSION=DEV"],
+)
+
+cc_library(
+    name = "client_socket",
+    srcs = ["client_socket.cc"],
+    hdrs = ["client_socket.h"],
+    linkopts = select({
+        "//tools:windows": [
+            "/DEFAULTLIB:Ws2_32.lib",  # Sockets, e.g. recv, send, WSA*.
+        ],
+        "//conditions:default": [],
+    }),
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        ":log",
+        ":socket",
+        ":status",
+        ":util",
+    ],
+)
+
+cc_library(
     name = "clock",
     srcs = ["clock.cc"],
     hdrs = ["clock.h"],
@@ -60,14 +87,6 @@ cc_library(
         ":platform",
         "@com_google_absl//absl/strings:str_format",
     ],
-)
-
-cc_library(
-    name = "build_version",
-    srcs = ["build_version.cc"],
-    hdrs = ["build_version.h"],
-    # This definition should be replaced by release flow.
-    copts = ["-DCDC_BUILD_VERSION=DEV"],
 )
 
 cc_library(
@@ -124,6 +143,16 @@ cc_test(
         ":status_test_macros",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "fake_socket",
+    srcs = ["fake_socket.cc"],
+    hdrs = ["fake_socket.h"],
+    deps = [
+        ":socket",
+        "@com_google_absl//absl/status",
     ],
 )
 
@@ -439,6 +468,39 @@ cc_test(
         ":status_test_macros",
         ":test_main",
         "@com_google_googletest//:gtest",
+    ],
+)
+
+cc_library(
+    name = "server_socket",
+    srcs = ["server_socket.cc"],
+    hdrs = ["server_socket.h"],
+    linkopts = select({
+        "//tools:windows": [
+            "/DEFAULTLIB:Ws2_32.lib",  # Sockets, e.g. recv, send, WSA*.
+        ],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":log",
+        ":socket",
+        ":status",
+        ":util",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
+    ],
+)
+
+cc_library(
+    name = "socket",
+    srcs = ["socket.cc"],
+    hdrs = ["socket.h"],
+    deps = [
+        ":log",
+        ":platform",
+        ":status",
+        ":util",
+        "@com_google_absl//absl/status",
     ],
 )
 

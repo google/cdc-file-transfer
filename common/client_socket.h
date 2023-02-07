@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef CDC_RSYNC_CLIENT_SOCKET_H_
-#define CDC_RSYNC_CLIENT_SOCKET_H_
+#ifndef COMMON_CLIENT_SOCKET_H_
+#define COMMON_CLIENT_SOCKET_H_
 
 #include <memory>
 
 #include "absl/status/status.h"
-#include "cdc_rsync/base/socket.h"
+#include "common/socket.h"
 
 namespace cdc_ft {
 
@@ -50,4 +50,4 @@ class ClientSocket : public Socket {
 
 }  // namespace cdc_ft
 
-#endif  // CDC_RSYNC_CLIENT_SOCKET_H_
+#endif  // COMMON_CLIENT_SOCKET_H_

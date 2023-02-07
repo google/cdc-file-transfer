@@ -28,20 +28,10 @@ cc_test(
     data = ["testdata/root.txt"] + glob(["testdata/cdc_interface/**"]),
     deps = [
         ":cdc_interface",
-        ":fake_socket",
+        "//common:fake_socket",
         "//common:status_test_macros",
         "//common:test_main",
         "@com_google_googletest//:gtest",
-    ],
-)
-
-cc_library(
-    name = "fake_socket",
-    srcs = ["fake_socket.cc"],
-    hdrs = ["fake_socket.h"],
-    deps = [
-        "//cdc_rsync/base:socket",
-        "@com_google_absl//absl/status",
     ],
 )
 
@@ -50,9 +40,9 @@ cc_library(
     srcs = ["message_pump.cc"],
     hdrs = ["message_pump.h"],
     deps = [
-        ":socket",
         "//common:buffer",
         "//common:log",
+        "//common:socket",
         "//common:status",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
@@ -64,9 +54,9 @@ cc_test(
     name = "message_pump_test",
     srcs = ["message_pump_test.cc"],
     deps = [
-        ":fake_socket",
         ":message_pump",
         "//cdc_rsync/protos:messages_cc_proto",
+        "//common:fake_socket",
         "//common:status_test_macros",
         "//common:test_main",
         "@com_google_googletest//:gtest",
@@ -76,19 +66,6 @@ cc_test(
 cc_library(
     name = "server_exit_code",
     hdrs = ["server_exit_code.h"],
-)
-
-cc_library(
-    name = "socket",
-    srcs = ["socket.cc"],
-    hdrs = ["socket.h"],
-    deps = [
-        "//common:log",
-        "//common:platform",
-        "//common:status",
-        "//common:util",
-        "@com_google_absl//absl/status",
-    ],
 )
 
 filegroup(

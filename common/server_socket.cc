@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cdc_rsync_server/server_socket.h"
+#include "common/server_socket.h"
 
 #include "common/log.h"
 #include "common/platform.h"

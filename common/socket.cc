@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "cdc_rsync/base/socket.h"
+#include "common/socket.h"
 
 #include "common/log.h"
 #include "common/platform.h"

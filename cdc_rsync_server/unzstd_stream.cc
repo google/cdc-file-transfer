@@ -14,7 +14,7 @@
 
 #include "cdc_rsync_server/unzstd_stream.h"
 
-#include "cdc_rsync/base/socket.h"
+#include "common/socket.h"
 #include "common/status.h"
 
 namespace cdc_ft {
