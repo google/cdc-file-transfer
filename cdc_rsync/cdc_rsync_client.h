@@ -30,7 +30,6 @@
 
 namespace cdc_ft {
 
-class PortManager;
 class Process;
 class RemoteUtil;
 class ServerArch;
@@ -53,8 +52,6 @@ class CdcRsyncClient {
     std::string copy_dest;
     int compress_level = 6;
     int connection_timeout_sec = 10;
-    int forward_port_first = 44450;
-    int forward_port_last = 44459;
     std::string ssh_command;
     std::string sftp_command;
     std::string sources_dir;  // Base dir for files loaded for --files-from.
@@ -132,7 +129,6 @@ class CdcRsyncClient {
   const std::string destination_;
   WinProcessFactory process_factory_;
   std::unique_ptr<RemoteUtil> remote_util_;
-  std::unique_ptr<PortManager> port_manager_;
   std::unique_ptr<SocketFinalizer> socket_finalizer_;
   ClientSocket socket_;
   MessagePump message_pump_{&socket_, MessagePump::PacketReceivedDelegate()};

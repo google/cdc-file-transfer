@@ -30,9 +30,9 @@
 #include "common/gamelet_component.h"
 #include "common/log.h"
 #include "common/path.h"
-#include "common/port_manager.h"
 #include "common/process.h"
 #include "common/remote_util.h"
+#include "common/server_socket.h"
 #include "common/status.h"
 #include "common/status_macros.h"
 #include "common/stopwatch.h"
@@ -113,12 +113,6 @@ CdcRsyncClient::CdcRsyncClient(const Options& options,
       remote_util_->SetSftpCommand(options_.sftp_command);
     }
   }
-
-  // Note that remote_util_.get() may be null.
-  port_manager_ = std::make_unique<PortManager>(
-      "cdc_rsync_ports_f77bcdfe-368c-4c45-9f01-230c5e7e2132",
-      options.forward_port_first, options.forward_port_last, &process_factory_,
-      nullptr /* never reserve remote ports */);
 }
 
 CdcRsyncClient::~CdcRsyncClient() {
@@ -288,22 +282,18 @@ absl::Status CdcRsyncClient::StartServer(const ServerArch& arch) {
     return SetTag(MakeStatus("Redeploy server"), Tag::kDeployServer);
   }
 
+  // Start up sockets.
+  status = Socket::Initialize();
+  if (!status.ok()) {
+    return WrapStatus(status, "Failed to initialize sockets");
+  }
+  socket_finalizer_ = std::make_unique<SocketFinalizer>();
+
   // Now that we know which port the server is using, set up port forwarding.
   std::unique_ptr<Process> fwd_process;
   int local_port = server_listen_port_;
   if (IsRemoteConnection()) {
-    absl::StatusOr<int> local_port_or = port_manager_->ReservePort(
-        options_.connection_timeout_sec, arch.GetType());
-
-    if (absl::IsResourceExhausted(local_port_or.status())) {
-      // Port in use.
-      return SetTag(local_port_or.status(), Tag::kAddressInUse);
-    }
-    if (!local_port_or.ok()) {
-      return local_port_or.status();
-    }
-
-    local_port = *local_port_or;
+    ASSIGN_OR_RETURN(local_port, ServerSocket::FindAvailablePort());
     ProcessStartInfo start_info =
         remote_util_->BuildProcessStartInfoForSshPortForward(
             local_port, server_listen_port_, /*reverse=*/false);
@@ -313,14 +303,8 @@ absl::Status CdcRsyncClient::StartServer(const ServerArch& arch) {
                     "Failed to start cdc_rsync_server process");
   }
 
-  // Connect to the socket with port |local_port|.
-  status = Socket::Initialize();
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to initialize sockets");
-  }
-  socket_finalizer_ = std::make_unique<SocketFinalizer>();
-
-  // Poll until the port forwarding connection is set up.
+  // Poll the connection to the socket with port |local_port| until the port
+  // forwarding connection is set up.
   timeout_timer.Reset();
   for (;;) {
     assert(local_port != 0);

@@ -80,8 +80,6 @@ Options:
     --sftp-command <cmd>    Path and arguments of sftp command to use, e.g.
                             "C:\path\to\sftp.exe -P 12345 -i id_rsa -oUserKnownHostsFile=known_hosts"
                             Can also be specified by the CDC_SFTP_COMMAND environment variable.
-    --forward-port <port>   TCP port or range used for SSH port forwarding (default: 44450-44459).
-                            If a range is specified, searches for available ports (slower).
 -h, --help                  Help for cdc_rsync
 )";
 
@@ -305,15 +303,9 @@ OptionResult HandleParameter(const std::string& key, const char* value,
   }
 
   if (key == "forward-port") {
-    if (!ValidateValue(key, value)) return OptionResult::kError;
-    uint16_t first, last;
-    if (!port_range::Parse(value, &first, &last)) {
-      PrintError("Failed to parse %s=%s, expected <port> or <port1>-<port2>",
-                 key, value);
-      return OptionResult::kError;
-    }
-    params->options.forward_port_first = first;
-    params->options.forward_port_last = last;
+    // This param is no longer needed. Just print a warning for backwards
+    // compatibility.
+    std::cout << "--forward-port argument no longer needed" << std::endl;
     return OptionResult::kConsumedKeyValue;
   }
 

@@ -585,40 +585,6 @@ TEST_F(ParamsTest, IncludeExcludeMixed_ProperOrder) {
   ExpectNoError();
 }
 
-TEST_F(ParamsTest, ForwardPort_Single) {
-  const char* argv[] = {"cdc_rsync.exe", "--forward-port=65535", kSrc,
-                        kUserHostDst, NULL};
-  EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  EXPECT_EQ(parameters_.options.forward_port_first, 65535);
-  EXPECT_EQ(parameters_.options.forward_port_last, 65535);
-  ExpectNoError();
-}
-
-TEST_F(ParamsTest, ForwardPort_Range) {
-  const char* argv[] = {
-      "cdc_rsync.exe", "--forward-port", "1-2", kSrc, kUserHostDst, NULL};
-  EXPECT_TRUE(Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  EXPECT_EQ(parameters_.options.forward_port_first, 1);
-  EXPECT_EQ(parameters_.options.forward_port_last, 2);
-  ExpectNoError();
-}
-
-TEST_F(ParamsTest, ForwardPort_NoValue) {
-  const char* argv[] = {"cdc_rsync.exe", "--forward-port=", kSrc, kUserHostDst,
-                        NULL};
-  EXPECT_FALSE(
-      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError(NeedsValueError("forward-port"));
-}
-
-TEST_F(ParamsTest, ForwardPort_BadValueTooSmall) {
-  const char* argv[] = {"cdc_rsync.exe", "--forward-port=0", kSrc, kUserHostDst,
-                        NULL};
-  EXPECT_FALSE(
-      Parse(static_cast<int>(std::size(argv)) - 1, argv, &parameters_));
-  ExpectError("Failed to parse");
-}
-
 }  // namespace
 }  // namespace params
 }  // namespace cdc_ft

@@ -147,8 +147,7 @@ absl::StatusOr<ServerArch> ServerArch::DetectFromRemoteDevice(
   // Note: That space after PROCESSOR_ARCHITECTURE is important or else Windows
   //       command magic interprets quotes as part of the string.
   std::string arch_out;
-  std::string windows_cmd =
-      RemoteUtil::QuoteForSsh("cmd /C set PROCESSOR_ARCHITECTURE ");
+  std::string windows_cmd = "\"cmd /C set PROCESSOR_ARCHITECTURE \"";
   status = remote_util->RunWithCapture(windows_cmd,
                                        "set PROCESSOR_ARCHITECTURE", &arch_out,
                                        nullptr, ArchType::kWindows_x86_64);
@@ -223,14 +222,13 @@ std::string ServerArch::GetStartServerCommand(int exit_code_not_found,
     // a minor issue and means we display "Deploying server..." instead of
     // "Server not deployed. Deploying...";
     return RemoteUtil::QuoteForWindows(
-        absl::StrFormat("powershell -Command \" "
+        absl::StrFormat("powershell -Command "
                         "Set-StrictMode -Version 2; "
                         "$ErrorActionPreference = 'Stop'; "
                         "if (-not (Test-Path -Path '%s')) { "
                         "  exit %i; "
                         "} "
-                        "%s %s "
-                        "\"",
+                        "%s %s",
                         server_path, exit_code_not_found, server_path, args));
   }
 

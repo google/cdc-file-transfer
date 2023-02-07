@@ -30,6 +30,15 @@ class ServerSocket : public Socket {
   ServerSocket();
   ~ServerSocket();
 
+  // Returns an available ephemeral port that can be used as a listening port.
+  // Note that calling this function, followed by StartListening() or similar,
+  // is slightly racy as another process might use the port in the meantime.
+  // However, the OS usually returns ephemeral ports in a round-robin manner,
+  // and ports remain in TIME_WAIT state for a while, which may block other apps
+  // from reusing the port. Hence, the chances of races are small. Nevertheless,
+  // consider calling StartListening() with zero |port| if possible.
+  static absl::StatusOr<int> FindAvailablePort();
+
   // Starts listening for connections on |port|.
   // Passing 0 as port will bind to any available port.
   // Returns the port that was bound to.

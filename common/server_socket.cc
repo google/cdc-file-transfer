@@ -125,6 +125,12 @@ ServerSocket::~ServerSocket() {
   StopListening();
 }
 
+// static
+absl::StatusOr<int> ServerSocket::FindAvailablePort() {
+  ServerSocket socket;
+  return socket.StartListening(0);
+}
+
 absl::StatusOr<int> ServerSocket::StartListening(int port) {
   if (socket_info_->listen_sock != kInvalidSocket) {
     return MakeStatus("Already listening");
@@ -246,7 +252,7 @@ absl::StatusOr<int> ServerSocket::StartListeningInternal(int port,
 
 void ServerSocket::StopListening() {
   Close(&socket_info_->listen_sock);
-  LOG_INFO("Stopped listening.");
+  LOG_DEBUG("Stopped listening.");
 }
 
 absl::Status ServerSocket::WaitForConnection() {
@@ -268,7 +274,7 @@ absl::Status ServerSocket::WaitForConnection() {
 
 void ServerSocket::Disconnect() {
   Close(&socket_info_->conn_sock);
-  LOG_INFO("Disconnected");
+  LOG_DEBUG("Disconnected");
 }
 
 absl::Status ServerSocket::ShutdownSendingEnd() {
