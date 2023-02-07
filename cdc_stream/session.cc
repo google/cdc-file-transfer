@@ -68,33 +68,18 @@ Session::~Session() {
   }
 }
 
-absl::Status Session::Start(int local_port, int first_remote_port,
-                            int last_remote_port) {
-  // Find an available remote port.
-  int remote_port = first_remote_port;
-  if (first_remote_port < last_remote_port) {
-    std::unordered_set<int> ports;
-    ASSIGN_OR_RETURN(
-        ports,
-        PortManager::FindAvailableRemotePorts(
-            first_remote_port, last_remote_port, ArchType::kLinux_x86_64,
-            process_factory_, &remote_util_, kInstanceConnectionTimeoutSec),
-        "Failed to find an available remote port in the range [%d, %d]",
-        first_remote_port, last_remote_port);
-    assert(!ports.empty());
-    remote_port = *ports.begin();
-  }
-
+absl::Status Session::Start(int local_port) {
   assert(!fuse_);
   fuse_ = std::make_unique<CdcFuseManager>(instance_id_, process_factory_,
                                            &remote_util_);
+
   RETURN_IF_ERROR(
-      fuse_->Start(mount_dir_, local_port, remote_port, cfg_.verbosity,
-                   cfg_.fuse_debug, cfg_.fuse_singlethreaded, cfg_.stats,
-                   cfg_.fuse_check, cfg_.fuse_cache_capacity,
-                   cfg_.fuse_cleanup_timeout_sec,
+      fuse_->Start(mount_dir_, local_port, cfg_.verbosity, cfg_.fuse_debug,
+                   cfg_.fuse_singlethreaded, cfg_.stats, cfg_.fuse_check,
+                   cfg_.fuse_cache_capacity, cfg_.fuse_cleanup_timeout_sec,
                    cfg_.fuse_access_idle_timeout_sec),
       "Failed to start instance component");
+
   return absl::OkStatus();
 }
 

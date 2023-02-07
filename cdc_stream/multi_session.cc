@@ -22,6 +22,7 @@
 #include "common/platform.h"
 #include "common/port_manager.h"
 #include "common/process.h"
+#include "common/server_socket.h"
 #include "common/util.h"
 #include "data_store/disk_data_store.h"
 #include "manifest/content_id.h"
@@ -436,19 +437,8 @@ absl::Status MultiSession::Initialize() {
   }
 
   // Find an available local port.
-  local_asset_stream_port_ = cfg_.forward_port_first;
-  if (cfg_.forward_port_first < cfg_.forward_port_last) {
-    std::unordered_set<int> ports;
-    ASSIGN_OR_RETURN(
-        ports,
-        PortManager::FindAvailableLocalPorts(
-            cfg_.forward_port_first, cfg_.forward_port_last,
-            ArchType::kWindows_x86_64, process_factory_),
-        "Failed to find an available local port in the range [%d, %d]",
-        cfg_.forward_port_first, cfg_.forward_port_last);
-    assert(!ports.empty());
-    local_asset_stream_port_ = *ports.begin();
-  }
+  ASSIGN_OR_RETURN(local_asset_stream_port_, ServerSocket::FindAvailablePort(),
+                   "Failed to find an available local port");
 
   assert(!runner_);
   runner_ = std::make_unique<MultiSessionRunner>(
@@ -523,9 +513,7 @@ absl::Status MultiSession::StartSession(const std::string& instance_id,
 
   auto session = std::make_unique<Session>(
       instance_id, target, cfg_, process_factory_, std::move(metrics_recorder));
-  RETURN_IF_ERROR(session->Start(local_asset_stream_port_,
-                                 cfg_.forward_port_first,
-                                 cfg_.forward_port_last));
+  RETURN_IF_ERROR(session->Start(local_asset_stream_port_));
 
   // Wait for the FUSE to receive the first intermediate manifest.
   RETURN_IF_ERROR(runner_->WaitForManifestAck(instance_id, absl::Seconds(5)));

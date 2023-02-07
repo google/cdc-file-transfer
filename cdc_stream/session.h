@@ -58,9 +58,7 @@ class Session {
 
   // Starts the CDC FUSE on the instance with established port forwarding.
   // |local_port| is the local reverse forwarding port to use.
-  // [|first_remote_port|, |last_remote_port|] are the allowed remote ports.
-  absl::Status Start(int local_port, int first_remote_port,
-                     int last_remote_port);
+  absl::Status Start(int local_port);
 
   // Shuts down the connection to the instance.
   absl::Status Stop() ABSL_LOCKS_EXCLUDED(transferred_data_mu_);

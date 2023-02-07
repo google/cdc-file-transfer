@@ -214,6 +214,7 @@ cc_library(
         "//common:process",
         "//common:remote_util",
         "//common:sdk_util",
+        "//common:server_socket",
         "//common:status_macros",
         "//common:stopwatch",
         "//data_store:disk_data_store",
