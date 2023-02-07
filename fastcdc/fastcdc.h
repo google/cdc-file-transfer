@@ -106,7 +106,8 @@ class ChunkerTmpl {
 
     // Calculate the threshold the hash must be <= to for a 1/(avg-min+1)
     // chance of a chunk boundary.
-    threshold_ = std::numeric_limits<T>::max() / (cfg_.avg_size - cfg_.min_size + 1);
+    threshold_ =
+        std::numeric_limits<T>::max() / (cfg_.avg_size - cfg_.min_size + 1);
     data_.reserve(cfg_.max_size << 1);
   }
 
