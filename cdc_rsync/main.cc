@@ -68,8 +68,8 @@ ReturnCode TagToMessage(cdc_ft::Tag tag,
 
     case cdc_ft::Tag::kDeployServer:
       *msg =
-          "Failed to deploy the instance components for unknown reasons. "
-          "Please report this issue.";
+          "Failed to deploy or run the instance components for unknown "
+          "reasons. Please report this issue.";
       return ReturnCode::kDeployFailed;
 
     case cdc_ft::Tag::kConnectionTimeout:

@@ -64,7 +64,10 @@ cc_library(
 
 cc_library(
     name = "build_version",
+    srcs = ["build_version.cc"],
     hdrs = ["build_version.h"],
+    # This definition should be replaced by release flow.
+    copts = ["-DCDC_BUILD_VERSION=DEV"],
 )
 
 cc_library(
