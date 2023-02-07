@@ -62,7 +62,10 @@ cc_library(
 
 cc_library(
     name = "client_socket",
-    srcs = ["client_socket.cc"],
+    srcs = [
+        "client_socket.cc",
+        "socket_internal.h",
+    ],
     hdrs = ["client_socket.h"],
     linkopts = select({
         "//tools:windows": [
@@ -70,7 +73,6 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
-    target_compatible_with = ["@platforms//os:windows"],
     deps = [
         ":log",
         ":socket",
@@ -473,7 +475,10 @@ cc_test(
 
 cc_library(
     name = "server_socket",
-    srcs = ["server_socket.cc"],
+    srcs = [
+        "server_socket.cc",
+        "socket_internal.h",
+    ],
     hdrs = ["server_socket.h"],
     linkopts = select({
         "//tools:windows": [

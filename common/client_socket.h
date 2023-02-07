@@ -29,6 +29,10 @@ class ClientSocket : public Socket {
   ClientSocket();
   ~ClientSocket();
 
+  // Polls until a connection to |port| succeeds.
+  // Returns TimeoutError
+  static absl::Status WaitForConnection(int port, absl::Duration timeout);
+
   // Connects to localhost on |port|.
   absl::Status Connect(int port);
 

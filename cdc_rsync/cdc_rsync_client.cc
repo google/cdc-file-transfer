@@ -300,24 +300,9 @@ absl::Status CdcRsyncClient::StartServer(const ServerArch& arch) {
                     "Failed to start cdc_rsync_server process");
   }
 
-  // Poll the connection to the socket with port |local_port| until the port
-  // forwarding connection is set up.
-  timeout_timer.Reset();
-  for (;;) {
-    assert(local_port != 0);
-    status = socket_.Connect(local_port);
-    if (status.ok()) {
-      break;
-    }
-
-    if (timeout_timer.ElapsedSeconds() > options_.connection_timeout_sec) {
-      return SetTag(
-          absl::DeadlineExceededError("Timeout while connecting to server"),
-          Tag::kConnectionTimeout);
-    }
-
-    Util::Sleep(10);
-  }
+  // Wait for port forwarding to be up.
+  RETURN_IF_ERROR(ClientSocket::WaitForConnection(
+      local_port, absl::Seconds(options_.connection_timeout_sec)));
 
   server_process_ = std::move(srv_process);
   port_forwarding_process_ = std::move(fwd_process);
