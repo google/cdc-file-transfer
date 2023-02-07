@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <vector>
 
 namespace cdc_ft {
@@ -105,7 +106,7 @@ class ChunkerTmpl {
 
     // Calculate the threshold the hash must be <= to for a 1/(avg-min+1)
     // chance of a chunk boundary.
-    kthreshold_ = (T)(-1) / (cfg_.avg_size - cfg_.min_size + 1);
+    threshold_ = std::numeric_limits<T>::max() / (cfg_.avg_size - cfg_.min_size + 1);
     data_.reserve(cfg_.max_size << 1);
   }
 
@@ -149,7 +150,7 @@ class ChunkerTmpl {
   void Finalize() { Process(nullptr, 0); }
 
   // Returns the threshold for the hash <= threshold chunk boundary.
-  T Threshold() { return kthreshold_; }
+  T Threshold() { return threshold_; }
 
  private:
   size_t FindChunkBoundary(const uint8_t* data, size_t len) {
@@ -166,25 +167,24 @@ class ChunkerTmpl {
     T rc_mask = 0;
 
     // Init hash to all 1's to avoid zero-length chunks with min_size=0.
-    T hash = (T)-1;
+    T hash = std::numeric_limits<T>::max();
     // Skip the first min_size bytes, but "warm up" the rolling hash for enough
     // rounds to make sure the hash has gathered full "content history".
-    size_t i = cfg_.min_size > khashbits_ ? cfg_.min_size - khashbits_ : 0;
+    size_t i = cfg_.min_size > kHashBits ? cfg_.min_size - kHashBits : 0;
     for (/*empty*/; i < cfg_.min_size; ++i) {
       hash = (hash << 1) + gear[data[i]];
     }
     for (/*empty*/; i < len; ++i) {
       if (!(hash & rc_mask)) {
-        if (hash <= kthreshold_) {
+        if (hash <= threshold_) {
           // This hash matches the target length hash criteria, return it.
           return i;
-        } else {
-          // This is a better regression point. Set it as the new rc_len and
-          // update rc_mask to check as many MSBits as this hash would pass.
-          rc_len = i;
-          for (rc_mask = (T)-1; hash & rc_mask; rc_mask <<= 1)
-            ;
         }
+        // This is a better regression point. Set it as the new rc_len and
+        // update rc_mask to check as many MSBits as this hash would pass.
+        rc_len = i;
+        rc_mask = std::numeric_limits<T>::max();
+        while (hash & rc_mask) rc_mask <<= 1;
       }
       hash = (hash << 1) + gear[data[i]];
     }
@@ -192,10 +192,10 @@ class ChunkerTmpl {
     return (hash & rc_mask) ? rc_len : i;
   }
 
-  static constexpr size_t khashbits_ = sizeof(T) * 8;
+  static constexpr size_t kHashBits = sizeof(T) * 8;
   const Config cfg_;
   const ChunkFoundHandler handler_;
-  T kthreshold_;
+  T threshold_;
   std::vector<uint8_t> data_;
 };
 
