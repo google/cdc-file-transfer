@@ -24,13 +24,11 @@
 #include <cstdio>
 #include <functional>
 #include <iostream>
+#include <limits>
 #include <vector>
 
 namespace cdc_ft {
 namespace fastcdc {
-
-static constexpr uint32_t default_mask_stages = 7;
-static constexpr uint32_t default_mask_lshift = 3;
 
 // Configures the chunk sizes that the ChunkerTmpl class produces. All sizes are
 // given in bytes.
@@ -41,9 +39,12 @@ struct Config {
   // that this size can still be undercut for the last chunk after processing
   // the input data.
   size_t min_size;
-  // The average chunk size is the target size for chunks. Sizes will show a
-  // normal distribution around the average size, depending on the template
-  // parameters of the ChunkerTmpl class.
+  // The average chunk size is the target size for chunks, not including the
+  // effects of max_size regression. Before regression, sizes will show an
+  // offset exponential distribution decaying after min_size with the desired
+  // average size. Regression will "reflect-back" the exponential
+  // distribution past max_size, which reduces the actual average size and
+  // gives a very flat distribution when max_size is small.
   size_t avg_size;
   // The maximum size is the upper bound for generating chunks. This limit is
   // never exceeded. If a chunk boundary was not detected based on the content
@@ -57,53 +58,57 @@ using ChunkFoundHandler = std::function<void(const uint8_t* data, size_t len)>;
 // Implements a very fast content-defined chunking algorithm.
 //
 // FastCDC [1] identifies chunk boundaries based on a simple yet efficient
-// rolling hash. This library implements a modified version of this algorithm to
-// achieve better normalization of the chunk sizes around the target average
-// size. This behavior can be tweaked with several parameters.
+// "gear" rolling hash, a "normalized chunking" algorithm using a stepped
+// chunk probability with a pair spread-out bitmasks for the '!(hash&mask)'
+// "hash criteria".
+//
+// This library implements a modified version based on rollsum-chunking [2]
+// tests and analysis that showed simple "exponential chunking" gives better
+// deduplication, and a 'hash<=threshold' "hash criteria" works better for
+// the gear rollsum and can support arbitrary non-power-of-two sizes.
+//
+// For limiting block sizes it uses a modified version of "Regression
+// Chunking"[3] with an arbitrary number of regressions using power-of-2
+// target block lengths (not multiples of the target block length, which
+// doesn't have to be a power-of-2). This means we can use a bitmask for the
+// most significant bits for the regression hash criteria.
 //
 // The Config struct passed in during construction defines the minimum, average,
 // and maximum allowed chunk sizes. Those are runtime parameters.
 //
 // The template allows additional compile-time configuration:
-// - T, gear: an array of random numbers that serves as a look-up table to
+//
+// - T : The type used for the hash. Should be an unsigned integer type,
+// ideally uint32_t or uint64_t. The number of bits of this type determines
+// the "sliding window" size of the gear hash. A smaller type is likely to be
+// faster at the expense of reduced deduplication.
+//
+// - gear: an array of random numbers that serves as a look-up table to
 // modify be added to the rolling hash in each round based on the input data.
-// This library comes with two different tables, one of type uint32_t and one of
-// uint64_t. Both showed good results in our experiments, yet the 64-bit version
-// provided slightly better deduplication.
-// - mask_stages: the number of stages in which the requirements for identifying
-// a chunk boundary is gradually losened as the amount of data processed is
-// approaching the maximum chunk size. More stages result in a smoother normal
-// distribution of chunk sizes around the configured average size. Our
-// experiments showed good normalization with stages between 5 and 9.
-// - mask_lshift: defines how much the bits set in the mask that identifies the
-// chunk boundary are spread apart. Our experiments showed a better
-// deduplication rate with a small amount of lshift (between 2 and 4).
+// This library comes with two different tables, one of type uint32_t and one
+// of uint64_t. Both showed good results in our experiments, yet the 64-bit
+// version provided slightly better deduplication.
 //
 // [1] https://www.usenix.org/system/files/conference/atc16/atc16-paper-xia.pdf.
+// [2] https://github.com/dbaarda/rollsum-chunking/blob/master/RESULTS.rst
+// [3] https://www.usenix.org/system/files/conference/atc12/atc12-final293.pdf
 //
 // TODO: Remove template parameters.
-template <typename T, const T gear[256],
-          uint32_t mask_stages = default_mask_stages,
-          uint32_t mask_lshift = default_mask_lshift>
+template <typename T, const T gear[256]>
 class ChunkerTmpl {
  public:
-  struct MaskStage {
-    size_t barrier;
-    uint64_t mask;
-  };
-
   // Constructor.
   ChunkerTmpl(const Config& cfg, ChunkFoundHandler handler)
       : cfg_(cfg), handler_(handler) {
-    static_assert(mask_stages > 0 && mask_stages <= 64,
-                  "mask_stages must be between 1 and 64");
-    static_assert(mask_lshift > 0 && mask_lshift <= 31,
-                  "mask_lshift must be between 1 and 31");
+    assert(cfg_.avg_size >= 1);
     assert(cfg_.min_size <= cfg_.avg_size);
     assert(cfg_.avg_size <= cfg_.max_size);
 
+    // Calculate the threshold the hash must be <= to for a 1/(avg-min+1)
+    // chance of a chunk boundary.
+    threshold_ =
+        std::numeric_limits<T>::max() / (cfg_.avg_size - cfg_.min_size + 1);
     data_.reserve(cfg_.max_size << 1);
-    InitStages();
   }
 
   // Slices the given data block into chunks and calls the specified handler
@@ -145,92 +150,10 @@ class ChunkerTmpl {
   // be smaller than the specified minimum chunk size.
   void Finalize() { Process(nullptr, 0); }
 
-  // Returns the number of mask stages used for determening chunk boundaries.
-  uint32_t StagesCount() { return mask_stages; }
-
-  // Returns the mask stage with the given index.
-  const MaskStage& Stage(uint32_t i) {
-    assert(i < mask_stages);
-    return stages_[i];
-  }
+  // Returns the threshold for the hash <= threshold chunk boundary.
+  T Threshold() { return threshold_; }
 
  private:
-  // Returns approximately log_2 of the given size, slightly adjusted to better
-  // achieve the average chunk size.
-  static uint32_t Bits(size_t size) {
-    uint32_t bits = 0;
-    for (; size > 0; size >>= 1) bits++;
-    // Adjust number of bits to better hit the target chunk size (evaluated via
-    // experiments).
-    return bits > 3 ? bits - 3 : 1;
-  }
-
-  // Returns a bitmask with the given number of bits set to 1.
-  static uint64_t Mask(const uint32_t bits) {
-    assert(bits > 0 && bits < 64);
-    uint64_t mask = 0;
-
-    // Check which bit pattern we need to make the 1s fit into 64 bit:
-    // 10..10..10... vs. 110..110..110... vs. 1110..1110..1110...
-    uint64_t pattern = 1ull;
-    uint32_t actual_lshift = mask_lshift;
-    for (uint32_t num_ones = 1; num_ones <= 32; num_ones++) {
-      // Round up integer division: (bits + num_ones - 1) / num_ones
-      if (((bits + num_ones - 1) / num_ones) * actual_lshift < 64) {
-        // The number of rounds needed depends on the number of 1s in "pattern".
-        uint32_t num_shifts = bits / num_ones;
-        for (uint32_t j = 0; j < num_shifts; j++) {
-          mask = (mask << actual_lshift) | pattern;
-        }
-        // Append any missing 1s to the end.
-        for (uint32_t j = num_shifts * num_ones; j < bits; j++) {
-          mask = (mask << 1) | 1ull;
-        }
-        return mask;
-      }
-      // Switch to the next denser pattern (e.g. 100100... => 11001100...).
-      pattern = (pattern << 1) | 1ull;
-      actual_lshift++;
-    }
-    // If we came here it's likely an error.
-    assert(bits == 0 || mask != 0);
-    return mask;
-  }
-
-  void InitStages() {
-    constexpr uint32_t mask_stages_left = mask_stages / 2;
-    constexpr uint32_t mask_stages_right = mask_stages - mask_stages_left;
-    const uint32_t avg_bits = Bits(cfg_.avg_size);
-
-    // Minimum distance from the average size to the extremes.
-    size_t dist =
-        std::min(cfg_.avg_size - cfg_.min_size, cfg_.max_size - cfg_.avg_size);
-    int stg = 0;
-    // Decrease mask bits by one in each stage from (bits + n) downto (bits +
-    // 1), barriers at 1/2, 1/3, ... 1/(n+1) of dist.
-    for (uint32_t i = 0; i < mask_stages_left; i++) {
-      // Bitmasks require at least one bit set.
-      uint32_t bits =
-          avg_bits + mask_stages_left > i ? avg_bits + mask_stages_left - i : 1;
-      stages_[stg].mask = Mask(bits);
-      stages_[stg].barrier = cfg_.avg_size - dist / (i + 2);
-      stg++;
-    }
-    // Decrease mask bits by one in each stage from (bits) downto (bits - n),
-    // barriers at 1/(n+1), 1/n, ..., 1/2 of dist.
-    for (int i = mask_stages_right; i > 0; i--) {
-      // Bitmasks require at least one bit set.
-      uint32_t bits = avg_bits + i > mask_stages_right
-                          ? avg_bits + i - mask_stages_right
-                          : 1;
-      stages_[stg].mask = Mask(bits);
-      stages_[stg].barrier = cfg_.avg_size + dist / i;
-      stg++;
-    }
-    // Adjust the final barrier to the max. chunk size.
-    stages_[mask_stages - 1].barrier = cfg_.max_size;
-  }
-
   size_t FindChunkBoundary(const uint8_t* data, size_t len) {
     if (len <= cfg_.min_size) {
       return len;
@@ -239,30 +162,41 @@ class ChunkerTmpl {
       len = cfg_.max_size;
     }
 
+    // Initialize the regression length to len (the end) and the regression
+    // mask to an empty bitmask (match any hash).
+    size_t rc_len = len;
+    T rc_mask = 0;
+
     // Init hash to all 1's to avoid zero-length chunks with min_size=0.
-    uint64_t hash = UINT64_MAX;
-    // Skip the first min_size bytes, but "warm up" the rolling hash for 64
-    // rounds to make sure the 64-bit hash has gathered full "content history".
-    size_t i = cfg_.min_size > 64 ? cfg_.min_size - 64 : 0;
+    T hash = std::numeric_limits<T>::max();
+    // Skip the first min_size bytes, but "warm up" the rolling hash for enough
+    // rounds to make sure the hash has gathered full "content history".
+    size_t i = cfg_.min_size > kHashBits ? cfg_.min_size - kHashBits : 0;
     for (/*empty*/; i < cfg_.min_size; ++i) {
       hash = (hash << 1) + gear[data[i]];
     }
-    for (uint32_t stg = 0; stg < mask_stages && i < len; stg++) {
-      uint64_t mask = stages_[stg].mask;
-      size_t barrier = std::min(len, stages_[stg].barrier);
-      for (/*empty*/; i < barrier; ++i) {
-        if (!(hash & mask)) {
+    for (/*empty*/; i < len; ++i) {
+      if (!(hash & rc_mask)) {
+        if (hash <= threshold_) {
+          // This hash matches the target length hash criteria, return it.
           return i;
         }
-        hash = (hash << 1) + gear[data[i]];
+        // This is a better regression point. Set it as the new rc_len and
+        // update rc_mask to check as many MSBits as this hash would pass.
+        rc_len = i;
+        rc_mask = std::numeric_limits<T>::max();
+        while (hash & rc_mask) rc_mask <<= 1;
       }
+      hash = (hash << 1) + gear[data[i]];
     }
-    return i;
+    // Return best regression point we found or the end if it's better.
+    return (hash & rc_mask) ? rc_len : i;
   }
 
+  static constexpr size_t kHashBits = sizeof(T) * 8;
   const Config cfg_;
   const ChunkFoundHandler handler_;
-  MaskStage stages_[mask_stages];
+  T threshold_;
   std::vector<uint8_t> data_;
 };
 
@@ -404,16 +338,12 @@ static constexpr uint64_t gear64[256] = {
 };  // namespace internal
 
 // Chunker template with a 32-bit gear table.
-template <uint32_t mask_stages = default_mask_stages,
-          uint32_t mask_lshift = default_mask_lshift>
-using Chunker32 =
-    ChunkerTmpl<uint32_t, internal::gear32, mask_stages, mask_lshift>;
+template <const uint32_t gear[256] = internal::gear32>
+using Chunker32 = ChunkerTmpl<uint32_t, gear>;
 
 // Chunker template with a 64-bit gear table.
-template <uint32_t mask_stages = default_mask_stages,
-          uint32_t mask_lshift = default_mask_lshift>
-using Chunker64 =
-    ChunkerTmpl<uint64_t, internal::gear64, mask_stages, mask_lshift>;
+template <const uint64_t gear[256] = internal::gear64>
+using Chunker64 = ChunkerTmpl<uint64_t, gear>;
 
 // Default chunker class using params that are known to work well.
 using Chunker = Chunker64<>;

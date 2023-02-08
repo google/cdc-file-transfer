@@ -201,8 +201,11 @@ bool ManifestTestBase::InProgress(const ContentIdProto& manifest_id,
 
 void ManifestTestBase::ValidateChunkLookup(const std::string& rel_path,
                                            bool expect_contained) {
+  Buffer file;
+  EXPECT_OK(path::ReadFile(path::Join(cfg_.src_dir, rel_path), &file));
+
   uint64_t offset = 0;
-  auto handler = [&offset, &rel_path, file_chunks = &file_chunks_,
+  auto handler = [&file, &offset, &rel_path, file_chunks = &file_chunks_,
                   expect_contained](const void* data, size_t size) {
     ContentIdProto id = ContentId::FromArray(data, size);
 
@@ -214,8 +217,14 @@ void ManifestTestBase::ValidateChunkLookup(const std::string& rel_path,
         expect_contained);
     if (expect_contained) {
       EXPECT_EQ(lookup_path, rel_path);
-      EXPECT_EQ(lookup_offset, offset);
       EXPECT_EQ(lookup_size, size);
+
+      // The offset can be ambiguous since the file might contain duplicate
+      // data. Make sure that the actual data is the same.
+      EXPECT_LE(offset + size, file.size());
+      EXPECT_LE(lookup_offset + size, file.size());
+      EXPECT_EQ(memcmp(file.data() + offset, file.data() + lookup_offset, size),
+                0);
     }
 
     offset += size;
@@ -224,9 +233,7 @@ void ManifestTestBase::ValidateChunkLookup(const std::string& rel_path,
                           cfg_.max_chunk_size);
   fastcdc::Chunker chunker(cdc_cfg, handler);
 
-  Buffer b;
-  EXPECT_OK(path::ReadFile(path::Join(cfg_.src_dir, rel_path), &b));
-  chunker.Process(reinterpret_cast<uint8_t*>(b.data()), b.size());
+  chunker.Process(reinterpret_cast<uint8_t*>(file.data()), file.size());
   chunker.Finalize();
 }
 

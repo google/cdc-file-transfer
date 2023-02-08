@@ -51,7 +51,7 @@ struct UpdaterConfig {
   size_t avg_chunk_size = 256 << 10;
 
   // Maximum allowed chunk size.
-  size_t max_chunk_size = 1024 << 10;
+  size_t max_chunk_size = 512 << 10;
 
   // Size of the chunker thread pool. Defaults to the number of available CPUs.
   uint32_t num_threads = 0;
