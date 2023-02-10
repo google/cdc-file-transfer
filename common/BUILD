@@ -301,54 +301,6 @@ cc_library(
 )
 
 cc_library(
-    name = "port_manager",
-    srcs = ["port_manager_win.cc"],
-    hdrs = ["port_manager.h"],
-    target_compatible_with = ["@platforms//os:windows"],
-    deps = [
-        ":arch_type",
-        ":remote_util",
-        ":status",
-        ":stopwatch",
-        ":util",
-        "@com_google_absl//absl/status:statusor",
-    ],
-)
-
-cc_test(
-    name = "port_manager_test",
-    srcs = ["port_manager_test.cc"],
-    target_compatible_with = ["@platforms//os:windows"],
-    deps = [
-        ":port_manager",
-        ":status_test_macros",
-        ":stub_process",
-        ":test_main",
-        ":testing_clock",
-        "@com_google_googletest//:gtest",
-    ],
-)
-
-cc_library(
-    name = "port_range_parser",
-    srcs = ["port_range_parser.cc"],
-    hdrs = ["port_range_parser.h"],
-    deps = [
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_test(
-    name = "port_range_parser_test",
-    srcs = ["port_range_parser_test.cc"],
-    deps = [
-        ":port_range_parser",
-        ":test_main",
-        "@com_google_googletest//:gtest",
-    ],
-)
-
-cc_library(
     name = "process",
     srcs = ["process_win.cc"],
     hdrs = ["process.h"],

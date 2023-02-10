@@ -78,10 +78,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)common\path_filter.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\path_filter_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\path_test.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_manager_test.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_manager_win.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\process_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\process_win.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\remote_util.cc" />
@@ -163,7 +159,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)common\ansi_filter.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\arch_type.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\build_version.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)common\port_range_parser.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)fastcdc\fastcdc.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)manifest\pending_assets_queue.h" />
   </ItemGroup>
@@ -207,7 +202,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)common\path.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\path_filter.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\platform.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)common\port_manager.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\process.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\remote_util.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\scoped_handle_win.h" />

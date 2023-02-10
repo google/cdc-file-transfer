@@ -17,7 +17,6 @@
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_split.h"
 #include "absl_helper/jedec_size_flag.h"
-#include "common/port_range_parser.h"
 #include "lyra/lyra.hpp"
 
 namespace cdc_ft {
@@ -53,18 +52,6 @@ std::function<void(const std::string&)> BaseCommand::JedecParser(
     } else {
       *error = absl::StrFormat("Failed to parse %s=%s: %s", flag_name, value,
                                *error);
-    }
-  };
-}
-
-std::function<void(const std::string&)> BaseCommand::PortRangeParser(
-    const char* flag_name, uint16_t* first, uint16_t* last) {
-  return [flag_name, first, last,
-          error = &parse_error_](const std::string& value) {
-    if (!port_range::Parse(value.c_str(), first, last)) {
-      *error = absl::StrFormat(
-          "Failed to parse %s=%s, expected <port> or <port1>-<port2>",
-          flag_name, value);
     }
   };
 }

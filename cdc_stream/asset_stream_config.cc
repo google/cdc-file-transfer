@@ -50,11 +50,7 @@ void AssetStreamConfig::RegisterCommandLineFlags(lyra::command& cmd,
                              "asset stream service, default: " +
                              std::to_string(service_port_)));
 
-  cmd.add_argument(lyra::opt(base_command.PortRangeParser(
-                                 "--forward-port",
-                                 &session_cfg_.deprecated_forward_port_first,
-                                 &session_cfg_.deprecated_forward_port_last),
-                             "port")
+  cmd.add_argument(lyra::opt(session_cfg_.deprecated_forward_port_range, "port")
                        .name("--forward-port")
                        .help("[Deprecated, ignored] TCP port or range used for "
                              "SSH port forwarding"));
