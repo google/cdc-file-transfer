@@ -158,7 +158,7 @@ class MultiSessionTest : public ManifestTestBase {
     EXPECT_EQ(data->file_count, file_count);
     EXPECT_EQ(data->min_chunk_size, 128 << 10);
     EXPECT_EQ(data->avg_chunk_size, 256 << 10);
-    EXPECT_EQ(data->max_chunk_size, 1024 << 10);
+    EXPECT_EQ(data->max_chunk_size, 512 << 10);
   }
 
   metrics::ManifestUpdateData GetManifestUpdateData(

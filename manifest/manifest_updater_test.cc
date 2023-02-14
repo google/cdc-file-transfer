@@ -180,19 +180,19 @@ TEST_F(ManifestUpdaterTest, UpdateAll_PrunesUnreferencedChunks) {
   EXPECT_OK(updater.Update(
       MakeUpdateOps({"subdir/b.txt", "subdir/c.txt", "subdir/d.txt"}),
       &file_chunks_, nullptr));
-  // 1 for manifest id, 1 for manifest, 5 indirect assets.
+  // 1 for manifest id, 1 for manifest, 6 indirect assets.
   // 2 additional chunks from the first Update() that are now unreferenced.
   // -1, because the indirect asset for "a.txt" is deduplicated
-  EXPECT_EQ(data_store_.Chunks().size(), 8)
+  EXPECT_EQ(data_store_.Chunks().size(), 9)
       << "Manifest: " << ContentId::ToHexString(updater.ManifestId())
       << std::endl
       << DumpDataStoreProtos();
 
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
-  // 1 for manifest id, 1 for manifest, 5 indirect assets.
+  // 1 for manifest id, 1 for manifest, 6 indirect assets.
   // Pruning has removed the 2 unreferenced ones.
-  EXPECT_EQ(data_store_.Chunks().size(), 7)
+  EXPECT_EQ(data_store_.Chunks().size(), 8)
       << "Manifest: " << ContentId::ToHexString(updater.ManifestId())
       << std::endl
       << DumpDataStoreProtos();
@@ -224,9 +224,9 @@ TEST_F(ManifestUpdaterTest, UpdateAll_RecoversFromMissingChunks) {
   }
 
   EXPECT_OK(updater.UpdateAll(&file_chunks_));
-  // 1 for manifest id, 1 for manifest, 5 indirect assets.
-  // There would be 8 chunks without the removal above, see UpdateAll_Prune.
-  EXPECT_EQ(data_store_.Chunks().size(), 7)
+  // 1 for manifest id, 1 for manifest, 6 indirect assets.
+  // There would be 9 chunks without the removal above, see UpdateAll_Prune.
+  EXPECT_EQ(data_store_.Chunks().size(), 8)
       << "Manifest: " << ContentId::ToHexString(updater.ManifestId())
       << std::endl
       << DumpDataStoreProtos();

@@ -27,16 +27,10 @@
 #include "fastcdc/fastcdc.h"
 
 // Compile-time parameters for the FastCDC algorithm.
-#define CDC_GEAR_32BIT 1
-#define CDC_GEAR_64BIT 2
-#ifndef CDC_GEAR_TABLE
-#define CDC_GEAR_TABLE CDC_GEAR_64BIT
-#endif
-#ifndef CDC_MASK_STAGES
-#define CDC_MASK_STAGES 7
-#endif
-#ifndef CDC_MASK_BIT_LSHIFT_AMOUNT
-#define CDC_MASK_BIT_LSHIFT_AMOUNT 3
+#define CDC_GEAR_32BIT 32
+#define CDC_GEAR_64BIT 64
+#ifndef CDC_GEAR_BITS
+#define CDC_GEAR_BITS CDC_GEAR_64BIT
 #endif
 
 namespace cdc_ft {
@@ -66,23 +60,20 @@ struct IndexerConfig {
   uint32_t num_threads;
   // Which hash function to use.
   HashType hash_type;
-  // The masks will be populated by the indexer, setting them here has no
-  // effect. They are in this struct so that they can be conveniently accessed
-  // when printing the operation summary (and since they are derived from the
-  // configuration, they are technically part of it).
-  uint64_t mask_s;
-  uint64_t mask_l;
+  // The threshold will be populated by the indexer, setting it here has no
+  // effect. It is in this struct so that it can be conveniently accessed
+  // when printing the operation summary (and since it is derived from the
+  // configuration, it is technically part of it).
+  uint64_t threshold;
 };
 
 class Indexer {
  public:
   using hash_t = std::string;
-#if CDC_GEAR_TABLE == CDC_GEAR_32BIT
-  typedef fastcdc::Chunker32<CDC_MASK_STAGES, CDC_MASK_BIT_LSHIFT_AMOUNT>
-      Chunker;
-#elif CDC_GEAR_TABLE == CDC_GEAR_64BIT
-  typedef fastcdc::Chunker64<CDC_MASK_STAGES, CDC_MASK_BIT_LSHIFT_AMOUNT>
-      Chunker;
+#if CDC_GEAR_BITS == CDC_GEAR_32BIT
+  typedef fastcdc::Chunker32<> Chunker;
+#elif CDC_GEAR_BITS == CDC_GEAR_64BIT
+  typedef fastcdc::Chunker64<> Chunker;
 #else
 #error "Unknown gear table"
 #endif
