@@ -24,6 +24,7 @@
 #include "common/log.h"
 #include "common/path.h"
 #include "common/status.h"
+#include "common/status_macros.h"
 #include "common/stopwatch.h"
 #include "common/threadpool.h"
 #include "common/util.h"
@@ -295,10 +296,11 @@ absl::Status CdcRsyncServer::Run(int port) {
   socket_finalizer_ = std::make_unique<SocketFinalizer>();
 
   socket_ = std::make_unique<ServerSocket>();
-  status = socket_->StartListening(port);
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to start listening on port %i", port);
-  }
+  int new_port;
+  ASSIGN_OR_RETURN(new_port, socket_->StartListening(port),
+                   "Failed to start listening on port %i", port);
+  assert(port != 0);
+  assert(port == new_port);
   LOG_INFO("cdc_rsync_server listening on port %i", port);
 
   // This is the marker for the client, so it knows it can connect.
