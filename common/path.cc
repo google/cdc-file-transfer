@@ -219,9 +219,12 @@ absl::Status ExpandPathVariables(std::string* path) {
   *path = Util::WideToUtf8Str(wchar_expanded);
   return absl::OkStatus();
 #else
+  // Exclude command substitution. It.s not what users of this method would
+  // expect and could lead to security issues.
   wordexp_t res;
-  wordexp(path->c_str(), &res, 0);
+  wordexp(path->c_str(), &res, WRDE_NOCMD);
   if (res.we_wordc > 1) {
+    wordfree(&res);
     return absl::InvalidArgumentError(
         "Path expands to multiple results (did you use * etc. ?");
   }
