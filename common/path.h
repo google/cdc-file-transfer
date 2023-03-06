@@ -104,8 +104,8 @@ absl::Status GetKnownFolderPath(FolderId folder_id, std::string* path);
 // Expands environment path variables like %APPDATA% on Windows or ~ on Linux.
 // On Windows, variables are matched case invariantly. Unknown environment
 // variables are not changed.
-// On Linux, performs a shell-like expansion. Returns an error if multiple
-// results would be returned, e.g. from *.txt.
+// On Linux, performs a shell-like expansion, but without command substitution.
+// Returns an error if multiple results would be returned, e.g. from *.txt.
 absl::Status ExpandPathVariables(std::string* path);
 
 // Returns the environment variable with given |name| in |value|.
