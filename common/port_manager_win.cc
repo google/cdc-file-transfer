@@ -168,7 +168,7 @@ absl::StatusOr<int> PortManager::ReservePort(int remote_timeout_sec,
       local_ports,
       FindAvailableLocalPorts(first_port_, last_port_,
                               ArchType::kWindows_x86_64, process_factory_),
-      "Failed to find available ports on workstation");
+      "Failed to find available local ports");
 
   // Find available port on remote instance.
   std::unordered_set<int> remote_ports = local_ports;
@@ -178,7 +178,7 @@ absl::StatusOr<int> PortManager::ReservePort(int remote_timeout_sec,
         FindAvailableRemotePorts(first_port_, last_port_, remote_arch_type,
                                  process_factory_, remote_util_,
                                  remote_timeout_sec, steady_clock_),
-        "Failed to find available ports on instance");
+        "Failed to find available remote ports");
   }
 
   // Fetch shared memory.
@@ -209,9 +209,9 @@ absl::StatusOr<int> PortManager::ReservePort(int remote_timeout_sec,
       LOG_DEBUG("Trying to reserve port %i", port);
 
       // We have reserved this port. Double-check that it's actually not in use
-      // on both the workstation and the server.
+      // on both the local and the remote device
       if (local_ports.find(port) == local_ports.end()) {
-        LOG_DEBUG("Port %i not available on workstation", port);
+        LOG_DEBUG("Local port %i not available", port);
         InterlockedCompareExchange64(ts_ptr, now, port_timestamp);
         continue;
       }
@@ -221,7 +221,7 @@ absl::StatusOr<int> PortManager::ReservePort(int remote_timeout_sec,
         continue;
       }
 
-      LOG_DEBUG("Port %i is available on workstation and instance", port);
+      LOG_DEBUG("Port %i is available", port);
       reserved_ports_.insert(port);
       return port;
     }
@@ -269,7 +269,7 @@ absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableLocalPorts(
     return WrapStatus(status, "Failed to run netstat:\n%s", errors);
   }
 
-  LOG_DEBUG("netstat (workstation) output:\n%s", output);
+  LOG_DEBUG("netstat (local) output:\n%s", output);
   return FindAvailablePorts(first_port, last_port, output, arch_type);
 }
 
@@ -316,7 +316,7 @@ absl::StatusOr<std::unordered_set<int>> PortManager::FindAvailableRemotePorts(
                       errors);
   }
 
-  LOG_DEBUG("netstat (instance) output:\n%s", output);
+  LOG_DEBUG("netstat (remote) output:\n%s", output);
   return FindAvailablePorts(first_port, last_port, output, arch_type);
 }
 

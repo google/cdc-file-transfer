@@ -68,11 +68,10 @@ absl::Status ClientSocket::Connect(int port) {
   int count = 0;
   for (addrinfo* curr = addr_infos; curr; curr = curr->ai_next, count++) {
     socket_info_->socket =
-        socket(addr_infos->ai_family, addr_infos->ai_socktype,
-               addr_infos->ai_protocol);
+        socket(curr->ai_family, curr->ai_socktype, curr->ai_protocol);
     if (socket_info_->socket == INVALID_SOCKET) {
       LOG_DEBUG("socket() failed for addr_info %i: %s", count,
-                Util::GetWin32Error(WSAGetLastError()).c_str());
+                Util::GetWin32Error(WSAGetLastError()));
       continue;
     }
 
@@ -80,7 +79,8 @@ absl::Status ClientSocket::Connect(int port) {
     result = connect(socket_info_->socket, curr->ai_addr,
                      static_cast<int>(curr->ai_addrlen));
     if (result == SOCKET_ERROR) {
-      LOG_DEBUG("connect() failed for addr_info %i: %i", count, result);
+      LOG_DEBUG("connect() failed for addr_info %i: %s", count,
+                Util::GetWin32Error(WSAGetLastError()));
       closesocket(socket_info_->socket);
       socket_info_->socket = INVALID_SOCKET;
       continue;

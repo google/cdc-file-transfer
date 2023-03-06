@@ -118,7 +118,7 @@ CdcRsyncClient::CdcRsyncClient(const Options& options,
   port_manager_ = std::make_unique<PortManager>(
       "cdc_rsync_ports_f77bcdfe-368c-4c45-9f01-230c5e7e2132",
       options.forward_port_first, options.forward_port_last, &process_factory_,
-      remote_util_.get());
+      nullptr /* never reserve remote ports */);
 }
 
 CdcRsyncClient::~CdcRsyncClient() {
@@ -127,19 +127,15 @@ CdcRsyncClient::~CdcRsyncClient() {
 }
 
 absl::Status CdcRsyncClient::Run() {
-  // If |remote_util_| is not set, it's a local sync. Otherwise, guess the
-  // architecture of the device that runs cdc_rsync_server from the destination
-  // path, e.g. "C:\path\to\dest" strongly indicates Windows.
-  ServerArch server_arch = !remote_util_
-                               ? ServerArch::DetectFromLocalDevice()
-                               : ServerArch::GuessFromDestination(destination_);
-
-  int port;
-  ASSIGN_OR_RETURN(port, FindAvailablePort(&server_arch),
-                   "Failed to find available port");
+  // For local syncs, cdc_rsync_server runs on this machine. For remote syncs,
+  // guess the architecture of the device that runs cdc_rsync_server from the
+  // destination path, e.g. "C:\path\to\dest" strongly indicates Windows.
+  ServerArch server_arch = IsRemoteConnection()
+                               ? ServerArch::GuessFromDestination(destination_)
+                               : ServerArch::DetectFromLocalDevice();
 
   // Start the server process.
-  absl::Status status = StartServer(port, server_arch);
+  absl::Status status = StartServer(server_arch);
   if (HasTag(status, Tag::kDeployServer) && server_arch.IsGuess() &&
       server_exit_code_ != kServerExitCodeOutOfDate) {
     // Server couldn't be run, e.g. not found or failed to start.
@@ -155,7 +151,7 @@ absl::Status CdcRsyncClient::Run() {
     if (server_arch.GetType() != old_type) {
       LOG_DEBUG("Guessed server arch type wrong, guessed %s, actual %s.",
                 GetArchTypeStr(old_type), server_arch.GetTypeStr());
-      status = StartServer(port, server_arch);
+      status = StartServer(server_arch);
     }
   }
 
@@ -166,7 +162,7 @@ absl::Status CdcRsyncClient::Run() {
       return WrapStatus(status, "Failed to deploy server");
     }
 
-    status = StartServer(port, server_arch);
+    status = StartServer(server_arch);
   }
   if (!status.ok()) {
     return WrapStatus(status, "Failed to start server");
@@ -198,47 +194,7 @@ absl::Status CdcRsyncClient::Run() {
   return status;
 }
 
-absl::StatusOr<int> CdcRsyncClient::FindAvailablePort(ServerArch* server_arch) {
-  // Find available local and remote ports for port forwarding.
-  // If only one port is in the given range, try that without checking.
-  if (options_.forward_port_first >= options_.forward_port_last) {
-    return options_.forward_port_first;
-  }
-
-  assert(server_arch);
-  absl::StatusOr<int> port = port_manager_->ReservePort(
-      options_.connection_timeout_sec, server_arch->GetType());
-
-  if (absl::IsDeadlineExceeded(port.status())) {
-    // Server didn't respond in time.
-    return SetTag(port.status(), Tag::kConnectionTimeout);
-  }
-  if (absl::IsResourceExhausted(port.status())) {
-    // Port in use.
-    return SetTag(port.status(), Tag::kAddressInUse);
-  }
-
-  // If |server_arch| was guessed, calling netstat might have failed because
-  // the arch was wrong. Properly detect it and try again if it changed.
-  if (!port.ok() && server_arch->IsGuess()) {
-    const ArchType old_type = server_arch->GetType();
-    LOG_DEBUG(
-        "Failed to reserve port, retrying after detecting remote arch: %s",
-        port.status().ToString());
-    ASSIGN_OR_RETURN(*server_arch,
-                     ServerArch::DetectFromRemoteDevice(remote_util_.get()));
-    assert(!server_arch->IsGuess());
-    if (server_arch->GetType() != old_type) {
-      LOG_DEBUG("Guessed server arch type wrong, guessed %s, actual %s.",
-                GetArchTypeStr(old_type), server_arch->GetTypeStr());
-      return FindAvailablePort(server_arch);
-    }
-  }
-
-  return port;
-}
-
-absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
+absl::Status CdcRsyncClient::StartServer(const ServerArch& arch) {
   assert(!server_process_);
 
   // Components are expected to reside in the same dir as the executable.
@@ -262,20 +218,20 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
   ProcessStartInfo start_info;
   start_info.name = "cdc_rsync_server";
 
-  if (remote_util_) {
+  if (IsRemoteConnection()) {
     // Run cdc_rsync_server on the remote instance.
-    std::string remote_command = arch.GetStartServerCommand(
-        kExitCodeNotFound, absl::StrFormat("%i %s", port, component_args));
-    start_info = remote_util_->BuildProcessStartInfoForSshPortForwardAndCommand(
-        port, port, /*reverse=*/false, remote_command, arch.GetType());
+    std::string remote_command =
+        arch.GetStartServerCommand(kExitCodeNotFound, component_args);
+    assert(remote_util_);
+    start_info = remote_util_->BuildProcessStartInfoForSsh(remote_command,
+                                                           arch.GetType());
   } else {
     // Run cdc_rsync_server locally.
     std::string exe_dir;
     RETURN_IF_ERROR(path::GetExeDir(&exe_dir), "Failed to get exe directory");
 
     std::string server_path = path::Join(exe_dir, arch.CdcServerFilename());
-    start_info.command =
-        absl::StrFormat("%s %i %s", server_path, port, component_args);
+    start_info.command = absl::StrFormat("%s %s", server_path, component_args);
   }
 
   // Capture stdout, but forward to stdout for debugging purposes.
@@ -283,8 +239,8 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
     return HandleServerOutput(data);
   };
 
-  std::unique_ptr<Process> process = process_factory_.Create(start_info);
-  status = process->Start();
+  std::unique_ptr<Process> srv_process = process_factory_.Create(start_info);
+  status = srv_process->Start();
   if (!status.ok()) {
     return WrapStatus(status, "Failed to start cdc_rsync_server process");
   }
@@ -292,13 +248,13 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
   // Wait until the server process is listening.
   Stopwatch timeout_timer;
   bool is_timeout = false;
-  auto detect_listening_or_timeout = [is_listening = &is_server_listening_,
+  auto detect_listening_or_timeout = [port = &server_listen_port_,
                                       timeout = options_.connection_timeout_sec,
                                       &timeout_timer, &is_timeout]() -> bool {
     is_timeout = timeout_timer.ElapsedSeconds() > timeout;
-    return *is_listening || is_timeout;
+    return *port != 0 || is_timeout;
   };
-  status = process->RunUntil(detect_listening_or_timeout);
+  status = srv_process->RunUntil(detect_listening_or_timeout);
   if (!status.ok()) {
     // Some internal process error. Note that this does NOT mean that
     // cdc_rsync_server does not exist. In that case, the ssh process exits with
@@ -310,10 +266,10 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
                   Tag::kConnectionTimeout);
   }
 
-  if (process->HasExited()) {
+  if (srv_process->HasExited()) {
     // Don't re-deploy for code > kServerExitCodeOutOfDate, which means that the
     // out-of-date check already passed on the server.
-    server_exit_code_ = process->ExitCode();
+    server_exit_code_ = srv_process->ExitCode();
     if (server_exit_code_ > kServerExitCodeOutOfDate &&
         server_exit_code_ <= kServerExitCodeMax) {
       return GetServerExitStatus(server_exit_code_, server_error_);
@@ -321,7 +277,7 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
 
     // Don't re-deploy if we're not copying to a remote device. We can start
     // cdc_rsync_server from the original location directly.
-    if (!remote_util_) {
+    if (!IsRemoteConnection()) {
       return GetServerExitStatus(server_exit_code_, server_error_);
     }
 
@@ -332,19 +288,58 @@ absl::Status CdcRsyncClient::StartServer(int port, const ServerArch& arch) {
     return SetTag(MakeStatus("Redeploy server"), Tag::kDeployServer);
   }
 
+  // Now that we know which port the server is using, set up port forwarding.
+  std::unique_ptr<Process> fwd_process;
+  int local_port = server_listen_port_;
+  if (IsRemoteConnection()) {
+    absl::StatusOr<int> local_port_or = port_manager_->ReservePort(
+        options_.connection_timeout_sec, arch.GetType());
+
+    if (absl::IsResourceExhausted(local_port_or.status())) {
+      // Port in use.
+      return SetTag(local_port_or.status(), Tag::kAddressInUse);
+    }
+    if (!local_port_or.ok()) {
+      return local_port_or.status();
+    }
+
+    local_port = *local_port_or;
+    ProcessStartInfo start_info =
+        remote_util_->BuildProcessStartInfoForSshPortForward(
+            local_port, server_listen_port_, /*reverse=*/false);
+    start_info.forward_output_to_log = true;
+    fwd_process = process_factory_.Create(start_info);
+    RETURN_IF_ERROR(fwd_process->Start(),
+                    "Failed to start cdc_rsync_server process");
+  }
+
+  // Connect to the socket with port |local_port|.
   status = Socket::Initialize();
   if (!status.ok()) {
     return WrapStatus(status, "Failed to initialize sockets");
   }
   socket_finalizer_ = std::make_unique<SocketFinalizer>();
 
-  assert(is_server_listening_);
-  status = socket_.Connect(port);
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to initialize connection");
+  // Poll until the port forwarding connection is set up.
+  timeout_timer.Reset();
+  for (;;) {
+    assert(local_port != 0);
+    status = socket_.Connect(local_port);
+    if (status.ok()) {
+      break;
+    }
+
+    if (timeout_timer.ElapsedSeconds() > options_.connection_timeout_sec) {
+      return SetTag(
+          absl::DeadlineExceededError("Timeout while connecting to server"),
+          Tag::kConnectionTimeout);
+    }
+
+    Util::Sleep(10);
   }
 
-  server_process_ = std::move(process);
+  server_process_ = std::move(srv_process);
+  port_forwarding_process_ = std::move(fwd_process);
   message_pump_.StartMessagePump();
   return absl::OkStatus();
 }
@@ -365,6 +360,7 @@ absl::Status CdcRsyncClient::StopServer() {
 
   server_exit_code_ = server_process_->ExitCode();
   server_process_.reset();
+  port_forwarding_process_.reset();
   return absl::OkStatus();
 }
 
@@ -396,10 +392,29 @@ absl::Status CdcRsyncClient::HandleServerOutput(const char* data) {
   }
 
   printer_.Print(stdout_data, false, Util::GetConsoleWidth());
-  if (!is_server_listening_) {
+  if (server_listen_port_ == 0) {
     server_output_.append(stdout_data);
-    is_server_listening_ =
-        server_output_.find("Server is listening") != std::string::npos;
+
+    // Parse port from "Port <n>: Server is listening".
+    size_t listening_pos = server_output_.find("Server is listening");
+    if (listening_pos != std::string::npos) {
+      // Search backwards until we find "Port ".
+      constexpr char port_key[] = "Port ";
+      size_t port_pos = server_output_.rfind(port_key, listening_pos);
+      if (port_pos == std::string::npos) {
+        return MakeStatus("Failed to find 'Port' marker in server output '%s'",
+                          server_output_);
+      }
+      assert(listening_pos > port_pos);
+      server_listen_port_ = atoi(
+          server_output_
+              .substr(port_pos + strlen(port_key), listening_pos - port_pos)
+              .c_str());
+      if (server_listen_port_ == 0) {
+        return MakeStatus("Failed to parse port from server output '%s'",
+                          server_output_);
+      }
+    }
   }
 
   return absl::OkStatus();
@@ -466,6 +481,7 @@ absl::Status CdcRsyncClient::Sync() {
 absl::Status CdcRsyncClient::DeployServer(const ServerArch& arch) {
   assert(!server_process_);
   assert(remote_util_);
+  assert(IsRemoteConnection());
 
   std::string exe_dir;
   absl::Status status = path::GetExeDir(&exe_dir);
