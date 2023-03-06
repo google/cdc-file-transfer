@@ -43,9 +43,10 @@ class CdcRsyncServer {
   // up-to-date by checking their sizes and timestamps.
   bool CheckComponents(const std::vector<GameletComponent>& components);
 
-  // Listens to |port|, accepts a connection from the client and runs the rsync
-  // procedure.
-  absl::Status Run(int port);
+  // Listens to any available port, accepts a connection from the client and
+  // runs the rsync procedure. Prints "Port <n>: Server is listening" to stdout,
+  // so the client can retrieve the selected port.
+  absl::Status Run();
 
   // Returns the verbosity sent from the client. 0 by default.
   int GetVerbosity() const { return verbosity_; }

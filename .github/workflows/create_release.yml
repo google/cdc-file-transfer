@@ -63,7 +63,6 @@ jobs:
                      --test_output=errors --local_test_jobs=1  \
                      -- //... -//third_party/... -//cdc_rsync_server:file_finder_test
 
-      # The artifact collector doesn't like the fact that bazel-bin is a symlink.
       - name: Copy artifacts
         run: |
           mkdir artifacts
@@ -152,7 +151,6 @@ jobs:
             //manifest/... `
             //metrics/...
 
-      # The artifact collector doesn't like the fact that bazel-bin is a symlink.
       - name: Copy artifacts
         run: |
           mkdir artifacts

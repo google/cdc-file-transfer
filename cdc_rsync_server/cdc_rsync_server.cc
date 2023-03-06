@@ -288,7 +288,7 @@ bool CdcRsyncServer::CheckComponents(
   return true;
 }
 
-absl::Status CdcRsyncServer::Run(int port) {
+absl::Status CdcRsyncServer::Run() {
   absl::Status status = Socket::Initialize();
   if (!status.ok()) {
     return WrapStatus(status, "Failed to initialize sockets");
@@ -296,15 +296,15 @@ absl::Status CdcRsyncServer::Run(int port) {
   socket_finalizer_ = std::make_unique<SocketFinalizer>();
 
   socket_ = std::make_unique<ServerSocket>();
-  int new_port;
-  ASSIGN_OR_RETURN(new_port, socket_->StartListening(port),
-                   "Failed to start listening on port %i", port);
-  assert(port != 0);
-  assert(port == new_port);
+  int port;
+  ASSIGN_OR_RETURN(port, socket_->StartListening(0),
+                   "Failed to start listening for connections");
   LOG_INFO("cdc_rsync_server listening on port %i", port);
 
   // This is the marker for the client, so it knows it can connect.
-  printf("Server is listening\n");
+  // Print port first so the client can easily parse it when it sees "Server is
+  // listening" without dealing with half-transmitted data.
+  printf("Port %i: Server is listening\n", port);
   fflush(stdout);
 
   status = socket_->WaitForConnection();
@@ -607,7 +607,7 @@ absl::Status CdcRsyncServer::CreateMissingDirs() {
 template <typename T>
 absl::Status CdcRsyncServer::SendFileIndices(const char* file_type,
                                              const std::vector<T>& files) {
-  LOG_INFO("Sending indices of missing files to client");
+  LOG_INFO("Sending indices of %s files to client", file_type);
   constexpr char error_fmt[] = "Failed to send indices of %s files.";
 
   AddFileIndicesResponse response;

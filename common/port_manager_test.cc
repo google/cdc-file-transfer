@@ -118,9 +118,8 @@ TEST_F(PortManagerTest, ReservePortLocalNetstatFails) {
   absl::StatusOr<int> port =
       port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64);
   EXPECT_NOT_OK(port);
-  EXPECT_TRUE(
-      absl::StrContains(port.status().message(),
-                        "Failed to find available ports on workstation"));
+  EXPECT_TRUE(absl::StrContains(port.status().message(),
+                                "Failed to find available local ports"));
 }
 
 TEST_F(PortManagerTest, ReservePortRemoteNetstatFails) {
@@ -131,7 +130,7 @@ TEST_F(PortManagerTest, ReservePortRemoteNetstatFails) {
       port_manager_.ReservePort(kTimeoutSec, ArchType::kLinux_x86_64);
   EXPECT_NOT_OK(port);
   EXPECT_TRUE(absl::StrContains(port.status().message(),
-                                "Failed to find available ports on instance"));
+                                "Failed to find available remote ports"));
 }
 
 TEST_F(PortManagerTest, ReservePortRemoteNetstatTimesOut) {
