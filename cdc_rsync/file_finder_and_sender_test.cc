@@ -18,8 +18,8 @@
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
-#include "cdc_rsync/base/fake_socket.h"
 #include "cdc_rsync/base/message_pump.h"
+#include "common/fake_socket.h"
 #include "common/log.h"
 #include "common/path.h"
 #include "common/path_filter.h"

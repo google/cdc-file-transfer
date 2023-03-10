@@ -16,7 +16,6 @@
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)absl_helper\jedec_size_flag.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\mock_config_stream_client.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\socket.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\server_arch.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\server_arch_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\asset_stream_config.cc" />
@@ -39,12 +38,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\start_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\start_service_command.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_stream\stop_service_command.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\ansi_filter.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\ansi_filter_test.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\arch_type.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\arch_type_test.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)fastcdc\fastcdc_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)manifest\pending_assets_queue.cc" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\mock_config_stream_client.h" />
@@ -62,13 +55,19 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\mock_libfuse.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_indexer\indexer.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_indexer\main.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\ansi_filter.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\ansi_filter_test.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\arch_type.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\arch_type_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\buffer.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\buffer_test.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\client_socket.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\clock.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\dir_iter.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\dir_iter_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\errno_mapping.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\errno_mapping_test.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\fake_socket.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\file_watcher_win.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\file_watcher_win_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\gamelet_component.cc" />
@@ -81,6 +80,8 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)common\path_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\port_manager_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\port_manager_win.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\port_range_parser_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\process_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\process_win.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\remote_util.cc" />
@@ -90,6 +91,8 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)common\sdk_util_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\semaphore.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\semaphore_test.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\server_socket.cc" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)common\socket.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\stats_collector.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\status.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)common\stopwatch.cc" />
@@ -115,10 +118,8 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)data_store\mem_data_store_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\cdc_interface.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\cdc_interface_test.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\fake_socket.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\message_pump.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\base\message_pump_test.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\client_socket.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\file_finder_and_sender.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\file_finder_and_sender_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync\cdc_rsync_client.cc" />
@@ -139,7 +140,6 @@
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_finder_test.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_server\cdc_rsync_server.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_server\main.cc" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_server\server_socket.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)cdc_rsync_server\unzstd_stream.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)manifest\asset_builder.cc" />
     <ClCompile Include="$(MSBuildThisFileDirectory)manifest\content_id.cc" />
@@ -195,9 +195,11 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_fuse_fs\mock_libfuse.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_indexer\indexer.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\buffer.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)common\client_socket.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\clock.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\dir_iter.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\errno_mapping.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)common\fake_socket.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\file_watcher_win.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\gamelet_component.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\grpc_status.h" />
@@ -211,6 +213,8 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)common\scoped_handle_win.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\sdk_util.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\semaphore.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)common\server_socket.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)common\socket.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\stats_collector.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\status.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)common\status_macros.h" />
@@ -230,12 +234,9 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)data_store\grpc_reader.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)data_store\mem_data_store.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\base\cdc_interface.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\base\fake_socket.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\base\message_pump.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\base\server_exit_code.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\base\socket.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\client_file_info.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\client_socket.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\file_finder_and_sender.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\cdc_rsync_client.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync\parallel_file_opener.h" />
@@ -247,7 +248,6 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_finder.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_server\file_info.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_server\cdc_rsync_server.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_server\server_socket.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)cdc_rsync_server\unzstd_stream.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)manifest\asset_builder.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)manifest\content_id.h" />

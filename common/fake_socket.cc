@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cdc_rsync/base/fake_socket.h"
+#include "common/fake_socket.h"
 
 namespace cdc_ft {
 

@@ -21,8 +21,8 @@
 
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
-#include "cdc_rsync/base/socket.h"
 #include "common/buffer.h"
+#include "common/socket.h"
 #include "lib/zstd.h"
 
 namespace cdc_ft {

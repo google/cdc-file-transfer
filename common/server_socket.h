@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef CDC_RSYNC_SERVER_SERVER_SOCKET_H_
-#define CDC_RSYNC_SERVER_SERVER_SOCKET_H_
+#ifndef COMMON_SERVER_SOCKET_H_
+#define COMMON_SERVER_SOCKET_H_
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
-#include "cdc_rsync/base/socket.h"
+#include "common/socket.h"
 
 struct addrinfo;
 

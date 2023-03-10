@@ -17,8 +17,8 @@
 #include <cstdio>
 #include <fstream>
 
-#include "cdc_rsync/base/fake_socket.h"
 #include "cdc_rsync/base/message_pump.h"
+#include "common/fake_socket.h"
 #include "common/log.h"
 #include "common/path.h"
 #include "common/status_test_macros.h"

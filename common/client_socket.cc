@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cdc_rsync/client_socket.h"
+#include "common/client_socket.h"
 
 #include <winsock2.h>
 #include <ws2tcpip.h>

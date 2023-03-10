@@ -19,19 +19,6 @@ cc_library(
 )
 
 cc_library(
-    name = "client_socket",
-    srcs = ["client_socket.cc"],
-    hdrs = ["client_socket.h"],
-    target_compatible_with = ["@platforms//os:windows"],
-    deps = [
-        "//cdc_rsync/base:socket",
-        "//common:log",
-        "//common:status",
-        "//common:util",
-    ],
-)
-
-cc_library(
     name = "file_finder_and_sender",
     srcs = ["file_finder_and_sender.cc"],
     hdrs = ["file_finder_and_sender.h"],
@@ -54,8 +41,8 @@ cc_test(
     data = ["testdata/root.txt"] + glob(["testdata/file_finder_and_sender/**"]),
     deps = [
         ":file_finder_and_sender",
-        "//cdc_rsync/base:fake_socket",
         "//cdc_rsync/protos:messages_cc_proto",
+        "//common:fake_socket",
         "//common:status_test_macros",
         "//common:test_main",
         "@com_google_googletest//:gtest",
@@ -67,15 +54,8 @@ cc_library(
     name = "cdc_rsync_client",
     srcs = ["cdc_rsync_client.cc"],
     hdrs = ["cdc_rsync_client.h"],
-    linkopts = select({
-        "//tools:windows": [
-            "/DEFAULTLIB:Ws2_32.lib",  # Sockets, e.g. recv, send, WSA*.
-        ],
-        "//conditions:default": [],
-    }),
     target_compatible_with = ["@platforms//os:windows"],
     deps = [
-        ":client_socket",
         ":file_finder_and_sender",
         ":parallel_file_opener",
         ":progress_tracker",
@@ -84,8 +64,8 @@ cc_library(
         "//cdc_rsync/base:cdc_interface",
         "//cdc_rsync/base:message_pump",
         "//cdc_rsync/base:server_exit_code",
-        "//cdc_rsync/base:socket",
         "//cdc_rsync/protos:messages_cc_proto",
+        "//common:client_socket",
         "//common:gamelet_component",
         "//common:log",
         "//common:path",
@@ -94,6 +74,7 @@ cc_library(
         "//common:port_manager",
         "//common:process",
         "//common:remote_util",
+        "//common:socket",
         "//common:status",
         "//common:status_macros",
         "//common:threadpool",
@@ -203,8 +184,8 @@ cc_library(
     srcs = ["zstd_stream.cc"],
     hdrs = ["zstd_stream.h"],
     deps = [
-        ":client_socket",
         "//common:buffer",
+        "//common:client_socket",
         "//common:status",
         "//common:status_macros",
         "//common:stopwatch",
@@ -217,8 +198,8 @@ cc_test(
     srcs = ["zstd_stream_test.cc"],
     deps = [
         ":zstd_stream",
-        "//cdc_rsync/base:fake_socket",
         "//cdc_rsync_server:unzstd_stream",
+        "//common:fake_socket",
         "//common:status_test_macros",
         "//common:test_main",
         "@com_github_zstd//:zstd",

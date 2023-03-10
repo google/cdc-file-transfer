@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef CDC_RSYNC_BASE_FAKE_SOCKET_H_
-#define CDC_RSYNC_BASE_FAKE_SOCKET_H_
+#ifndef COMMON_FAKE_SOCKET_H_
+#define COMMON_FAKE_SOCKET_H_
 
 #include <condition_variable>
 #include <mutex>
 
 #include "absl/status/status.h"
-#include "cdc_rsync/base/socket.h"
+#include "common/socket.h"
 
 namespace cdc_ft {
 

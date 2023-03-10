@@ -14,8 +14,8 @@
 
 #include "cdc_rsync/base/message_pump.h"
 
-#include "cdc_rsync/base/fake_socket.h"
 #include "cdc_rsync/protos/messages.pb.h"
+#include "common/fake_socket.h"
 #include "common/log.h"
 #include "common/status.h"
 #include "common/status_test_macros.h"

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CDC_RSYNC_BASE_SOCKET_H_
-#define CDC_RSYNC_BASE_SOCKET_H_
+#ifndef COMMON_SOCKET_H_
+#define COMMON_SOCKET_H_
 
 #include "absl/status/status.h"
 
@@ -56,4 +56,4 @@ class SocketFinalizer {
 
 }  // namespace cdc_ft
 
-#endif  // CDC_RSYNC_BASE_SOCKET_H_
+#endif  // COMMON_SOCKET_H_
