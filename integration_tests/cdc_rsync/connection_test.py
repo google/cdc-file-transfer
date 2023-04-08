@@ -27,37 +27,19 @@ RETURN_CODE_GENERIC_ERROR = 1
 RETURN_CODE_CONNECTION_TIMEOUT = 2
 RETURN_CODE_ADDRESS_IN_USE = 4
 
-FIRST_PORT = 44450
-LAST_PORT = 44459
-
 
 class ConnectionTest(test_base.CdcRsyncTest):
   """cdc_rsync connection test class."""
 
-  def test_valid_instance(self):
-    """Runs rsync with --instance option for a valid id.
-
-       1) Uploads a file with --instance option instead of --ip --port.
-       2) Checks the file exists on the used instance.
-    """
-    utils.create_test_file(self.local_data_path, 1024)
-    res = utils.run_rsync(self.local_data_path, self.remote_base_dir)
-    self._assert_rsync_success(res)
-    self.assertTrue(utils.does_file_exist_remotely(self.remote_data_path))
-
   def test_invalid_instance(self):
-    """Runs rsync with --instance option for an invalid id.
-
-       1) Uploads a file with --instance option for a non-existing id.
-       2) Checks the error message.
-    """
+    """Runs rsync with an invalid host"""
     bad_host = 'bad_host'
 
     utils.create_test_file(self.local_data_path, 1024)
     res = utils.run_rsync(self.local_data_path,
                           bad_host + ":" + self.remote_base_dir)
     self.assertEqual(res.returncode, RETURN_CODE_GENERIC_ERROR)
-    self.assertIn('Failed to find available ports', str(res.stderr))
+    self.assertIn('Failed to detect remote architecture', str(res.stderr))
 
   def test_contimeout(self):
     """Runs rsync with --contimeout option for an invalid ip.
@@ -89,7 +71,7 @@ class ConnectionTest(test_base.CdcRsyncTest):
 
   def test_multiple_instances(self):
     """Runs multiple instances of rsync at the same time."""
-    num_instances = LAST_PORT - FIRST_PORT + 1
+    num_instances = 10
 
     local_data_paths = []
     for n in range(num_instances):
@@ -105,26 +87,6 @@ class ConnectionTest(test_base.CdcRsyncTest):
                             self.remote_base_dir))
       for r in res:
         self._assert_rsync_success(r.result())
-
-  def test_address_in_use(self):
-    """Blocks all ports and checks that rsync fails with the expected error."""
-    sockets = []
-    try:
-      # Occupy all ports.
-      for port in range(FIRST_PORT, LAST_PORT + 1):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sockets.append(s)
-        s.bind(('127.0.0.1', port))
-        s.listen()
-
-      # rsync shouldn't be able to find an available port now.
-      utils.create_test_file(self.local_data_path, 1024)
-      res = utils.run_rsync(self.local_data_path, self.remote_base_dir)
-      self.assertIn('All ports are already in use', str(res.stderr))
-
-    finally:
-      for s in sockets:
-        s.close()
 
 
 if __name__ == '__main__':
