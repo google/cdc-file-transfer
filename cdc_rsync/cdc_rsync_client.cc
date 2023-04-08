@@ -283,10 +283,7 @@ absl::Status CdcRsyncClient::StartServer(const ServerArch& arch) {
   }
 
   // Start up sockets.
-  status = Socket::Initialize();
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to initialize sockets");
-  }
+  RETURN_IF_ERROR(Socket::Initialize(), "Failed to initialize sockets");
   socket_finalizer_ = std::make_unique<SocketFinalizer>();
 
   // Now that we know which port the server is using, set up port forwarding.

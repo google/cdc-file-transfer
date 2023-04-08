@@ -289,10 +289,7 @@ bool CdcRsyncServer::CheckComponents(
 }
 
 absl::Status CdcRsyncServer::Run() {
-  absl::Status status = Socket::Initialize();
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to initialize sockets");
-  }
+  RETURN_IF_ERROR(Socket::Initialize(), "Failed to initialize sockets");
   socket_finalizer_ = std::make_unique<SocketFinalizer>();
 
   socket_ = std::make_unique<ServerSocket>();
@@ -307,10 +304,8 @@ absl::Status CdcRsyncServer::Run() {
   printf("Port %i: Server is listening\n", port);
   fflush(stdout);
 
-  status = socket_->WaitForConnection();
-  if (!status.ok()) {
-    return WrapStatus(status, "Failed to establish a connection");
-  }
+  RETURN_IF_ERROR(socket_->WaitForConnection(),
+                  "Failed to establish a connection");
 
   message_pump_ = std::make_unique<MessagePump>(
       socket_.get(),
@@ -318,7 +313,7 @@ absl::Status CdcRsyncServer::Run() {
   message_pump_->StartMessagePump();
 
   LOG_INFO("Client connected. Starting to sync.");
-  status = Sync();
+  absl::Status status = Sync();
   if (!status.ok()) {
     socket_->ShutdownSendingEnd().IgnoreError();
     return status;
