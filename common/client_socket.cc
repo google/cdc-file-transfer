@@ -14,13 +14,12 @@
 
 #include "common/client_socket.h"
 
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include <cassert>
 
 #include "common/log.h"
+#include "common/socket_internal.h"
 #include "common/status.h"
+#include "common/stopwatch.h"
 #include "common/util.h"
 
 namespace cdc_ft {
@@ -29,9 +28,9 @@ namespace {
 // Creates a status with the given |message| and the last WSA error.
 // Assigns Tag::kSocketEof for WSAECONNRESET errors.
 absl::Status MakeSocketStatus(const char* message) {
-  const int err = WSAGetLastError();
-  absl::Status status = MakeStatus("%s: %s", message, Util::GetWin32Error(err));
-  if (err == WSAECONNRESET) {
+  const int err = GetLastError();
+  absl::Status status = MakeStatus("%s: %s", message, GetErrorStr(err));
+  if (err == kErrConnReset) {
     status = SetTag(status, Tag::kSocketEof);
   }
   return status;
@@ -40,18 +39,39 @@ absl::Status MakeSocketStatus(const char* message) {
 }  // namespace
 
 struct ClientSocketInfo {
-  SOCKET socket;
+  SocketType socket;
 
-  ClientSocketInfo() : socket(INVALID_SOCKET) {}
+  ClientSocketInfo() : socket(kInvalidSocket) {}
 };
 
 ClientSocket::ClientSocket() = default;
 
 ClientSocket::~ClientSocket() { Disconnect(); }
 
+// static
+absl::Status ClientSocket::WaitForConnection(int port, absl::Duration timeout) {
+  assert(port != 0);
+  Stopwatch timeout_timer;
+  ClientSocket socket;
+  for (;;) {
+    absl::Status status = socket.Connect(port);
+    if (status.ok()) {
+      return absl::OkStatus();
+    }
+
+    if (timeout_timer.Elapsed() > timeout) {
+      return SetTag(
+          absl::DeadlineExceededError("Timeout while connecting to server"),
+          Tag::kConnectionTimeout);
+    }
+
+    Util::Sleep(50);
+  }
+}
+
 absl::Status ClientSocket::Connect(int port) {
   addrinfo hints;
-  ZeroMemory(&hints, sizeof(hints));
+  memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_protocol = IPPROTO_TCP;
@@ -63,26 +83,26 @@ absl::Status ClientSocket::Connect(int port) {
   if (result != 0) {
     return MakeStatus("getaddrinfo() failed: %i", result);
   }
+  AddrInfoReleaser releaser(addr_infos);
 
   socket_info_ = std::make_unique<ClientSocketInfo>();
   int count = 0;
   for (addrinfo* curr = addr_infos; curr; curr = curr->ai_next, count++) {
     socket_info_->socket =
         socket(curr->ai_family, curr->ai_socktype, curr->ai_protocol);
-    if (socket_info_->socket == INVALID_SOCKET) {
+    if (socket_info_->socket == kInvalidSocket) {
       LOG_DEBUG("socket() failed for addr_info %i: %s", count,
-                Util::GetWin32Error(WSAGetLastError()));
+                GetLastErrorStr());
       continue;
     }
 
     // Connect to server.
     result = connect(socket_info_->socket, curr->ai_addr,
                      static_cast<int>(curr->ai_addrlen));
-    if (result == SOCKET_ERROR) {
+    if (result == kSocketError) {
       LOG_DEBUG("connect() failed for addr_info %i: %s", count,
-                Util::GetWin32Error(WSAGetLastError()));
-      closesocket(socket_info_->socket);
-      socket_info_->socket = INVALID_SOCKET;
+                GetLastErrorStr());
+      Close(&socket_info_->socket);
       continue;
     }
 
@@ -90,9 +110,7 @@ absl::Status ClientSocket::Connect(int port) {
     break;
   }
 
-  freeaddrinfo(addr_infos);
-
-  if (socket_info_->socket == INVALID_SOCKET) {
+  if (socket_info_->socket == kInvalidSocket) {
     socket_info_.reset();
     return MakeStatus("Unable to connect to port %i", port);
   }
@@ -106,18 +124,15 @@ void ClientSocket::Disconnect() {
     return;
   }
 
-  if (socket_info_->socket != INVALID_SOCKET) {
-    closesocket(socket_info_->socket);
-    socket_info_->socket = INVALID_SOCKET;
-  }
-
+  Close(&socket_info_->socket);
   socket_info_.reset();
 }
 
 absl::Status ClientSocket::Send(const void* buffer, size_t size) {
-  int result = send(socket_info_->socket, static_cast<const char*>(buffer),
-                    static_cast<int>(size), /*flags */ 0);
-  if (result == SOCKET_ERROR) {
+  int result =
+      HANDLE_EINTR(send(socket_info_->socket, static_cast<const char*>(buffer),
+                        static_cast<int>(size), /*flags */ 0));
+  if (result == kSocketError) {
     return MakeSocketStatus("send() failed");
   }
 
@@ -133,9 +148,10 @@ absl::Status ClientSocket::Receive(void* buffer, size_t size,
   }
 
   int flags = allow_partial_read ? 0 : MSG_WAITALL;
-  int bytes_read = recv(socket_info_->socket, static_cast<char*>(buffer),
-                        static_cast<int>(size), flags);
-  if (bytes_read == SOCKET_ERROR) {
+  int bytes_read =
+      HANDLE_EINTR(recv(socket_info_->socket, static_cast<char*>(buffer),
+                        static_cast<int>(size), flags));
+  if (bytes_read == kSocketError) {
     return MakeSocketStatus("recv() failed");
   }
 
@@ -154,9 +170,9 @@ absl::Status ClientSocket::Receive(void* buffer, size_t size,
 }
 
 absl::Status ClientSocket::ShutdownSendingEnd() {
-  int result = shutdown(socket_info_->socket, SD_SEND);
-  if (result == SOCKET_ERROR) {
-    return MakeSocketStatus("shutdown() failed");
+  int result = shutdown(socket_info_->socket, kSendingEnd);
+  if (result == kSocketError) {
+    return MakeStatus("Socket shutdown failed: %s", GetLastErrorStr());
   }
 
   return absl::OkStatus();

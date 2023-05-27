@@ -15,99 +15,10 @@
 #include "common/server_socket.h"
 
 #include "common/log.h"
-#include "common/platform.h"
+#include "common/socket_internal.h"
 #include "common/status.h"
-#include "common/util.h"
-
-#if PLATFORM_WINDOWS
-
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
-#elif PLATFORM_LINUX
-
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-
-#include <cerrno>
-
-#endif
 
 namespace cdc_ft {
-namespace {
-
-#if PLATFORM_WINDOWS
-
-using SocketType = SOCKET;
-using SockAddrType = SOCKADDR;
-constexpr SocketType kInvalidSocket = INVALID_SOCKET;
-constexpr int kSocketError = SOCKET_ERROR;
-constexpr int kSendingEnd = SD_SEND;
-
-constexpr int kErrAgain = WSAEWOULDBLOCK;  // There's no EAGAIN on Windows.
-constexpr int kErrWouldBlock = WSAEWOULDBLOCK;
-constexpr int kErrAddrInUse = WSAEADDRINUSE;
-
-int GetLastError() { return WSAGetLastError(); }
-std::string GetErrorStr(int err) { return Util::GetWin32Error(err); }
-void Close(SocketType* socket) {
-  if (*socket != kInvalidSocket) {
-    closesocket(*socket);
-    *socket = kInvalidSocket;
-  }
-}
-
-// Not necessary on Windows.
-#define HANDLE_EINTR(x) (x)
-
-#elif PLATFORM_LINUX
-
-using SocketType = int;
-using SockAddrType = sockaddr;
-constexpr SocketType kInvalidSocket = -1;
-constexpr int kSocketError = -1;
-constexpr int kSendingEnd = SHUT_WR;
-
-constexpr int kErrAgain = EAGAIN;
-constexpr int kErrWouldBlock = EWOULDBLOCK;
-constexpr int kErrAddrInUse = EADDRINUSE;
-
-int GetLastError() { return errno; }
-std::string GetErrorStr(int err) { return strerror(err); }
-void Close(SocketType* socket) {
-  if (*socket != kInvalidSocket) {
-    close(*socket);
-    *socket = kInvalidSocket;
-  }
-}
-
-// Keep re-evaluating the expression |x| while it returns EINTR.
-#define HANDLE_EINTR(x)                                     \
-  ({                                                        \
-    decltype(x) eintr_wrapper_result;                       \
-    do {                                                    \
-      eintr_wrapper_result = (x);                           \
-    } while (eintr_wrapper_result == -1 && errno == EINTR); \
-    eintr_wrapper_result;                                   \
-  })
-
-#endif
-
-std::string GetLastErrorStr() { return GetErrorStr(GetLastError()); }
-
-class AddrInfoReleaser {
- public:
-  AddrInfoReleaser(addrinfo* addr_infos) : addr_infos_(addr_infos) {}
-  ~AddrInfoReleaser() { freeaddrinfo(addr_infos_); }
-
- private:
-  addrinfo* addr_infos_;
-};
-
-}  // namespace
 
 struct ServerSocketInfo {
   // Listening socket file descriptor (where new connections are accepted).
