@@ -16,7 +16,6 @@
 
 #include "cdc_stream/cdc_fuse_manager.h"
 #include "common/log.h"
-#include "common/port_manager.h"
 #include "common/status.h"
 #include "common/status_macros.h"
 #include "metrics/enums.h"

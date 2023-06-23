@@ -48,13 +48,6 @@ class BaseCommand {
   std::function<void(const std::string&)> JedecParser(const char* flag_name,
                                                       uint64_t* bytes);
 
-  // Parser for single ports "123" or port ranges "123-234". Usage:
-  //   lyra::opt(PortRangeParser("port-flag", &first, &last), "port"))
-  // Automatically reports a parse failure on error.
-  std::function<void(const std::string&)> PortRangeParser(const char* flag_name,
-                                                          uint16_t* first,
-                                                          uint16_t* last);
-
   // Validator that should be used for all positional arguments. Lyra interprets
   // -u, --unknown_flag as positional argument. This validator makes sure that
   // a positional argument starting with - is reported as an error. Otherwise,

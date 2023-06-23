@@ -24,7 +24,6 @@ cc_library(
     hdrs = ["base_command.h"],
     deps = [
         "//absl_helper:jedec_size_flag",
-        "//common:port_range_parser",
         "@com_github_lyra//:lyra",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
@@ -210,7 +209,6 @@ cc_library(
         "//common:log",
         "//common:path",
         "//common:path_filter",
-        "//common:port_manager",
         "//common:process",
         "//common:remote_util",
         "//common:sdk_util",

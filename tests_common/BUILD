@@ -31,8 +31,6 @@ cc_binary(
         "//common:path",
         "//common:path_filter",
         "//common:platform",
-        "//common:port_manager",
-        "//common:port_range_parser",
         "//common:process",
         "//common:remote_util",
         "//common:sdk_util",

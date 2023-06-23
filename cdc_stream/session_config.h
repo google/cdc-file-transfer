@@ -59,8 +59,7 @@ struct SessionConfig {
 
   // Ports used for local port forwarding. Deprecated as forward ports are
   // determined automatically now using ephemeral ports.
-  uint16_t deprecated_forward_port_first = 0;
-  uint16_t deprecated_forward_port_last = 0;
+  std::string deprecated_forward_port_range;
 };
 
 }  // namespace cdc_ft
