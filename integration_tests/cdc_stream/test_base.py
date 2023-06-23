@@ -129,17 +129,17 @@ class CdcStreamTest(unittest.TestCase):
                            utils.target(self.remote_base_dir),
                            self.service_port_arg)
     self._assert_stream_success(res)
+    CdcStreamTest.service_running = True
 
   def _stop(self, ignore_not_found=False):
     """Stops streaming to the target
 
     Args:
-        local_dir (string): Directory to stream. Defaults to local_base_dir.
+        ignore_not_found (bool): True to ignore if there's nothing to stop.
     """
-    if not self.service_running:
+    if not CdcStreamTest.service_running:
       return
-    res = utils.run_stream('stop', utils.target(self.remote_base_dir),
-                           self.service_port_arg)
+    res = utils.run_stream('stop', '*', self.service_port_arg)
     if ignore_not_found and res.returncode == self.NOT_FOUND:
       return
     self._assert_stream_success(res)

@@ -36,6 +36,24 @@ constexpr char kRemoteToolsBinDir[] = ".cache/cdc-file-transfer/bin/";
 // Cache directory on the gamelet to store data chunks.
 constexpr char kCacheDir[] = "~/.cache/cdc-file-transfer/chunks";
 
+// Parses the port from the FUSE stdout when FUSE is up-to-date. In that case,
+// the expected stdout is similar to "Port 12345 cdc_fuse_fs is up-to-date".
+absl::StatusOr<int> ParsePort(const std::string& fuse_stdout) {
+  // Search backwards until we find "Port ".
+  size_t port_pos = fuse_stdout.find(kFusePortPrefix);
+  if (port_pos == std::string::npos) {
+    return MakeStatus("Failed to find '%s' marker in server output '%s'",
+                      kFusePortPrefix, fuse_stdout);
+  }
+  int port =
+      atoi(fuse_stdout.substr(port_pos + strlen(kFusePortPrefix)).c_str());
+  if (port == 0) {
+    return MakeStatus("Failed to parse port from server output '%s'",
+                      fuse_stdout);
+  }
+  return port;
+}
+
 }  // namespace
 
 CdcFuseManager::CdcFuseManager(std::string instance,
@@ -79,10 +97,10 @@ absl::Status CdcFuseManager::Deploy() {
 }
 
 absl::Status CdcFuseManager::Start(const std::string& mount_dir,
-                                   uint16_t local_port, uint16_t remote_port,
-                                   int verbosity, bool debug,
-                                   bool singlethreaded, bool enable_stats,
-                                   bool check, uint64_t cache_capacity,
+                                   uint16_t local_port, int verbosity,
+                                   bool debug, bool singlethreaded,
+                                   bool enable_stats, bool check,
+                                   uint64_t cache_capacity,
                                    uint32_t cleanup_timeout_sec,
                                    uint32_t access_idle_timeout_sec) {
   assert(!fuse_process_);
@@ -109,70 +127,109 @@ absl::Status CdcFuseManager::Start(const std::string& mount_dir,
   std::string remote_command = absl::StrFormat(
       "LD_LIBRARY_PATH=%s %s "
       "--instance=%s "
-      "--components=%s --port=%i --cache_dir=%s "
+      "--components=%s --cache_dir=%s "
       "--verbosity=%i --cleanup_timeout=%i --access_idle_timeout=%i --stats=%i "
       "--check=%i --cache_capacity=%u -- -o allow_root -o ro -o nonempty -o "
       "auto_unmount %s%s%s",
       kRemoteToolsBinDir, remotePath, RemoteUtil::QuoteForSsh(instance_),
-      RemoteUtil::QuoteForSsh(component_args), remote_port, kCacheDir,
-      verbosity, cleanup_timeout_sec, access_idle_timeout_sec, enable_stats,
-      check, cache_capacity, debug ? "-d " : "", singlethreaded ? "-s " : "",
+      RemoteUtil::QuoteForSsh(component_args), kCacheDir, verbosity,
+      cleanup_timeout_sec, access_idle_timeout_sec, enable_stats, check,
+      cache_capacity, debug ? "-d " : "", singlethreaded ? "-s " : "",
       RemoteUtil::QuoteForSsh(mount_dir));
 
   bool needs_deploy = false;
-  RETURN_IF_ERROR(
-      RunFuseProcess(local_port, remote_port, remote_command, &needs_deploy));
+  int remote_port;
+  ASSIGN_OR_RETURN(remote_port, RunFuseProcess(remote_command, &needs_deploy));
   if (needs_deploy) {
     // Deploy and try again.
     RETURN_IF_ERROR(Deploy());
-    RETURN_IF_ERROR(
-        RunFuseProcess(local_port, remote_port, remote_command, &needs_deploy));
+    ASSIGN_OR_RETURN(remote_port,
+                     RunFuseProcess(remote_command, &needs_deploy));
   }
+
+  // Start port forwarding.
+  RETURN_IF_ERROR(RunPortForwardingProcess(local_port, remote_port));
+
+  // Wait until port forwarding is up and FUSE can connect to |remote_port|.
+  RETURN_IF_ERROR(WaitForFuseConnected());
 
   return absl::OkStatus();
 }
 
-absl::Status CdcFuseManager::RunFuseProcess(uint16_t local_port,
-                                            uint16_t remote_port,
-                                            const std::string& remote_command,
-                                            bool* needs_deploy) {
+absl::StatusOr<int> CdcFuseManager::RunFuseProcess(
+    const std::string& remote_command, bool* needs_deploy) {
   assert(!fuse_process_);
   assert(needs_deploy);
   *needs_deploy = false;
 
   LOG_DEBUG("Running FUSE process");
-  ProcessStartInfo start_info =
-      remote_util_->BuildProcessStartInfoForSshPortForwardAndCommand(
-          local_port, remote_port, true, remote_command,
-          ArchType::kLinux_x86_64);
+  ProcessStartInfo start_info = remote_util_->BuildProcessStartInfoForSsh(
+      remote_command, ArchType::kLinux_x86_64);
   start_info.name = kFuseFilename;
 
   // Capture stdout to determine whether a deploy is required.
   fuse_stdout_.clear();
-  fuse_startup_finished_ = false;
-  start_info.stdout_handler = [this, needs_deploy](const char* data,
-                                                   size_t size) {
-    return HandleFuseStdout(data, size, needs_deploy);
+  fuse_port_ = 0;
+  fuse_not_up_to_date_ = false;
+  fuse_update_check_finished_ = false;
+  fuse_connected_ = false;
+  start_info.stdout_handler = [this](const char* data, size_t size) {
+    return HandleFuseStdout(data, size);
   };
   fuse_process_ = process_factory_->Create(start_info);
   RETURN_IF_ERROR(fuse_process_->Start(), "Failed to start FUSE process");
   LOG_DEBUG("FUSE process started. Waiting for startup to finish.");
 
   // Run until process exits or startup finishes.
-  auto startup_finished = [this]() { return fuse_startup_finished_.load(); };
-  RETURN_IF_ERROR(fuse_process_->RunUntil(startup_finished),
+  RETURN_IF_ERROR(fuse_process_->RunUntil(
+                      [this]() { return fuse_update_check_finished_.load(); }),
                   "Failed to run FUSE process");
-  LOG_DEBUG("FUSE process startup complete.");
+  LOG_DEBUG("FUSE process update check complete.");
 
   // If the FUSE process exited before it could perform its up-to-date check, it
   // most likely happens because the binary does not exist and needs to be
   // deployed.
-  *needs_deploy |= !fuse_startup_finished_ && fuse_process_->HasExited() &&
-                   fuse_process_->ExitCode() != 0;
+  *needs_deploy = fuse_not_up_to_date_ ||
+                  (!fuse_update_check_finished_ && fuse_process_->HasExited() &&
+                   fuse_process_->ExitCode() != 0);
   if (*needs_deploy) {
     LOG_DEBUG("FUSE needs to be (re-)deployed.");
     fuse_process_.reset();
-    return absl::OkStatus();
+  }
+
+  return fuse_port_;
+}
+
+absl::Status CdcFuseManager::RunPortForwardingProcess(int local_port,
+                                                      int remote_port) {
+  assert(fuse_process_);
+  assert(!forwarding_process_);
+
+  LOG_DEBUG(
+      "Running reverse port forwarding process, local port %i, remote port %i",
+      local_port, remote_port);
+  ProcessStartInfo start_info =
+      remote_util_->BuildProcessStartInfoForSshPortForward(
+          local_port, remote_port, /*reverse=*/true);
+  forwarding_process_ = process_factory_->Create(start_info);
+  RETURN_IF_ERROR(forwarding_process_->Start(),
+                  "Failed to start port forwarding process");
+
+  return absl::OkStatus();
+}
+
+absl::Status CdcFuseManager::WaitForFuseConnected() {
+  assert(fuse_process_);
+  assert(forwarding_process_);
+
+  RETURN_IF_ERROR(
+      fuse_process_->RunUntil([this]() { return fuse_connected_.load(); }),
+      "Failed to run FUSE process");
+  LOG_DEBUG("FUSE process connected.");
+
+  if (!fuse_connected_ && fuse_process_->HasExited()) {
+    return MakeStatus("FUSE exited during startup with code %u",
+                      fuse_process_->ExitCode());
   }
 
   return absl::OkStatus();
@@ -183,30 +240,37 @@ absl::Status CdcFuseManager::Stop() {
     return absl::OkStatus();
   }
 
-  LOG_DEBUG("Terminating FUSE process");
+  LOG_DEBUG("Terminating FUSE and port forwarding processes");
   absl::Status status = fuse_process_->Terminate();
+  status.Update(forwarding_process_->Terminate());
   fuse_process_.reset();
+  forwarding_process_.reset();
   return status;
 }
 
 bool CdcFuseManager::IsHealthy() const {
-  return fuse_process_ && !fuse_process_->HasExited();
+  return fuse_process_ && !fuse_process_->HasExited() && forwarding_process_ &&
+         !forwarding_process_->HasExited();
 }
 
-absl::Status CdcFuseManager::HandleFuseStdout(const char* data, size_t size,
-                                              bool* needs_deploy) {
-  assert(needs_deploy);
-
+absl::Status CdcFuseManager::HandleFuseStdout(const char* data, size_t size) {
   // Don't capture stdout beyond startup.
-  if (!fuse_startup_finished_) {
+  if (!fuse_connected_) {
     fuse_stdout_.append(data, size);
-    // The gamelet component prints some magic strings to stdout to indicate
+
+    // The remote component prints some magic strings to stdout to indicate
     // whether it's up-to-date.
     if (absl::StrContains(fuse_stdout_, kFuseUpToDate)) {
-      fuse_startup_finished_ = true;
+      ASSIGN_OR_RETURN(fuse_port_, ParsePort(fuse_stdout_));
+      fuse_update_check_finished_ = true;
     } else if (absl::StrContains(fuse_stdout_, kFuseNotUpToDate)) {
-      fuse_startup_finished_ = true;
-      *needs_deploy = true;
+      fuse_not_up_to_date_ = true;
+      fuse_update_check_finished_ = true;
+    }
+
+    // It also prints stuff when it can connect to its port.
+    if (absl::StrContains(fuse_stdout_, kFuseConnected)) {
+      fuse_connected_ = true;
     }
   }
 

@@ -19,14 +19,21 @@
 
 namespace cdc_ft {
 
-// FUSE prints this to stdout when the binary timestamp and file size match the
-// file on the workstation.
-static constexpr char kFuseUpToDate[] = "cdc_fuse_fs is up-to-date";
+// FUSE prints
+//   Port 12345 cdc_fuse_fs is up-to-date
+// to stdout when its version matches the version (=build version or
+// size/timestamp for DEV builds) on the local device. The port is the gRPC port
+// that FUSE will try to connect to.
+static constexpr char kFusePortPrefix[] = "Port ";
+static constexpr char kFuseUpToDate[] = " cdc_fuse_fs is up-to-date";
 
-// FUSE prints this to stdout when the binary timestamp or file size does not
-// match the file on the workstation. It indicates that the binary has to be
-// redeployed.
+// FUSE prints this to stdout when its version does not match the version on the
+// local device. It indicates that the binary has to be redeployed.
 static constexpr char kFuseNotUpToDate[] = "cdc_fuse_fs is not up-to-date";
+
+// FUSE prints this to stdout when it can connect to its port. This means that
+// port forwarding has finished setting up, and startup is finished.
+static constexpr char kFuseConnected[] = "cdc_fuse_fs is connected";
 
 }  // namespace cdc_ft
 

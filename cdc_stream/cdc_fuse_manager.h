@@ -18,6 +18,7 @@
 #define CDC_STREAM_CDC_FUSE_MANAGER_H_
 
 #include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "common/remote_util.h"
 
 namespace cdc_ft {
@@ -26,7 +27,7 @@ class Process;
 class ProcessFactory;
 class RemoteUtil;
 
-// Manages the gamelet-side CDC FUSE filesystem process.
+// Manages the remote CDC FUSE filesystem process.
 class CdcFuseManager {
  public:
   CdcFuseManager(std::string instance, ProcessFactory* process_factory,
@@ -36,11 +37,10 @@ class CdcFuseManager {
   CdcFuseManager(CdcFuseManager&) = delete;
   CdcFuseManager& operator=(CdcFuseManager&) = delete;
 
-  // Starts the CDC FUSE and establishes a reverse SSH tunnel from the gamelet's
-  // |remote_port| to the workstation's |local_port|. Deploys the binary if
-  // necessary.
+  // Starts the remote CDC FUSE process. Deploys the binary if necessary.
   //
   // |mount_dir| is the remote directory where to mount the FUSE.
+  // |local_port| is the local port used for gRPC connections to the FUSE.
   // |verbosity| is the log verbosity used by the filesystem.
   // |debug| puts the filesystem into debug mode if set to true. This also
   // causes the process to run in the foreground, so that logs are piped through
@@ -53,9 +53,9 @@ class CdcFuseManager {
   // |access_idle_timeout_sec| defines the number of seconds after which data
   // provider is considered to be access-idling.
   absl::Status Start(const std::string& mount_dir, uint16_t local_port,
-                     uint16_t remote_port, int verbosity, bool debug,
-                     bool singlethreaded, bool enable_stats, bool check,
-                     uint64_t cache_capacity, uint32_t cleanup_timeout_sec,
+                     int verbosity, bool debug, bool singlethreaded,
+                     bool enable_stats, bool check, uint64_t cache_capacity,
+                     uint32_t cleanup_timeout_sec,
                      uint32_t access_idle_timeout_sec);
 
   // Stops the CDC FUSE.
@@ -65,33 +65,49 @@ class CdcFuseManager {
   bool IsHealthy() const;
 
  private:
-  // Runs the FUSE process on the gamelet from the given |remote_command| and
-  // establishes a reverse SSH tunnel from the gamelet's |remote_port| to the
-  // workstation's |local_port|.
+  // Runs the remote FUSE process from the given |remote_command|. Returns the
+  // remote port that the FUSE will connect to, once the port forwarding process
+  // is up.
   //
   // If the FUSE is not up-to-date or does not exist, sets |needs_deploy| to
   // true and returns OK. In that case, Deploy() needs to be called and the FUSE
   // process should be run again.
-  absl::Status RunFuseProcess(uint16_t local_port, uint16_t remote_port,
-                              const std::string& remote_command,
-                              bool* needs_deploy);
+  absl::StatusOr<int> RunFuseProcess(const std::string& remote_command,
+                                     bool* needs_deploy);
 
-  // Deploys the gamelet components.
+  // Establishes a reverse SSH tunnel from |remote_port| to |local_port|.
+  absl::Status RunPortForwardingProcess(int local_port, int remote_port);
+
+  // Waits until FUSE can connect to its port. This essentially means that
+  // port forwarding is up and running.
+  absl::Status WaitForFuseConnected();
+
+  // Deploys the remote components.
   absl::Status Deploy();
 
-  // Output handler for FUSE's stdout. Sets |needs_deploy| to true if the output
-  // contains a magic marker to indicate that the binary has to be redeployed.
-  // Called in a background thread.
-  absl::Status HandleFuseStdout(const char* data, size_t size,
-                                bool* needs_deploy);
+  // Output handler for FUSE's stdout.
+  // Sets |fuse_not_up_to_date_| to true if the output contains a magic marker
+  // to indicate that the binary has to be redeployed.
+  // Sets |fuse_port_| to the remote gRPC port if the output contains a magic
+  // marker that has the port and indicates that the binary is up-to-date.
+  // Sets |fuse_update_check_finished_| to true if any of the above two markers
+  // was set. Called in a background thread.
+  // Sets |fuse_startup_finished_| to true if FUSE is connected to its port.
+  absl::Status HandleFuseStdout(const char* data, size_t size);
 
   std::string instance_;
   ProcessFactory* const process_factory_;
   RemoteUtil* const remote_util_;
 
   std::unique_ptr<Process> fuse_process_;
+  std::unique_ptr<Process> forwarding_process_;
   std::string fuse_stdout_;
-  std::atomic<bool> fuse_startup_finished_{false};
+
+  // Set by HandleFuseStdout
+  int fuse_port_ = 0;
+  bool fuse_not_up_to_date_ = false;
+  std::atomic_bool fuse_update_check_finished_{false};
+  std::atomic_bool fuse_connected_{false};
 };
 
 }  // namespace cdc_ft

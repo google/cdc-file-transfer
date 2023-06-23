@@ -21,9 +21,11 @@
 #include "cdc_fuse_fs/cdc_fuse_fs.h"
 #include "cdc_fuse_fs/config_stream_client.h"
 #include "cdc_fuse_fs/constants.h"
+#include "common/client_socket.h"
 #include "common/gamelet_component.h"
 #include "common/log.h"
 #include "common/path.h"
+#include "common/server_socket.h"
 #include "data_store/data_provider.h"
 #include "data_store/disk_data_store.h"
 #include "data_store/grpc_reader.h"
@@ -36,6 +38,8 @@ namespace {
 
 constexpr char kFuseFilename[] = "cdc_fuse_fs";
 constexpr char kLibFuseFilename[] = "libfuse.so";
+
+constexpr absl::Duration kConnectionTimeout = absl::Seconds(60);
 
 bool IsUpToDate(const std::string& components_arg) {
   // Components are expected to reside in the same dir as the executable.
@@ -107,7 +111,6 @@ ABSL_FLAG(
     "Whitespace-separated triples filename, size and timestamp of the "
     "workstation version of this binary and dependencies. Used for a fast "
     "up-to-date check.");
-ABSL_FLAG(uint16_t, port, 0, "Port to connect to on localhost");
 ABSL_FLAG(cdc_ft::JedecSize, prefetch_size, cdc_ft::JedecSize(512 << 10),
           "Additional data to request from the server when a FUSE read of "
           "maximum size is detected. This amount is added to the original "
@@ -138,7 +141,6 @@ int main(int argc, char* argv[]) {
   std::vector<char*> mount_args = absl::ParseCommandLine(argc, argv);
   std::string instance = absl::GetFlag(FLAGS_instance);
   std::string components = absl::GetFlag(FLAGS_components);
-  uint16_t port = absl::GetFlag(FLAGS_port);
   std::string cache_dir = absl::GetFlag(FLAGS_cache_dir);
   int cache_dir_levels = absl::GetFlag(FLAGS_cache_dir_levels);
   int verbosity = absl::GetFlag(FLAGS_verbosity);
@@ -159,7 +161,18 @@ int main(int argc, char* argv[]) {
     printf("%s\n", cdc_ft::kFuseNotUpToDate);
     return 0;
   }
-  printf("%s\n", cdc_ft::kFuseUpToDate);
+
+  // Find an available port.
+  absl::StatusOr<int> port_or = cdc_ft::ServerSocket::FindAvailablePort();
+  if (!port_or.ok()) {
+    LOG_ERROR("Failed to find available port: %s\n",
+              port_or.status().ToString());
+    return 1;
+  }
+  int port = *port_or;
+
+  // Write marker for the server.
+  printf("%s%i%s\n", cdc_ft::kFusePortPrefix, port, cdc_ft::kFuseUpToDate);
   fflush(stdout);
 
   // Create mount dir if it doesn't exist yet.
@@ -188,6 +201,18 @@ int main(int argc, char* argv[]) {
   LOG_INFO("Setting cache capacity to '%u'", cache_capacity);
   store.value()->SetCapacity(cache_capacity);
   LOG_INFO("Caching chunks in '%s'", store.value()->RootDir());
+
+  // Wait for port forwarding to listen to |port|.
+  status =
+      cdc_ft::ClientSocket::WaitForConnection(port, cdc_ft::kConnectionTimeout);
+  if (!status.ok()) {
+    LOG_ERROR("Failed to connect to port %i: %s", port, status.ToString());
+    return static_cast<int>(status.code());
+  }
+
+  // Write another marker for the server.
+  printf("%s\n", cdc_ft::kFuseConnected);
+  fflush(stdout);
 
   // Start a gRpc client.
   std::string client_address = absl::StrFormat("localhost:%u", port);

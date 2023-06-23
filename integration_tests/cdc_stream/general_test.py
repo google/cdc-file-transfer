@@ -109,12 +109,14 @@ class GeneralTest(test_base.CdcStreamTest):
     self._test_dir_content(files=[], dirs=[])
     self.assertGreater(self._get_cache_size_in_bytes(), cache_size)
 
+  def test_rename_file(self):
     filename = 'file1.txt'
     file_local_path = os.path.join(self.local_base_dir, filename)
     utils.create_test_file(file_local_path, 1024)
     self._start()
     self._test_dir_content(files=[filename], dirs=[])
     cache_size = self._get_cache_size_in_bytes()
+    original = utils.get_ssh_command_output(self.ls_cmd)
 
     # After a file is renamed, the manifest is updated.
     renamed_filename = 'file2.txt'
