@@ -302,14 +302,84 @@ Note the small `-p` for `ssh.exe` and the capital `-P` for `sftp.exe`.
 
 #### Google Specific
 
-For Google internal usage, set the following environment variables to enable SSH
-authentication using a Google security key:
+For Google internal usage, there are two setups, a simple one that requires
+touching the security key for every remote access, and a slightly more complex
+one that tunnels all remote access through an SSH tunnel and only requires one
+security key touch to set up the tunnel.
+
+##### Setup Requiring Security Key Touches
+
+Set the following environment variables to enable SSH authentication using a
+Google security key:
 ```
 set CDC_SSH_COMMAND=C:\gnubby\bin\ssh.exe
 set CDC_SFTP_COMMAND=C:\gnubby\bin\sftp.exe
 ```
 Note that you will have to touch the security key multiple times during the
-first run. Subsequent runs only require a single touch.
+first run of each tool as the Linux components have to be deployed first.
+Subsequent runs only require a single touch.
+
+##### Setup Not Requiring Security Key Touches
+
+This section explains how to run the tools without security key touch for every
+action.
+
+On Linux, generate a host key pair with
+```
+mkdir ~/sshd_runner
+ssh-keygen -f ~/sshd_runner/ssh_host_ed25519_key -N '' -t ed25519
+```
+
+On Windows, create `%USERPROFILE%\sshd_runner\known_hosts` and copy the public
+key from `~/sshd_runner/ssh_host_ed25519_key.pub` to it, using `localhost` and
+port `50000` (if the port is in use, use another port). The file should look
+similar to
+```
+[localhost]:50000 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOR1EInlod0Pm853Ew0p4eXaD3V8y9njf6EoyaPfc8ln	
+```
+
+Next, generate an auth key for the Windows machine with
+```
+ssh-keygen -f %USERPROFILE%\sshd_runner\id_ed25519 -N "" -t ed25519
+```
+Note the subtle difference `-N ''` vs `-N ""`.
+
+On Linux, create `~/sshd_runner/authorized_keys` and copy the public key from
+`%USERPROFILE%\sshd_runner\id_ed25519.pub` to it. The file should look similar
+to
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKleiT/yRhZ9aMutOJ8XaAYX0SPUZHuS50HP4QK5kBft google\user@user-w
+```
+On Windows, open an SSH tunnel to the Linux machine through port 50000.
+This should require one gnubby touch.
+```
+C:\gnubby\bin\ssh.exe -N -L50000:localhost:50000 <user>.<location>.corp.google.com
+```
+On Linux, run the SSH server with
+```
+/usr/sbin/sshd -D -p 50000 -oHostKey=~/sshd_runner/ssh_host_ed25519_key -oAuthorizedKeysFile=~/sshd_runner/authorized_keys -oListenAddress=localhost:50000
+```
+It runs as user, not as root, and only accepts connections from localhost
+through port 50000, so it's secure.
+
+Now you should be able to run SSH on the Windows machine into the Linux device
+without security key touch
+```
+C:\Windows\System32\OpenSSH\ssh.exe -p 50000 -i %USERPROFILE%\sshd_runner\id_ed25519 -oUserKnownHostsFile=%USERPROFILE%\sshd_runner\known_hosts user@localhost
+```
+Next, set `CDC_SSH_COMMAND` and `CDC_SCP_COMMAND` to use the proper flags
+```
+set CDC_SSH_COMMAND=C:\Windows\System32\OpenSSH\ssh.exe -i %USERPROFILE%\sshd_runner\id_ed25519 -oUserKnownHostsFile=%USERPROFILE%\sshd_runner\known_hosts -p 50000
+set CDC_SCP_COMMAND=C:\Windows\System32\OpenSSH\scp.exe -i %USERPROFILE%\sshd_runner\id_ed25519 -oUserKnownHostsFile=%USERPROFILE%\sshd_runner\known_hosts -P 50000
+```
+Note the small `-p` for SSH and the capital `-P` for SCP.
+
+Now the file transfer tools should work without security key touch, but be sure
+to use `localhost` as target host as we're piping the data through the tunnel.
+```
+cdc_rsync C:\assets\* user@localhost:~/assets -vr
+cdc_stream start C:\assets user@localhost:~/assets
+```
 
 ### CDC RSync
 
